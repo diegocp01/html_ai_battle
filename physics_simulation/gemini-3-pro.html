@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Sand Simulation</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #eee;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        h1 { margin-bottom: 10px; font-size: 1.5rem; }
+        p { margin-top: 0; color: #aaa; font-size: 0.9rem; margin-bottom: 20px;}
+
+        /* The Canvas */
+        canvas {
+            border: 2px solid #555;
+            background-color: #000;
+            image-rendering: pixelated; /* Keeps the pixel art look crisp */
+            cursor: crosshair;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Controls */
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+
+        button:active { transform: scale(0.95); }
+
+        /* Button Colors to match particles */
+        .btn-sand { background-color: #f6d7b0; color: #333; }
+        .btn-water { background-color: #4fa4f4; color: #fff; }
+        .btn-stone { background-color: #808080; color: #fff; }
+        .btn-void { background-color: #000; color: #fff; border: 1px solid #555; }
+        .btn-clear { background-color: #d32f2f; color: #fff; margin-left: 10px;}
+
+        button.active {
+            outline: 3px solid #fff;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Falling Sand Simulator</h1>
+    <p>Select a material and drag across the canvas.</p>
+    
+    <canvas id="sandCanvas" width="100" height="100" style="width: 500px; height: 500px;"></canvas>
+
+    <div class="controls">
+        <button class="btn-sand active" onclick="setMaterial(1, this)">Sand</button>
+        <button class="btn-water" onclick="setMaterial(2, this)">Water</button>
+        <button class="btn-stone" onclick="setMaterial(3, this)">Stone</button>
+        <button class="btn-void" onclick="setMaterial(0, this)">Void (Eraser)</button>
+        <button class="btn-clear" onclick="clearGrid()">Clear All</button>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const canvas = document.getElementById('sandCanvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // Particle IDs
+        const EMPTY = 0;
+        const SAND = 1;
+        const WATER = 2;
+        const STONE = 3;
+
+        // Colors map
+        const colors = {
+            [EMPTY]: '#000000',
+            [SAND]:  '#f6d7b0', // Sandy Yellow
+            [WATER]: '#4fa4f4', // Fluid Blue
+            [STONE]: '#808080'  // Rigid Grey
+        };
+
+        // Current selected material
+        let currentMaterial = SAND;
+        let isMouseDown = false;
+        
+        // The Grid: A 1D array representing 2D space (y * width + x)
+        let grid = new Array(width * height).fill(EMPTY);
+
+        // --- INPUT HANDLING ---
+        
+        // UI Selection
+        function setMaterial(mat, btnElement) {
+            currentMaterial = mat;
+            // Update active button state
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+        }
+
+        function clearGrid() {
+            grid.fill(EMPTY);
+        }
+
+        // Mouse Events
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: Math.floor((evt.clientX - rect.left) * scaleX),
+                y: Math.floor((evt.clientY - rect.top) * scaleY)
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => { isMouseDown = true; paint(e); });
+        window.addEventListener('mouseup', () => { isMouseDown = false; });
+        canvas.addEventListener('mousemove', (e) => { if(isMouseDown) paint(e); });
+
+        // Paint particles onto the grid (Brush size: 3x3 approx)
+        function paint(e) {
+            const pos = getMousePos(e);
+            const brushRadius = currentMaterial === STONE ? 1 : 2; // Stone draws finer lines
+            
+            for (let y = -brushRadius; y <= brushRadius; y++) {
+                for (let x = -brushRadius; x <= brushRadius; x++) {
+                    if (Math.random() > 0.5 || currentMaterial === STONE || currentMaterial === EMPTY) { // Add noise to sand/water
+                        const px = pos.x + x;
+                        const py = pos.y + y;
+                        if (px >= 0 && px < width && py >= 0 && py < height) {
+                            grid[py * width + px] = currentMaterial;
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- PHYSICS ENGINE ---
+
+        function update() {
+            // We iterate from the bottom up to prevent particles from "teleporting"
+            // instantly to the floor in a single frame.
+            for (let y = height - 1; y >= 0; y--) {
+                // We iterate x randomly or bi-directionally to prevent bias (particles leaning left)
+                // Here we iterate normally but check random sides for movement
+                for (let x = 0; x < width; x++) {
+                    const idx = y * width + x;
+                    const type = grid[idx];
+
+                    // Skip empty or static particles
+                    if (type === EMPTY) continue;
+
+                    // If it's at the very bottom, it stays there
+                    if (y === height - 1) continue;
+
+                    const belowIdx = (y + 1) * width + x;
+                    
+                    // --- STONE LOGIC ---
+                    // Falls down. If it hits something, it stops. Rigid.
+                    if (type === STONE) {
+                        if (grid[belowIdx] === EMPTY) {
+                            grid[belowIdx] = STONE;
+                            grid[idx] = EMPTY;
+                        } else if (grid[belowIdx] === WATER) {
+                             // Stone is heavier than water, sink through it
+                            grid[belowIdx] = STONE;
+                            grid[idx] = WATER;
+                        }
+                        continue; 
+                    }
+
+                    // --- SAND LOGIC ---
+                    // Falls down, or slides down-left/down-right
+                    if (type === SAND) {
+                        if (grid[belowIdx] === EMPTY) {
+                            // Fall straight down
+                            grid[belowIdx] = SAND;
+                            grid[idx] = EMPTY;
+                        } else if (grid[belowIdx] === WATER) {
+                             // Sand sinks in water
+                            grid[belowIdx] = SAND;
+                            grid[idx] = WATER;
+                        } else {
+                            // Check Diagonals
+                            const left = x > 0;
+                            const right = x < width - 1;
+                            const belowLeftIdx = (y + 1) * width + (x - 1);
+                            const belowRightIdx = (y + 1) * width + (x + 1);
+
+                            // Randomize direction to avoid stacking bias
+                            const dir = Math.random() < 0.5 ? 1 : -1;
+                            
+                            if (dir === 1 && left && grid[belowLeftIdx] === EMPTY) {
+                                grid[belowLeftIdx] = SAND;
+                                grid[idx] = EMPTY;
+                            } else if (dir === -1 && right && grid[belowRightIdx] === EMPTY) {
+                                grid[belowRightIdx] = SAND;
+                                grid[idx] = EMPTY;
+                            } else if (left && grid[belowLeftIdx] === EMPTY) {
+                                // Fallback if random dir failed but other side is open
+                                grid[belowLeftIdx] = SAND;
+                                grid[idx] = EMPTY;
+                            } else if (right && grid[belowRightIdx] === EMPTY) {
+                                // Fallback
+                                grid[belowRightIdx] = SAND;
+                                grid[idx] = EMPTY;
+                            }
+                        }
+                    }
+
+                    // --- WATER LOGIC ---
+                    // Falls down, or moves horizontally
+                    if (type === WATER) {
+                        if (grid[belowIdx] === EMPTY) {
+                            grid[belowIdx] = WATER;
+                            grid[idx] = EMPTY;
+                        } else {
+                            // Can't move down? Try moving left or right
+                            const dir = Math.random() < 0.5 ? 1 : -1;
+                            const leftIdx = y * width + (x - 1);
+                            const rightIdx = y * width + (x + 1);
+                            
+                            if (dir === -1 && x > 0 && grid[leftIdx] === EMPTY) {
+                                grid[leftIdx] = WATER;
+                                grid[idx] = EMPTY;
+                            } else if (dir === 1 && x < width - 1 && grid[rightIdx] === EMPTY) {
+                                grid[rightIdx] = WATER;
+                                grid[idx] = EMPTY;
+                            } else if (x > 0 && grid[leftIdx] === EMPTY) {
+                                grid[leftIdx] = WATER;
+                                grid[idx] = EMPTY;
+                            } else if (x < width - 1 && grid[rightIdx] === EMPTY) {
+                                grid[rightIdx] = WATER;
+                                grid[idx] = EMPTY;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- RENDER LOOP ---
+
+        function draw() {
+            // Draw background
+            ctx.fillStyle = colors[EMPTY];
+            ctx.fillRect(0, 0, width, height);
+
+            // Create ImageData for direct pixel manipulation (Performance optimization)
+            // Or simple Rects for simplicity (Chosen for readability/simplicity in this demo)
+            // Because the grid is small (100x100), fillRect is fast enough.
+            
+            for (let i = 0; i < grid.length; i++) {
+                if (grid[i] !== EMPTY) {
+                    const x = i % width;
+                    const y = Math.floor(i / width);
+                    ctx.fillStyle = colors[grid[i]];
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // Start
+        loop();
+
+    </script>
+</body>
+</html>

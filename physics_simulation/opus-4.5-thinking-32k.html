@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Sand Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0d0d1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        h1 {
+            color: #ffffff;
+            font-size: 2rem;
+            text-shadow: 0 0 20px rgba(100, 150, 255, 0.5);
+            letter-spacing: 2px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 600px;
+        }
+
+        .material-btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .material-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .material-btn:hover::before {
+            left: 100%;
+        }
+
+        .material-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .material-btn.selected {
+            transform: translateY(-3px);
+            box-shadow: 0 0 30px currentColor, 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        #sandBtn {
+            background: linear-gradient(145deg, #f5d742, #c9a227);
+            color: #2a2000;
+        }
+
+        #waterBtn {
+            background: linear-gradient(145deg, #4da6ff, #2980b9);
+            color: #ffffff;
+        }
+
+        #stoneBtn {
+            background: linear-gradient(145deg, #8e8e8e, #5a5a5a);
+            color: #ffffff;
+        }
+
+        #eraseBtn {
+            background: linear-gradient(145deg, #3a3a4a, #252530);
+            color: #aaaaaa;
+            border: 2px solid #555;
+        }
+
+        #clearBtn {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            color: #ffffff;
+        }
+
+        .settings {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #aaa;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 16px;
+            border-radius: 10px;
+        }
+
+        .setting-group label {
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 120px;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #333, #555);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #6a9fff, #4a7fdf);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        .value-display {
+            background: rgba(100, 150, 255, 0.2);
+            padding: 4px 10px;
+            border-radius: 6px;
+            min-width: 30px;
+            text-align: center;
+            font-weight: bold;
+            color: #7ab0ff;
+        }
+
+        canvas {
+            border: 4px solid #2a2a3e;
+            border-radius: 12px;
+            box-shadow: 
+                0 0 40px rgba(0, 0, 0, 0.5),
+                inset 0 0 60px rgba(0, 0, 0, 0.3);
+            cursor: crosshair;
+            image-rendering: pixelated;
+        }
+
+        .info {
+            color: #666;
+            font-size: 13px;
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #888;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .sand-color { background: linear-gradient(145deg, #f5d742, #c9a227); }
+        .water-color { background: linear-gradient(145deg, #4da6ff, #2980b9); }
+        .stone-color { background: linear-gradient(145deg, #8e8e8e, #5a5a5a); }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.5rem; }
+            .material-btn { padding: 10px 18px; font-size: 14px; }
+            canvas { max-width: 100%; height: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⏳ Falling Sand</h1>
+        
+        <div class="controls">
+            <button id="sandBtn" class="material-btn selected">🏖️ Sand</button>
+            <button id="waterBtn" class="material-btn">💧 Water</button>
+            <button id="stoneBtn" class="material-btn">🪨 Stone</button>
+            <button id="eraseBtn" class="material-btn">✨ Erase</button>
+            <button id="clearBtn" class="material-btn">🗑️ Clear All</button>
+        </div>
+
+        <div class="settings">
+            <div class="setting-group">
+                <label>Brush Size:</label>
+                <input type="range" id="brushSize" min="1" max="12" value="4">
+                <span class="value-display" id="brushValue">4</span>
+            </div>
+        </div>
+
+        <canvas id="canvas"></canvas>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color sand-color"></div>
+                <span>Sand: Falls & piles up</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color water-color"></div>
+                <span>Water: Flows & spreads</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color stone-color"></div>
+                <span>Stone: Falls then stays fixed</span>
+            </div>
+        </div>
+
+        <p class="info">Click and drag to paint particles. Sand sinks through water, stone becomes immovable once it lands.</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const brushSlider = document.getElementById('brushSize');
+        const brushValueDisplay = document.getElementById('brushValue');
+
+        // Configuration
+        const CELL_SIZE = 5;
+        const GRID_WIDTH = 160;
+        const GRID_HEIGHT = 120;
+
+        canvas.width = GRID_WIDTH * CELL_SIZE;
+        canvas.height = GRID_HEIGHT * CELL_SIZE;
+
+        // Particle types
+        const VOID = 0;
+        const SAND = 1;
+        const WATER = 2;
+        const STONE = 3;
+
+        // Simulation state
+        let grid = [];
+        let isStatic = [];
+        let colorNoise = [];
+
+        let currentMaterial = SAND;
+        let isMouseDown = false;
+        let mouseGridX = 0;
+        let mouseGridY = 0;
+        let brushRadius = 4;
+
+        // Color definitions with HSL for variation
+        const PARTICLE_COLORS = {
+            [SAND]: { h: 48, s: 85, l: 55 },
+            [WATER]: { h: 210, s: 75, l: 58 },
+            [STONE]: { h: 220, s: 5, l: 55 }
+        };
+
+        // Initialize the simulation grids
+        function initializeGrids() {
+            grid = [];
+            isStatic = [];
+            colorNoise = [];
+            
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                grid[y] = [];
+                isStatic[y] = [];
+                colorNoise[y] = [];
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    grid[y][x] = VOID;
+                    isStatic[y][x] = false;
+                    colorNoise[y][x] = (Math.random() - 0.5) * 20;
+                }
+            }
+        }
+
+        // Get particle color with variation
+        function getParticleColor(type, x, y) {
+            if (type === VOID) return null;
+            
+            const base = PARTICLE_COLORS[type];
+            const noise = colorNoise[y][x];
+            const lightness = Math.max(25, Math.min(75, base.l + noise));
+            const saturation = Math.max(0, Math.min(100, base.s + noise * 0.5));
+            
+            return `hsl(${base.h}, ${saturation}%, ${lightness}%)`;
+        }
+
+        // Convert screen coordinates to grid coordinates
+        function screenToGrid(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            let x = Math.floor((clientX - rect.left) * scaleX / CELL_SIZE);
+            let y = Math.floor((clientY - rect.top) * scaleY / CELL_SIZE);
+            
+            x = Math.max(0, Math.min(GRID_WIDTH - 1, x));
+            y = Math.max(0, Math.min(GRID_HEIGHT - 1, y));
+            
+            return { x, y };
+        }
+
+        // Check if a cell is within bounds
+        function inBounds(x, y) {
+            return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT;
+        }
+
+        // Check if a cell is empty
+        function isEmpty(x, y) {
+            return inBounds(x, y) && grid[y][x] === VOID;
+        }
+
+        // Check if a cell contains water
+        function isWater(x, y) {
+            return inBounds(x, y) && grid[y][x] === WATER;
+        }
+
+        // Place particles with brush
+        function paintParticles(centerX, centerY) {
+            const radiusSq = brushRadius * brushRadius;
+            
+            for (let dy = -brushRadius; dy <= brushRadius; dy++) {
+                for (let dx = -brushRadius; dx <= brushRadius; dx++) {
+                    if (dx * dx + dy * dy > radiusSq) continue;
+                    
+                    const x = centerX + dx;
+                    const y = centerY + dy;
+                    
+                    if (!inBounds(x, y)) continue;
+                    
+                    // Random chance for more natural look
+                    if (Math.random() > 0.75) continue;
+                    
+                    if (currentMaterial === VOID) {
+                        grid[y][x] = VOID;
+                        isStatic[y][x] = false;
+                    } else if (grid[y][x] === VOID) {
+                        grid[y][x] = currentMaterial;
+                        isStatic[y][x] = false;
+                        colorNoise[y][x] = (Math.random() - 0.5) * 25;
+                    }
+                }
+            }
+        }
+
+        // Swap two cells
+        function swapCells(x1, y1, x2, y2) {
+            const tempType = grid[y1][x1];
+            const tempNoise = colorNoise[y1][x1];
+            const tempStatic = isStatic[y1][x1];
+            
+            grid[y1][x1] = grid[y2][x2];
+            colorNoise[y1][x1] = colorNoise[y2][x2];
+            isStatic[y1][x1] = isStatic[y2][x2];
+            
+            grid[y2][x2] = tempType;
+            colorNoise[y2][x2] = tempNoise;
+            isStatic[y2][x2] = tempStatic;
+        }
+
+        // Move a cell to an empty position
+        function moveCell(fromX, fromY, toX, toY) {
+            grid[toY][toX] = grid[fromY][fromX];
+            colorNoise[toY][toX] = colorNoise[fromY][fromX];
+            isStatic[toY][toX] = isStatic[fromY][fromX];
+            
+            grid[fromY][fromX] = VOID;
+            isStatic[fromY][fromX] = false;
+        }
+
+        // Update sand particle
+        function updateSand(x, y) {
+            const below = y + 1;
+            
+            // Fall straight down (through empty or water)
+            if (below < GRID_HEIGHT) {
+                if (isEmpty(x, below)) {
+                    moveCell(x, y, x, below);
+                    return true;
+                }
+                if (isWater(x, below)) {
+                    swapCells(x, y, x, below);
+                    return true;
+                }
+            }
+            
+            // Fall diagonally
+            const dir = Math.random() < 0.5 ? -1 : 1;
+            const diag1X = x + dir;
+            const diag2X = x - dir;
+            
+            if (below < GRID_HEIGHT) {
+                // Try first diagonal
+                if (inBounds(diag1X, below)) {
+                    if (isEmpty(diag1X, below)) {
+                        moveCell(x, y, diag1X, below);
+                        return true;
+                    }
+                    if (isWater(diag1X, below)) {
+                        swapCells(x, y, diag1X, below);
+                        return true;
+                    }
+                }
+                
+                // Try second diagonal
+                if (inBounds(diag2X, below)) {
+                    if (isEmpty(diag2X, below)) {
+                        moveCell(x, y, diag2X, below);
+                        return true;
+                    }
+                    if (isWater(diag2X, below)) {
+                        swapCells(x, y, diag2X, below);
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        }
+
+        // Update water particle
+        function updateWater(x, y) {
+            const below = y + 1;
+            
+            // Fall straight down
+            if (below < GRID_HEIGHT && isEmpty(x, below)) {
+                moveCell(x, y, x, below);
+                return true;
+            }
+            
+            // Fall diagonally
+            const dir = Math.random() < 0.5 ? -1 : 1;
+            
+            if (below < GRID_HEIGHT) {
+                if (isEmpty(x + dir, below)) {
+                    moveCell(x, y, x + dir, below);
+                    return true;
+                }
+                if (isEmpty(x - dir, below)) {
+                    moveCell(x, y, x - dir, below);
+                    return true;
+                }
+            }
+            
+            // Spread horizontally with some momentum
+            const spreadDir = Math.random() < 0.5 ? -1 : 1;
+            let canSpreadPrimary = isEmpty(x + spreadDir, y);
+            let canSpreadSecondary = isEmpty(x - spreadDir, y);
+            
+            if (canSpreadPrimary && canSpreadSecondary) {
+                moveCell(x, y, x + spreadDir, y);
+                return true;
+            } else if (canSpreadPrimary) {
+                moveCell(x, y, x + spreadDir, y);
+                return true;
+            } else if (canSpreadSecondary) {
+                moveCell(x, y, x - spreadDir, y);
+                return true;
+            }
+            
+            return false;
+        }
+
+        // Update stone particle
+        function updateStone(x, y) {
+            // Static stones never move
+            if (isStatic[y][x]) return false;
+            
+            const below = y + 1;
+            
+            // Fall straight down
+            if (below < GRID_HEIGHT) {
+                if (isEmpty(x, below)) {
+                    moveCell(x, y, x, below);
+                    return true;
+                }
+                if (isWater(x, below)) {
+                    swapCells(x, y, x, below);
+                    return true;
+                }
+            }
+            
+            // Stone has landed - become static
+            isStatic[y][x] = true;
+            return false;
+        }
+
+        // Main simulation update
+        function updateSimulation() {
+            // Alternate direction each frame for more even behavior
+            const leftToRight = Math.random() < 0.5;
+            
+            // Process from bottom to top
+            for (let y = GRID_HEIGHT - 2; y >= 0; y--) {
+                if (leftToRight) {
+                    for (let x = 0; x < GRID_WIDTH; x++) {
+                        updateCell(x, y);
+                    }
+                } else {
+                    for (let x = GRID_WIDTH - 1; x >= 0; x--) {
+                        updateCell(x, y);
+                    }
+                }
+            }
+        }
+
+        function updateCell(x, y) {
+            const cellType = grid[y][x];
+            
+            switch (cellType) {
+                case SAND:
+                    updateSand(x, y);
+                    break;
+                case WATER:
+                    updateWater(x, y);
+                    break;
+                case STONE:
+                    updateStone(x, y);
+                    break;
+            }
+        }
+
+        // Render the simulation
+        function render() {
+            // Clear canvas with void color
+            ctx.fillStyle = '#080810';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw particles
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    const cellType = grid[y][x];
+                    
+                    if (cellType !== VOID) {
+                        const color = getParticleColor(cellType, x, y);
+                        ctx.fillStyle = color;
+                        ctx.fillRect(
+                            x * CELL_SIZE,
+                            y * CELL_SIZE,
+                            CELL_SIZE,
+                            CELL_SIZE
+                        );
+                    }
+                }
+            }
+        }
+
+        // Main game loop
+        function gameLoop() {
+            // Handle continuous painting
+            if (isMouseDown) {
+                paintParticles(mouseGridX, mouseGridY);
+            }
+            
+            updateSimulation();
+            render();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event Handlers
+        function handlePointerStart(clientX, clientY) {
+            isMouseDown = true;
+            const pos = screenToGrid(clientX, clientY);
+            mouseGridX = pos.x;
+            mouseGridY = pos.y;
+        }
+
+        function handlePointerMove(clientX, clientY) {
+            const pos = screenToGrid(clientX, clientY);
+            mouseGridX = pos.x;
+            mouseGridY = pos.y;
+        }
+
+        function handlePointerEnd() {
+            isMouseDown = false;
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            handlePointerStart(e.clientX, e.clientY);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            handlePointerMove(e.clientX, e.clientY);
+        });
+
+        canvas.addEventListener('mouseup', handlePointerEnd);
+        canvas.addEventListener('mouseleave', handlePointerEnd);
+
+        // Touch events
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handlePointerStart(touch.clientX, touch.clientY);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handlePointerMove(touch.clientX, touch.clientY);
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handlePointerEnd();
+        });
+
+        // Prevent context menu on canvas
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Button selection helper
+        function selectMaterialButton(button) {
+            document.querySelectorAll('.material-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            button.classList.add('selected');
+        }
+
+        // Material buttons
+        document.getElementById('sandBtn').addEventListener('click', function() {
+            currentMaterial = SAND;
+            selectMaterialButton(this);
+        });
+
+        document.getElementById('waterBtn').addEventListener('click', function() {
+            currentMaterial = WATER;
+            selectMaterialButton(this);
+        });
+
+        document.getElementById('stoneBtn').addEventListener('click', function() {
+            currentMaterial = STONE;
+            selectMaterialButton(this);
+        });
+
+        document.getElementById('eraseBtn').addEventListener('click', function() {
+            currentMaterial = VOID;
+            selectMaterialButton(this);
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            initializeGrids();
+        });
+
+        // Brush size slider
+        brushSlider.addEventListener('input', function() {
+            brushRadius = parseInt(this.value);
+            brushValueDisplay.textContent = brushRadius;
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch (e.key.toLowerCase()) {
+                case '1':
+                    currentMaterial = SAND;
+                    selectMaterialButton(document.getElementById('sandBtn'));
+                    break;
+                case '2':
+                    currentMaterial = WATER;
+                    selectMaterialButton(document.getElementById('waterBtn'));
+                    break;
+                case '3':
+                    currentMaterial = STONE;
+                    selectMaterialButton(document.getElementById('stoneBtn'));
+                    break;
+                case 'e':
+                    currentMaterial = VOID;
+                    selectMaterialButton(document.getElementById('eraseBtn'));
+                    break;
+                case 'c':
+                    initializeGrids();
+                    break;
+            }
+        });
+
+        // Initialize and start
+        initializeGrids();
+        gameLoop();
+    </script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Sand Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        #container {
+            position: relative;
+        }
+        #canvas {
+            border: 1px solid #000;
+            display: block;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+        #controls button {
+            margin: 2px;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="controls">
+            <button onclick="setMaterial('sand')">Sand</button>
+            <button onclick="setMaterial('water')">Water</button>
+            <button onclick="setMaterial('stone')">Stone</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const CELL_SIZE = 4;
+        const WIDTH = canvas.width / CELL_SIZE;
+        const HEIGHT = canvas.height / CELL_SIZE;
+
+        const colors = {
+            void: 'white',
+            sand: 'yellow',
+            water: 'blue',
+            stone: 'gray'
+        };
+
+        let grid = Array.from({ length: HEIGHT }, () => Array(WIDTH).fill('void'));
+        let currentMaterial = 'sand';
+        let isDrawing = false;
+
+        function setMaterial(material) {
+            currentMaterial = material;
+        }
+
+        function getCell(x, y) {
+            if (y < 0) return 'void';
+            if (y >= HEIGHT) return 'stone';
+            if (x < 0 || x >= WIDTH) return 'stone';
+            return grid[y][x];
+        }
+
+        function setCell(x, y, type) {
+            if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return;
+            grid[y][x] = type;
+        }
+
+        function move(fromX, fromY, toX, toY) {
+            const type = grid[fromY][fromX];
+            setCell(toX, toY, type);
+            setCell(fromX, fromY, 'void');
+        }
+
+        function update() {
+            for (let y = HEIGHT - 1; y >= 0; y--) {
+                for (let x = 0; x < WIDTH; x++) {
+                    const type = grid[y][x];
+                    if (type === 'void') continue;
+
+                    if (type === 'stone') {
+                        if (getCell(x, y + 1) === 'void') {
+                            move(x, y, x, y + 1);
+                            continue;
+                        }
+                    } else if (type === 'sand') {
+                        if (getCell(x, y + 1) === 'void') {
+                            move(x, y, x, y + 1);
+                            continue;
+                        }
+                        if (x > 0 && getCell(x - 1, y + 1) === 'void') {
+                            move(x, y, x - 1, y + 1);
+                            continue;
+                        }
+                        if (x < WIDTH - 1 && getCell(x + 1, y + 1) === 'void') {
+                            move(x, y, x + 1, y + 1);
+                            continue;
+                        }
+                    } else if (type === 'water') {
+                        if (getCell(x, y + 1) === 'void') {
+                            move(x, y, x, y + 1);
+                            continue;
+                        }
+                        if (x > 0 && getCell(x - 1, y + 1) === 'void') {
+                            move(x, y, x - 1, y + 1);
+                            continue;
+                        }
+                        if (x < WIDTH - 1 && getCell(x + 1, y + 1) === 'void') {
+                            move(x, y, x + 1, y + 1);
+                            continue;
+                        }
+                        // Horizontal flow
+                        if (x > 0 && getCell(x - 1, y) === 'void') {
+                            move(x, y, x - 1, y);
+                            continue;
+                        }
+                        if (x < WIDTH - 1 && getCell(x + 1, y) === 'void') {
+                            move(x, y, x + 1, y);
+                        }
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for (let y = 0; y < HEIGHT; y++) {
+                for (let x = 0; x < WIDTH; x++) {
+                    const type = grid[y][x];
+                    if (type === 'void') continue;
+                    ctx.fillStyle = colors[type];
+                    ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                }
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function paint(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / CELL_SIZE);
+            const y = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+            setCell(x, y, currentMaterial);
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            paint(e);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDrawing) {
+                paint(e);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDrawing = false;
+        });
+
+        loop();
+    </script>
+</body>
+</html>

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Falling Sand Playground</title>
+  <style>
+    :root {
+      --bg: #050915;
+      --panel: #0f152c;
+      --border: #1c2444;
+      --void: #0b0f1d;
+      --sand: #f3c969;
+      --water: #4ba6ff;
+      --stone: #b0b0b0;
+      --text: #e8ecf7;
+      --muted: #8da2c7;
+      --accent: #7be3ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      color: var(--text);
+      background: radial-gradient(circle at 20% 20%, #0f1630 0%, #070b18 60%, #05060c 100%);
+      font-family: "Inter", "SF Pro Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    main {
+      width: min(1100px, 100%);
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      background: linear-gradient(135deg, rgba(23, 32, 63, 0.75), rgba(14, 19, 34, 0.95));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      letter-spacing: -0.4px;
+      font-size: 28px;
+    }
+
+    .subhead {
+      color: var(--muted);
+      margin: 4px 0 0;
+    }
+
+    .tagline {
+      font-size: 12px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 6px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .controls label {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    button {
+      background: var(--border);
+      color: var(--text);
+      border: 1px solid #2c355a;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      border-color: #3b4a7f;
+    }
+
+    button.active {
+      background: var(--accent);
+      color: #04121a;
+      border-color: #b0f3ff;
+      box-shadow: 0 0 0 3px rgba(123, 227, 255, 0.25);
+    }
+
+    .material-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--sand);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+    }
+
+    .canvas-shell {
+      background: #060913;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      image-rendering: pixelated;
+      border-radius: 10px;
+      background: var(--void);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .hint {
+      color: var(--muted);
+      margin: 10px 0 0;
+      font-size: 0.95rem;
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent);
+    }
+
+    @media (max-width: 720px) {
+      h1 {
+        font-size: 24px;
+      }
+
+      button {
+        padding: 7px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <div class="tagline">Cellular Automata</div>
+      <header>
+        <div>
+          <h1>Falling Sand Playground</h1>
+          <p class="subhead">Drag to drop material. Sand piles, water flows, stone falls then locks into place.</p>
+        </div>
+        <div class="material-chip">
+          <span class="dot" id="active-dot"></span>
+          <span id="active-material">Sand</span>
+        </div>
+      </header>
+      <div class="controls">
+        <label>Material:</label>
+        <button class="material-button active" data-material="1">Sand</button>
+        <button class="material-button" data-material="2">Water</button>
+        <button class="material-button" data-material="3">Stone</button>
+        <button class="material-button" data-material="0">Void</button>
+        <label class="material-chip" for="brush-range">
+          Brush
+          <input type="range" id="brush-range" min="1" max="5" step="1" value="2" />
+        </label>
+      </div>
+    </section>
+
+    <section class="panel canvas-shell">
+      <canvas id="sim" aria-label="falling sand simulation"></canvas>
+      <p class="hint">Tip: hold and drag to paint streams. Sand swaps with water when heavier; water spreads sideways; stone drops straight down then becomes static.</p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('sim');
+      const ctx = canvas.getContext('2d');
+
+      const Material = { VOID: 0, SAND: 1, WATER: 2, STONE: 3 };
+      const materialNames = {
+        [Material.VOID]: 'Void',
+        [Material.SAND]: 'Sand',
+        [Material.WATER]: 'Water',
+        [Material.STONE]: 'Stone',
+      };
+
+      const palette = {
+        [Material.VOID]: getComputedStyle(document.documentElement).getPropertyValue('--void') || '#0b0f1d',
+        [Material.SAND]: getComputedStyle(document.documentElement).getPropertyValue('--sand') || '#f3c969',
+        [Material.WATER]: getComputedStyle(document.documentElement).getPropertyValue('--water') || '#4ba6ff',
+        [Material.STONE]: getComputedStyle(document.documentElement).getPropertyValue('--stone') || '#b0b0b0',
+      };
+
+      const gridWidth = 180;
+      const gridHeight = 120;
+      const pixelSize = 5;
+      const waterSpread = 4;
+      const ticksPerFrame = 1;
+
+      canvas.width = gridWidth * pixelSize;
+      canvas.height = gridHeight * pixelSize;
+      ctx.imageSmoothingEnabled = false;
+
+      const cells = new Uint8Array(gridWidth * gridHeight);
+      const stoneSettled = new Uint8Array(gridWidth * gridHeight);
+
+      let currentMaterial = Material.SAND;
+      let brushSize = Number(document.getElementById('brush-range').value);
+
+      const buttons = Array.from(document.querySelectorAll('.material-button'));
+      const activeMaterialLabel = document.getElementById('active-material');
+      const activeDot = document.getElementById('active-dot');
+
+      function setActiveMaterial(material) {
+        currentMaterial = material;
+        buttons.forEach((btn) => btn.classList.toggle('active', Number(btn.dataset.material) === material));
+        activeMaterialLabel.textContent = materialNames[material];
+        activeDot.style.background = palette[material];
+      }
+
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => setActiveMaterial(Number(btn.dataset.material)));
+      });
+
+      setActiveMaterial(currentMaterial);
+
+      document.getElementById('brush-range').addEventListener('input', (event) => {
+        brushSize = Number(event.target.value);
+      });
+
+      const idx = (x, y) => y * gridWidth + x;
+      const inBounds = (x, y) => x >= 0 && x < gridWidth && y >= 0 && y < gridHeight;
+
+      const swap = (a, b) => {
+        const temp = cells[a];
+        cells[a] = cells[b];
+        cells[b] = temp;
+        const stoneTemp = stoneSettled[a];
+        stoneSettled[a] = stoneSettled[b];
+        stoneSettled[b] = stoneTemp;
+      };
+
+      const updateSand = (x, y, i) => {
+        if (y >= gridHeight - 1) return;
+        const below = i + gridWidth;
+        const belowType = cells[below];
+        if (belowType === Material.VOID || belowType === Material.WATER) {
+          swap(i, below);
+          return;
+        }
+        const dirs = Math.random() < 0.5 ? [-1, 1] : [1, -1];
+        for (const dir of dirs) {
+          const nx = x + dir;
+          if (nx < 0 || nx >= gridWidth) continue;
+          const ni = below + dir;
+          const target = cells[ni];
+          if (target === Material.VOID || target === Material.WATER) {
+            swap(i, ni);
+            return;
+          }
+        }
+      };
+
+      const updateWater = (x, y, i) => {
+        if (y < gridHeight - 1) {
+          const below = i + gridWidth;
+          if (cells[below] === Material.VOID) {
+            swap(i, below);
+            return;
+          }
+          const dirsDown = Math.random() < 0.5 ? [-1, 1] : [1, -1];
+          for (const dir of dirsDown) {
+            const nx = x + dir;
+            if (nx < 0 || nx >= gridWidth) continue;
+            const ni = below + dir;
+            if (cells[ni] === Material.VOID) {
+              swap(i, ni);
+              return;
+            }
+          }
+        }
+        const dirsSide = Math.random() < 0.5 ? [-1, 1] : [1, -1];
+        for (const dir of dirsSide) {
+          for (let step = 1; step <= waterSpread; step++) {
+            const nx = x + dir * step;
+            if (nx < 0 || nx >= gridWidth) break;
+            const ni = idx(nx, y);
+            if (cells[ni] === Material.VOID) {
+              swap(i, ni);
+              return;
+            }
+          }
+        }
+      };
+
+      // Stone falls vertically; once blocked it locks forever.
+      const updateStone = (x, y, i) => {
+        if (stoneSettled[i]) return;
+        if (y >= gridHeight - 1) {
+          stoneSettled[i] = 1;
+          return;
+        }
+        const below = i + gridWidth;
+        const belowType = cells[below];
+        if (belowType === Material.VOID || belowType === Material.WATER || belowType === Material.SAND) {
+          swap(i, below);
+        } else {
+          stoneSettled[i] = 1;
+        }
+      };
+
+      const step = () => {
+        for (let y = gridHeight - 1; y >= 0; y--) {
+          const dir = Math.random() < 0.5 ? 1 : -1;
+          for (let xi = 0; xi < gridWidth; xi++) {
+            const x = dir === 1 ? xi : gridWidth - 1 - xi;
+            const i = idx(x, y);
+            const type = cells[i];
+            if (type === Material.SAND) {
+              updateSand(x, y, i);
+            } else if (type === Material.WATER) {
+              updateWater(x, y, i);
+            } else if (type === Material.STONE) {
+              updateStone(x, y, i);
+            }
+          }
+        }
+      };
+
+      const render = () => {
+        ctx.fillStyle = palette[Material.VOID];
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (let y = 0; y < gridHeight; y++) {
+          for (let x = 0; x < gridWidth; x++) {
+            const value = cells[idx(x, y)];
+            if (value === Material.VOID) continue;
+            ctx.fillStyle = palette[value];
+            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+          }
+        }
+      };
+
+      let painting = false;
+
+      const paint = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const cx = Math.floor(((event.clientX - rect.left) / rect.width) * gridWidth);
+        const cy = Math.floor(((event.clientY - rect.top) / rect.height) * gridHeight);
+        if (!inBounds(cx, cy)) return;
+        const r = brushSize - 1;
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.abs(dx) + Math.abs(dy) > r) continue;
+            const nx = cx + dx;
+            const ny = cy + dy;
+            if (!inBounds(nx, ny)) continue;
+            const cellIndex = idx(nx, ny);
+            cells[cellIndex] = currentMaterial;
+            stoneSettled[cellIndex] = 0;
+          }
+        }
+      };
+
+      canvas.addEventListener('pointerdown', (event) => {
+        painting = true;
+        canvas.setPointerCapture(event.pointerId);
+        paint(event);
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        if (painting) paint(event);
+      });
+
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach((type) => {
+        canvas.addEventListener(type, (event) => {
+          painting = false;
+          if (event.pointerId !== undefined) {
+            try {
+              canvas.releasePointerCapture(event.pointerId);
+            } catch (_) {
+              /* ignore */
+            }
+          }
+        });
+      });
+
+      canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+
+      const tick = () => {
+        for (let t = 0; t < ticksPerFrame; t++) {
+          step();
+        }
+        render();
+        requestAnimationFrame(tick);
+      };
+
+      tick();
+    })();
+  </script>
+</body>
+</html>
