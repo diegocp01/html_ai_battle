@@ -14,10 +14,7 @@ Create a single-file HTML/CSS/JS "Falling Sand" simulation. It must be interacti
 
 ## 📸 Results Preview
 
-(Insert comparison image or GIF here)
-
-/images/result.png
-
+![Falling Sand simulation preview](image.png)
 
 ---
 
@@ -25,10 +22,10 @@ Create a single-file HTML/CSS/JS "Falling Sand" simulation. It must be interacti
 
 | Model | Lines of HTML | Time to Generate | Score / 10 |
 |--------|----------------|------------------|------------|
-| Claude Opus 4.5 | 651 | ⏱️ ___ | ___ |
-| GPT-5.1 | 460 | ⏱️ ___ | ___ |
-| Gemini 3 Pro | 267 | ⏱️ ___ | ___ |
-| Grok 4.1 | 219 | ⏱️ ___ | ___ |
+| opus-4.5-thinking-32k | 718 | ⏱️ ___ | 9.5 |
+| gpt-5.1-codex-max-xhigh | 436 | ⏱️ ___ | 9 |
+| gemini-3-pro | 295 | ⏱️ ___ | 9 |
+| grok-4.1-thinking | 184 | ⏱️ ___ | 7 |
 
 
 ---
@@ -42,7 +39,10 @@ Create a single-file HTML/CSS/JS "Falling Sand" simulation. It must be interacti
 ---
 
 ## 🧠 Observations
-	•	xx
+	•	**opus-4.5-thinking-32k**: Best overall UI and visual polish. Most balanced physics and interactivity. Cleanest user experience of the four.
+	•	**gpt-5.1-codex-max-xhigh**: Excellent UI layout, strong brush sizing, and very clean visuals. Felt professional and well-structured.
+	•	**gemini-3-pro**: Great tool design with the addition of an eraser. Strong usability and solid visual execution overall.
+	•	**grok-4.1-thinking**: White background reduced visual clarity, sand color looked off, and water physics felt less realistic. Still functional but weaker visually.
 
 ---
 
@@ -55,9 +55,10 @@ Link: https://x.com/________
 
 ## 📊 Future Work
 	•	Correlation matrix between:
-	•	Lines of code
-	•	Visual accuracy
-	•	Prompt adherence
-	•	Physics stability
-	•	Interactivity quality
+	•	    Lines of code
+	•	    Visual accuracy
+	•	    Prompt adherence
+	•	    Physics stability
+	•	    Interactivity quality
+
     •	Scoring framework
