@@ -14,7 +14,7 @@ Create a single-file HTML/CSS/JS "Falling Sand" simulation. It must be interacti
 
 ## 📸 Results Preview
 
-![Falling Sand simulation preview](image.png)
+![Falling Sand simulation preview](imagee.png)
 
 ---
 

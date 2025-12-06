@@ -28,6 +28,6 @@ def main() -> None:
 
     print(f"\nTotal lines across all HTML files: {total_lines}")
 
-
+# 
 if __name__ == "__main__":
     main()
