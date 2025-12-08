@@ -39,17 +39,17 @@ Create a single-file HTML/CSS/JS "Falling Sand" simulation. It must be interacti
 ---
 
 ## 🧠 Observations
-	•	**opus-4.5-thinking-32k**: Best overall UI and visual polish. Most balanced physics and interactivity. Cleanest user experience of the four.
-	•	**gpt-5.1-codex-max-xhigh**: Excellent UI layout, strong brush sizing, and very clean visuals. Felt professional and well-structured.
-	•	**gemini-3-pro**: Great tool design with the addition of an eraser. Strong usability and solid visual execution overall.
-	•	**grok-4.1-thinking**: White background reduced visual clarity, sand color looked off, and water physics felt less realistic. Still functional but weaker visually.
+	•	opus-4.5-thinking-32k: Best overall UI and visual polish. Most balanced physics and interactivity. Cleanest user experience of the four.
+	•	gpt-5.1-codex-max-xhigh: Excellent UI layout, strong brush sizing, and very clean visuals. Felt professional and well-structured.
+	•	gemini-3-pro: Great tool design with the addition of an eraser. Strong usability and solid visual execution overall.
+	•	grok-4.1-thinking: White background reduced visual clarity, sand color looked off, and water physics felt less realistic. Still functional but weaker visually.
 
 ---
 
 🔗 Original Post
 
 X (Twitter) post showcasing the experiment:
-Link: https://x.com/________
+Link: https://x.com/diegocabezas01/status/1998009023568674887?s=20
 
 ---
 
