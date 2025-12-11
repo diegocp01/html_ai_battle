@@ -15,6 +15,8 @@
 
 X (Twitter) posts showcasing the experiments:
 **Robot Arm:** https://x.com/diegocabezas01/status/1996356823436169623?s=20
+
+
 **Six Shot Revolver:** https://x.com/diegocabezas01/status/1994114205314633757?s=20
 
 
