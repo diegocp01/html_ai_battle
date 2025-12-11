@@ -55,7 +55,7 @@ Make a game like flappy bird using HTML/CSS/JS in a single HTML file
 
 X (Twitter) post showcasing the experiment:
 
-Link: 
+Link: https://x.com/diegocabezas01/status/1998925426085998887?s=20
 
 ---
 
