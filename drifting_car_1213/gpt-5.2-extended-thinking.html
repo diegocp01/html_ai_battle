@@ -1,0 +1,640 @@
+<!-- Save as: f1_donut_3d.html  |  Open in any modern browser -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>F1 Drift Donut (Single File)</title>
+  <style>
+    html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#0b0f14; }
+    #hud {
+      position: fixed; left: 14px; top: 14px; z-index: 10;
+      width: 320px; max-width: calc(100vw - 28px);
+      background: rgba(10, 14, 20, 0.72);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 12px 12px 10px 12px;
+      color: rgba(255,255,255,0.92);
+      font: 12px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      user-select: none;
+      backdrop-filter: blur(10px);
+    }
+    #hud h1 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: 0.2px;
+      opacity: 0.95;
+    }
+    .row { display:flex; align-items:center; gap:10px; margin: 7px 0; }
+    .row label { width: 110px; opacity: 0.88; }
+    .row input[type="range"] { flex: 1; }
+    .row .val { width: 56px; text-align:right; opacity:0.9; font-variant-numeric: tabular-nums; }
+    .btnrow { display:flex; gap:8px; margin-top:10px; flex-wrap: wrap; }
+    button {
+      appearance:none; border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.92);
+      border-radius: 12px; padding: 8px 10px; cursor:pointer;
+      font-weight: 600; letter-spacing: 0.15px;
+    }
+    button:hover { background: rgba(255,255,255,0.12); }
+    button:active { transform: translateY(1px); }
+    .hint { margin-top: 8px; opacity:0.75; }
+    .pill {
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px; padding: 4px 8px;
+      margin-top: 8px; opacity:0.85;
+    }
+    canvas { display:block; }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <h1>F1 Drift Donut (3D)</h1>
+
+    <div class="row">
+      <label>Radius</label>
+      <input id="radius" type="range" min="6" max="24" step="0.5" value="12" />
+      <div class="val" id="radiusV">12.0</div>
+    </div>
+
+    <div class="row">
+      <label>Speed</label>
+      <input id="speed" type="range" min="0.6" max="3.2" step="0.05" value="1.7" />
+      <div class="val" id="speedV">1.70</div>
+    </div>
+
+    <div class="row">
+      <label>Drift Angle</label>
+      <input id="drift" type="range" min="0" max="55" step="1" value="28" />
+      <div class="val" id="driftV">28°</div>
+    </div>
+
+    <div class="row">
+      <label>Smoke</label>
+      <input id="smoke" type="range" min="0" max="1" step="0.01" value="0.75" />
+      <div class="val" id="smokeV">0.75</div>
+    </div>
+
+    <div class="btnrow">
+      <button id="camBtn">Camera: Chase</button>
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset Skids</button>
+    </div>
+
+    <div class="pill">Keys: 1 chase, 2 orbit, Space pause</div>
+    <div class="hint">Tip: Orbit camera works best zoomed out a bit.</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+    // ---------- Renderer / Scene ----------
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x0b0f14, 35, 110);
+
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 400);
+    camera.position.set(0, 6.5, 16);
+
+    // Lighting
+    const hemi = new THREE.HemisphereLight(0x9fc2ff, 0x1a1a1a, 0.55);
+    scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xffffff, 1.25);
+    sun.position.set(14, 22, 10);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -40;
+    sun.shadow.camera.right = 40;
+    sun.shadow.camera.top = 40;
+    sun.shadow.camera.bottom = -40;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 110;
+    scene.add(sun);
+
+    // ---------- Ground: procedural asphalt + lane + skids (canvas texture) ----------
+    const GROUND_SIZE = 90;        // world size of the ground plane
+    const TEX_SIZE = 1024;         // texture resolution
+    const asphalt = document.createElement("canvas");
+    asphalt.width = TEX_SIZE;
+    asphalt.height = TEX_SIZE;
+    const gctx = asphalt.getContext("2d", { alpha: false });
+
+    // Base asphalt draw
+    function drawBaseAsphalt() {
+      gctx.fillStyle = "#1a1f27";
+      gctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+
+      // subtle noise
+      const img = gctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
+      const data = img.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const n = (Math.random() * 22) | 0;
+        data[i] = Math.min(255, data[i] + n);
+        data[i + 1] = Math.min(255, data[i + 1] + n);
+        data[i + 2] = Math.min(255, data[i + 2] + n);
+      }
+      gctx.putImageData(img, 0, 0);
+
+      // darker patches
+      for (let i = 0; i < 130; i++) {
+        const x = Math.random() * TEX_SIZE;
+        const y = Math.random() * TEX_SIZE;
+        const r = 10 + Math.random() * 60;
+        const a = 0.04 + Math.random() * 0.09;
+        gctx.fillStyle = `rgba(0,0,0,${a})`;
+        gctx.beginPath();
+        gctx.ellipse(x, y, r, r * (0.5 + Math.random()), Math.random() * Math.PI, 0, Math.PI * 2);
+        gctx.fill();
+      }
+
+      // lane markings (center cross)
+      gctx.save();
+      gctx.globalAlpha = 0.5;
+      gctx.strokeStyle = "#d6d6d6";
+      gctx.lineWidth = 10;
+      gctx.setLineDash([30, 22]);
+
+      // horizontal
+      gctx.beginPath();
+      gctx.moveTo(0, TEX_SIZE * 0.5);
+      gctx.lineTo(TEX_SIZE, TEX_SIZE * 0.5);
+      gctx.stroke();
+
+      // vertical
+      gctx.beginPath();
+      gctx.moveTo(TEX_SIZE * 0.5, 0);
+      gctx.lineTo(TEX_SIZE * 0.5, TEX_SIZE);
+      gctx.stroke();
+
+      gctx.restore();
+    }
+
+    drawBaseAsphalt();
+
+    // Skid layer state
+    let skidNeedsReset = false;
+    function resetSkids() {
+      drawBaseAsphalt();
+      skidTex.needsUpdate = true;
+      rearUVPrevL = null;
+      rearUVPrevR = null;
+    }
+
+    const skidTex = new THREE.CanvasTexture(asphalt);
+    skidTex.wrapS = skidTex.wrapT = THREE.ClampToEdgeWrapping;
+    skidTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+    const groundMat = new THREE.MeshStandardMaterial({
+      map: skidTex,
+      roughness: 0.98,
+      metalness: 0.05
+    });
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
+      groundMat
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Street props: a few curb blocks
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0x2b303a, roughness: 0.95, metalness: 0.02 });
+    function addCurbRing(radius) {
+      const n = 24;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const x = Math.cos(a) * (radius + 9);
+        const z = Math.sin(a) * (radius + 9);
+        const b = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.35, 0.8), curbMat);
+        b.position.set(x, 0.175, z);
+        b.rotation.y = -a;
+        b.castShadow = true;
+        b.receiveShadow = true;
+        scene.add(b);
+      }
+    }
+    addCurbRing(12);
+
+    // ---------- Simple F1 car (procedural) ----------
+    function makeCar() {
+      const car = new THREE.Group();
+
+      const paint = new THREE.MeshStandardMaterial({ color: 0xff2e2e, roughness: 0.35, metalness: 0.4 });
+      const dark = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.8, metalness: 0.15 });
+      const wing = new THREE.MeshStandardMaterial({ color: 0x0b0f14, roughness: 0.55, metalness: 0.25 });
+
+      // Main body
+      const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.35, 6.0), paint);
+      body.position.y = 0.55;
+      body.castShadow = true;
+      car.add(body);
+
+      // Nose (wedge)
+      const noseGeom = new THREE.ConeGeometry(0.75, 2.2, 20);
+      const nose = new THREE.Mesh(noseGeom, paint);
+      nose.rotation.x = Math.PI / 2;
+      nose.position.set(0, 0.55, 3.7);
+      nose.castShadow = true;
+      car.add(nose);
+
+      // Cockpit
+      const cockpit = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.35, 1.6), dark);
+      cockpit.position.set(0, 0.82, 0.3);
+      cockpit.castShadow = true;
+      car.add(cockpit);
+
+      // Front wing
+      const frontWing = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.15, 0.7), wing);
+      frontWing.position.set(0, 0.34, 4.55);
+      frontWing.castShadow = true;
+      car.add(frontWing);
+
+      // Rear wing
+      const rearWing = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.18, 0.8), wing);
+      rearWing.position.set(0, 0.95, -2.7);
+      rearWing.castShadow = true;
+      car.add(rearWing);
+
+      const rearWingPillarL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.15), wing);
+      rearWingPillarL.position.set(-0.65, 0.75, -2.6);
+      rearWingPillarL.castShadow = true;
+      car.add(rearWingPillarL);
+
+      const rearWingPillarR = rearWingPillarL.clone();
+      rearWingPillarR.position.x = 0.65;
+      car.add(rearWingPillarR);
+
+      // Side pods
+      const podGeom = new THREE.BoxGeometry(0.8, 0.25, 2.3);
+      const podL = new THREE.Mesh(podGeom, paint);
+      podL.position.set(-1.05, 0.52, -0.6);
+      podL.castShadow = true;
+      car.add(podL);
+      const podR = podL.clone();
+      podR.position.x = 1.05;
+      car.add(podR);
+
+      // Wheels
+      const wheelRadius = 0.38;
+      const wheelWidth = 0.28;
+
+      const tireMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.95, metalness: 0.03 });
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.45, metalness: 0.6 });
+
+      function wheel() {
+        const g = new THREE.Group();
+        const tire = new THREE.Mesh(new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 24), tireMat);
+        tire.rotation.z = Math.PI / 2;
+        tire.castShadow = true;
+        g.add(tire);
+
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(wheelRadius * 0.55, wheelRadius * 0.55, wheelWidth * 1.02, 18), rimMat);
+        rim.rotation.z = Math.PI / 2;
+        rim.castShadow = true;
+        g.add(rim);
+
+        return g;
+      }
+
+      const wheels = {
+        fl: wheel(), fr: wheel(), rl: wheel(), rr: wheel()
+      };
+
+      // Front axle (wider)
+      wheels.fl.position.set(-1.35, wheelRadius, 2.7);
+      wheels.fr.position.set( 1.35, wheelRadius, 2.7);
+
+      // Rear axle
+      wheels.rl.position.set(-1.25, wheelRadius, -2.2);
+      wheels.rr.position.set( 1.25, wheelRadius, -2.2);
+
+      car.add(wheels.fl, wheels.fr, wheels.rl, wheels.rr);
+
+      // Keep references for animation
+      car.userData.wheels = wheels;
+      car.userData.wheelRadius = wheelRadius;
+
+      return car;
+    }
+
+    const car = makeCar();
+    car.position.y = 0.02;
+    scene.add(car);
+
+    // ---------- Smoke particles (simple sprites) ----------
+    function makeSmokeTexture() {
+      const c = document.createElement("canvas");
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext("2d");
+      const grad = ctx.createRadialGradient(64, 64, 5, 64, 64, 60);
+      grad.addColorStop(0.0, "rgba(255,255,255,0.22)");
+      grad.addColorStop(0.35, "rgba(255,255,255,0.12)");
+      grad.addColorStop(1.0, "rgba(255,255,255,0.0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const smokeTex = makeSmokeTexture();
+    const smokeMat = new THREE.MeshBasicMaterial({ map: smokeTex, transparent: true, depthWrite: false, opacity: 1 });
+
+    const smokePool = [];
+    const smokeLive = [];
+    const SMOKE_MAX = 220;
+
+    function spawnSmoke(pos, size, alpha) {
+      let p = smokePool.pop();
+      if (!p) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), smokeMat.clone());
+        m.rotation.x = -Math.PI / 2;
+        p = { mesh: m, life: 0, maxLife: 0 };
+        scene.add(m);
+      }
+      p.mesh.position.copy(pos);
+      p.mesh.scale.setScalar(size);
+      p.mesh.material.opacity = alpha;
+      p.life = 0;
+      p.maxLife = 0.9 + Math.random() * 0.7;
+      smokeLive.push(p);
+    }
+
+    function updateSmoke(dt) {
+      for (let i = smokeLive.length - 1; i >= 0; i--) {
+        const p = smokeLive[i];
+        p.life += dt;
+        const t = p.life / p.maxLife;
+
+        // drift outward a bit and rise slightly
+        p.mesh.position.x += (Math.random() - 0.5) * 0.15;
+        p.mesh.position.z += (Math.random() - 0.5) * 0.15;
+        p.mesh.position.y = 0.03 + t * 0.05;
+
+        p.mesh.material.opacity = Math.max(0, (1 - t) * 0.35);
+        p.mesh.scale.multiplyScalar(1 + dt * 0.9);
+
+        if (p.life >= p.maxLife) {
+          smokeLive.splice(i, 1);
+          if (smokePool.length < SMOKE_MAX) smokePool.push(p);
+          p.mesh.material.opacity = 0;
+        }
+      }
+    }
+
+    // ---------- Skid marks: draw rear wheel paths into asphalt canvas ----------
+    function worldToUV(x, z) {
+      const u = (x / GROUND_SIZE) + 0.5;
+      const v = 1 - ((z / GROUND_SIZE) + 0.5);
+      return { u, v };
+    }
+
+    let rearUVPrevL = null;
+    let rearUVPrevR = null;
+
+    function drawSkidLine(prev, curr, strength) {
+      if (!prev || !curr) return;
+      const x1 = prev.u * TEX_SIZE;
+      const y1 = prev.v * TEX_SIZE;
+      const x2 = curr.u * TEX_SIZE;
+      const y2 = curr.v * TEX_SIZE;
+
+      gctx.save();
+      gctx.globalAlpha = 0.20 * strength;
+      gctx.strokeStyle = "#0a0a0a";
+      gctx.lineWidth = 10;
+      gctx.lineCap = "round";
+      gctx.beginPath();
+      gctx.moveTo(x1, y1);
+      gctx.lineTo(x2, y2);
+      gctx.stroke();
+
+      // feather edge
+      gctx.globalAlpha = 0.10 * strength;
+      gctx.lineWidth = 18;
+      gctx.beginPath();
+      gctx.moveTo(x1, y1);
+      gctx.lineTo(x2, y2);
+      gctx.stroke();
+
+      gctx.restore();
+    }
+
+    // ---------- Controls ----------
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 1, 0);
+
+    let chaseCam = true;
+    function setCameraModeChase(on) {
+      chaseCam = on;
+      controls.enabled = !on;
+      document.getElementById("camBtn").textContent = "Camera: " + (on ? "Chase" : "Orbit");
+    }
+    setCameraModeChase(true);
+
+    // ---------- UI wiring ----------
+    const elRadius = document.getElementById("radius");
+    const elSpeed  = document.getElementById("speed");
+    const elDrift  = document.getElementById("drift");
+    const elSmoke  = document.getElementById("smoke");
+
+    const radiusV = document.getElementById("radiusV");
+    const speedV  = document.getElementById("speedV");
+    const driftV  = document.getElementById("driftV");
+    const smokeV  = document.getElementById("smokeV");
+
+    function syncUI() {
+      radiusV.textContent = (+elRadius.value).toFixed(1);
+      speedV.textContent  = (+elSpeed.value).toFixed(2);
+      driftV.textContent  = `${(+elDrift.value)|0}°`;
+      smokeV.textContent  = (+elSmoke.value).toFixed(2);
+    }
+    ["input","change"].forEach(evt => {
+      elRadius.addEventListener(evt, syncUI);
+      elSpeed.addEventListener(evt, syncUI);
+      elDrift.addEventListener(evt, syncUI);
+      elSmoke.addEventListener(evt, syncUI);
+    });
+    syncUI();
+
+    document.getElementById("camBtn").addEventListener("click", () => setCameraModeChase(!chaseCam));
+
+    let paused = false;
+    const pauseBtn = document.getElementById("pauseBtn");
+    function setPaused(p) {
+      paused = p;
+      pauseBtn.textContent = paused ? "Resume" : "Pause";
+    }
+    pauseBtn.addEventListener("click", () => setPaused(!paused));
+
+    document.getElementById("resetBtn").addEventListener("click", () => resetSkids());
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") { e.preventDefault(); setPaused(!paused); }
+      if (e.key === "1") setCameraModeChase(true);
+      if (e.key === "2") setCameraModeChase(false);
+    });
+
+    // ---------- Donut motion ----------
+    let t = 0; // time accumulator
+
+    const tmpV = new THREE.Vector3();
+    const tmpW = new THREE.Vector3();
+    const tmpQ = new THREE.Quaternion();
+
+    // camera smoothing
+    const camPos = new THREE.Vector3();
+    const camLook = new THREE.Vector3();
+
+    // precompute wheel offsets for smoke + skid
+    const rearWheelLocalL = new THREE.Vector3(-1.25, car.userData.wheelRadius, -2.2);
+    const rearWheelLocalR = new THREE.Vector3( 1.25, car.userData.wheelRadius, -2.2);
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.033, clock.getDelta());
+
+      if (!paused) {
+        const radius = +elRadius.value;
+        const speed = +elSpeed.value;              // angular speed scaler
+        const driftDeg = +elDrift.value;
+        const smokeAmt = +elSmoke.value;
+
+        t += dt * speed;
+
+        // Path position
+        const x = Math.cos(t) * radius;
+        const z = Math.sin(t) * radius;
+        car.position.set(x, 0.02, z);
+
+        // Direction of motion is tangent: derivative of circle
+        const dx = -Math.sin(t);
+        const dz =  Math.cos(t);
+
+        // Heading angle of velocity
+        const motionYaw = Math.atan2(dx, dz);
+
+        // Drift: car points slightly inward compared to motion direction
+        // Make drift direction consistent with turning around the circle
+        const driftSign = 1; // change to -1 to flip drift
+        const driftRad = THREE.MathUtils.degToRad(driftDeg) * driftSign;
+
+        // For a donut, pointing toward center looks cool: add inward bias
+        const inwardYaw = Math.atan2(-x, -z);
+        const blend = 0.35; // blend toward inward aim
+        let targetYaw = THREE.MathUtils.lerp(motionYaw + driftRad, inwardYaw + driftRad * 0.4, blend);
+
+        // Apply yaw
+        car.rotation.set(0, targetYaw, 0);
+
+        // Slight lean from lateral acceleration
+        const lean = THREE.MathUtils.degToRad(5 + driftDeg * 0.06);
+        car.rotation.z = -lean;
+
+        // Wheel animation
+        const wheels = car.userData.wheels;
+        const wheelSpin = (dt * speed * radius) / (car.userData.wheelRadius * 1.4);
+        wheels.fl.rotation.x -= wheelSpin;
+        wheels.fr.rotation.x -= wheelSpin;
+        wheels.rl.rotation.x -= wheelSpin;
+        wheels.rr.rotation.x -= wheelSpin;
+
+        // Fake steering angle for front wheels (countersteer style)
+        const steer = THREE.MathUtils.degToRad(Math.min(22, driftDeg * 0.6));
+        wheels.fl.rotation.y = steer * 0.9;
+        wheels.fr.rotation.y = steer * 0.9;
+
+        // Smoke spawn behind rear wheels
+        if (smokeAmt > 0.001) {
+          const spawnRate = 18 * smokeAmt * (0.5 + driftDeg / 55);
+          const toSpawn = Math.min(6, Math.floor(spawnRate * dt * 10));
+
+          for (let i = 0; i < toSpawn; i++) {
+            // rear wheel world positions
+            tmpV.copy(rearWheelLocalL).applyMatrix4(car.matrixWorld);
+            tmpW.copy(rearWheelLocalR).applyMatrix4(car.matrixWorld);
+
+            // offset slightly behind, opposite car forward
+            const back = new THREE.Vector3(0, 0, -1).applyQuaternion(car.quaternion);
+            tmpV.addScaledVector(back, 0.35);
+            tmpW.addScaledVector(back, 0.35);
+
+            spawnSmoke(tmpV, 0.45 + Math.random() * 0.55, 0.35);
+            spawnSmoke(tmpW, 0.45 + Math.random() * 0.55, 0.35);
+          }
+        }
+
+        // Skid marks (rear wheels)
+        const skidStrength = THREE.MathUtils.clamp((driftDeg / 55) * (0.65 + speed / 3.2), 0, 1);
+
+        tmpV.copy(rearWheelLocalL).applyMatrix4(car.matrixWorld);
+        tmpW.copy(rearWheelLocalR).applyMatrix4(car.matrixWorld);
+
+        const uvL = worldToUV(tmpV.x, tmpV.z);
+        const uvR = worldToUV(tmpW.x, tmpW.z);
+
+        drawSkidLine(rearUVPrevL, uvL, skidStrength);
+        drawSkidLine(rearUVPrevR, uvR, skidStrength);
+
+        rearUVPrevL = uvL;
+        rearUVPrevR = uvR;
+
+        // Update texture occasionally (not every frame)
+        if ((Math.floor(t * 60) % 2) === 0) skidTex.needsUpdate = true;
+
+        // Chase camera
+        if (chaseCam) {
+          const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(car.quaternion);
+          const up = new THREE.Vector3(0, 1, 0);
+
+          const desiredPos = new THREE.Vector3()
+            .copy(car.position)
+            .addScaledVector(forward, -9.5)
+            .addScaledVector(up, 4.2);
+
+          const desiredLook = new THREE.Vector3()
+            .copy(car.position)
+            .addScaledVector(up, 1.2);
+
+          camPos.lerp(desiredPos, 1 - Math.pow(0.001, dt));
+          camLook.lerp(desiredLook, 1 - Math.pow(0.001, dt));
+
+          camera.position.copy(camPos);
+          camera.lookAt(camLook);
+        }
+      }
+
+      controls.update();
+      updateSmoke(dt);
+      renderer.render(scene, camera);
+    }
+
+    // initialize camera smoothing vectors
+    camPos.copy(camera.position);
+    camLook.copy(controls.target);
+
+    // ---------- Resize ----------
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    animate();
+  </script>
+</body>
+</html>

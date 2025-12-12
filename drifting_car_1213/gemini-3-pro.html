@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Drift Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: monospace;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="info">F1 Street Drift Simulation</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x202025);
+        scene.fog = new THREE.Fog(0x202025, 20, 100);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 20, 40);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(10, 50, 20);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 100;
+        dirLight.shadow.camera.left = -30;
+        dirLight.shadow.camera.right = 30;
+        dirLight.shadow.camera.top = 30;
+        dirLight.shadow.camera.bottom = -30;
+        scene.add(dirLight);
+
+        // --- ENVIRONMENT (STREET) ---
+        const planeGeometry = new THREE.PlaneGeometry(200, 200);
+        const planeMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x333333,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const ground = new THREE.Mesh(planeGeometry, planeMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Skid marks (Torus to simulate circular skid path)
+        const skidGeometry = new THREE.RingGeometry(9.5, 10.5, 64);
+        const skidMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x111111, 
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.6
+        });
+        const skidMarks = new THREE.Mesh(skidGeometry, skidMaterial);
+        skidMarks.rotation.x = -Math.PI / 2;
+        skidMarks.position.y = 0.02;
+        scene.add(skidMarks);
+
+        // --- CAR CONSTRUCTION ---
+        const carGroup = new THREE.Group();
+        scene.add(carGroup);
+
+        const carColor = 0xff0000; // Ferrari Red style
+        const bodyMat = new THREE.MeshStandardMaterial({ color: carColor, roughness: 0.2, metalness: 0.5 });
+        const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+        
+        // Main Body
+        const chassisGeo = new THREE.BoxGeometry(1.4, 0.5, 4);
+        const chassis = new THREE.Mesh(chassisGeo, bodyMat);
+        chassis.position.y = 0.5;
+        chassis.castShadow = true;
+        carGroup.add(chassis);
+
+        // Cockpit
+        const cockpitGeo = new THREE.BoxGeometry(0.8, 0.4, 1.5);
+        const cockpit = new THREE.Mesh(cockpitGeo, blackMat);
+        cockpit.position.set(0, 0.8, -0.2);
+        carGroup.add(cockpit);
+
+        // Front Wing
+        const fWingGeo = new THREE.BoxGeometry(2.2, 0.1, 0.8);
+        const fWing = new THREE.Mesh(fWingGeo, bodyMat);
+        fWing.position.set(0, 0.3, 2.2);
+        fWing.castShadow = true;
+        carGroup.add(fWing);
+
+        // Rear Wing
+        const rWingGeo = new THREE.BoxGeometry(1.8, 0.1, 0.6);
+        const rWing = new THREE.Mesh(rWingGeo, blackMat);
+        rWing.position.set(0, 1.2, -1.9);
+        rWing.castShadow = true;
+        carGroup.add(rWing);
+
+        // Wing Supports
+        const rSupportGeo = new THREE.BoxGeometry(0.1, 0.8, 0.4);
+        const rSupportL = new THREE.Mesh(rSupportGeo, bodyMat);
+        rSupportL.position.set(0.4, 0.8, -1.9);
+        const rSupportR = new THREE.Mesh(rSupportGeo, bodyMat);
+        rSupportR.position.set(-0.4, 0.8, -1.9);
+        carGroup.add(rSupportL, rSupportR);
+
+        // Wheels
+        const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 24);
+        wheelGeo.rotateZ(Math.PI / 2);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+
+        function createWheel(x, z, isFront) {
+            const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+            wheel.position.set(x, 0.4, z);
+            wheel.castShadow = true;
+            carGroup.add(wheel);
+            return wheel;
+        }
+
+        const wheels = {
+            fl: createWheel(0.9, 1.4, true),
+            fr: createWheel(-0.9, 1.4, true),
+            rl: createWheel(0.9, -1.2, false),
+            rr: createWheel(-0.9, -1.2, false)
+        };
+
+        // --- SMOKE SYSTEM ---
+        const smokeParticles = [];
+        const smokeGeo = new THREE.DodecahedronGeometry(1, 0); // Low poly sphere
+        const smokeMat = new THREE.MeshStandardMaterial({
+            color: 0xdddddd,
+            transparent: true,
+            opacity: 0.6,
+            depthWrite: false,
+            roughness: 1
+        });
+
+        // Initialize particle pool
+        for(let i=0; i<150; i++) {
+            const p = new THREE.Mesh(smokeGeo, smokeMat);
+            p.position.set(0, -10, 0); // Hide initially
+            p.scale.set(0.1, 0.1, 0.1);
+            p.visible = false;
+            p.userData = { life: 0, speed: 0 };
+            scene.add(p);
+            smokeParticles.push(p);
+        }
+
+        // --- ANIMATION STATE ---
+        let angle = 0;
+        const radius = 10;
+        const speed = 0.05;
+        let particleIdx = 0;
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. Orbital Movement (The Donut)
+            angle += speed;
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+
+            carGroup.position.set(x, 0, z);
+
+            // 2. Car Rotation
+            // We want the car to look at the tangent, then rotate INWARDS (slip angle)
+            // Tangent angle is angle + PI
+            // Drift offset: -0.6 radians (counter-steering into the turn)
+            carGroup.rotation.y = -angle + 0.6; 
+
+            // 3. Wheel Spin
+            Object.values(wheels).forEach(w => w.rotation.x += 0.5);
+
+            // 4. Front Wheel Steering (Counter-steer visual)
+            // Front wheels should point towards the direction of travel, opposing the drift
+            wheels.fl.rotation.y = -0.5; 
+            wheels.fr.rotation.y = -0.5;
+
+            // 5. Camera Follow (Smooth dynamic camera)
+            const camX = Math.cos(angle - 0.5) * (radius + 15);
+            const camZ = Math.sin(angle - 0.5) * (radius + 15);
+            camera.position.lerp(new THREE.Vector3(camX, 12, camZ), 0.05);
+            camera.lookAt(carGroup.position);
+
+            // 6. Particle Emission (Smoke)
+            // Emit 2 particles per frame (one per rear wheel)
+            emitSmoke(wheels.rl);
+            emitSmoke(wheels.rr);
+
+            // Update all particles
+            updateSmoke();
+
+            renderer.render(scene, camera);
+        }
+
+        function emitSmoke(wheel) {
+            const p = smokeParticles[particleIdx];
+            
+            // Get world position of the wheel
+            const worldPos = new THREE.Vector3();
+            wheel.getWorldPosition(worldPos);
+
+            // Reset particle
+            p.position.copy(worldPos);
+            p.position.y = 0.2; // Start at ground level
+            
+            // Randomize slightly
+            p.position.x += (Math.random() - 0.5) * 0.5;
+            p.position.z += (Math.random() - 0.5) * 0.5;
+
+            p.scale.set(0.5, 0.5, 0.5);
+            p.material.opacity = 0.4;
+            p.visible = true;
+            p.userData.life = 1.0;
+            p.userData.speed = 0.05 + Math.random() * 0.05;
+
+            particleIdx = (particleIdx + 1) % smokeParticles.length;
+        }
+
+        function updateSmoke() {
+            smokeParticles.forEach(p => {
+                if(!p.visible) return;
+
+                p.userData.life -= 0.015; // Decay rate
+                p.position.y += p.userData.speed; // Rise up
+                p.scale.multiplyScalar(1.05); // Expand
+
+                // Fade out
+                p.material.opacity = p.userData.life * 0.4;
+
+                if (p.userData.life <= 0) {
+                    p.visible = false;
+                    p.position.y = -10;
+                }
+            });
+        }
+
+        // Handle Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

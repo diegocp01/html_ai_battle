@@ -11,7 +11,7 @@ Every update
 ``` bash
 git status
 git add .
-git commit -m "Post"
+git commit -m "draft Post 1213"
 git push
 ```
 

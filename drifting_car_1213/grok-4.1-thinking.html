@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Car Drifting Donut Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(50, 50, 50);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+
+        // Street (ground plane)
+        const streetGeometry = new THREE.PlaneGeometry(200, 200);
+        const streetMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const street = new THREE.Mesh(streetGeometry, streetMaterial);
+        street.rotation.x = -Math.PI / 2;
+        street.receiveShadow = true;
+        scene.add(street);
+
+        // Add street lines (simple white lines for road marking)
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+        for (let i = -100; i <= 100; i += 10) {
+            const points = [
+                new THREE.Vector3(i, 0.01, -100),
+                new THREE.Vector3(i, 0.01, 100)
+            ];
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(lineGeometry, lineMaterial);
+            scene.add(line);
+        }
+
+        // Simple F1 Car model (using basic geometries)
+        const car = new THREE.Group();
+
+        // Car body (aerodynamic shape approximation with box)
+        const bodyGeometry = new THREE.BoxGeometry(4, 0.5, 1.5);
+        const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 }); // Red for F1 vibe
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.25;
+        body.castShadow = true;
+        car.add(body);
+
+        // Car nose (front extension)
+        const noseGeometry = new THREE.BoxGeometry(1, 0.4, 1);
+        const nose = new THREE.Mesh(noseGeometry, bodyMaterial);
+        nose.position.set(-2.5, 0.2, 0);
+        car.add(nose);
+
+        // Rear wing
+        const wingGeometry = new THREE.BoxGeometry(3, 0.1, 0.3);
+        const wingMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+        const wing = new THREE.Mesh(wingGeometry, wingMaterial);
+        wing.position.set(0, 0.5, -0.9);
+        car.add(wing);
+
+        // Wheels (four cylinders)
+        const wheelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.4, 8);
+        const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x111111 });
+        const wheels = [];
+        const wheelPositions = [
+            { x: 1.5, z: 0.6 }, { x: -1.5, z: 0.6 }, // front
+            { x: 1.5, z: -0.6 }, { x: -1.5, z: -0.6 }  // rear
+        ];
+        wheelPositions.forEach(pos => {
+            const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+            wheel.position.set(pos.x, 0, pos.z);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.castShadow = true;
+            car.add(wheel);
+            wheels.push(wheel);
+        });
+
+        scene.add(car);
+
+        // Animation variables
+        let time = 0;
+        const radius = 10; // Radius of the donut circle
+        const driftTilt = 0.3; // Max tilt for drifting effect
+        const spinSpeed = 0.02; // Speed of the donut spin
+
+        // Position car initially
+        car.position.set(radius, 0, 0);
+
+        // Camera setup (follow the car from behind and above)
+        camera.position.set(0, 15, 25);
+
+        // Animate loop
+        function animate() {
+            requestAnimationFrame(animate);
+            time += spinSpeed;
+
+            // Circular motion for donut
+            const angle = time;
+            car.position.x = Math.cos(angle) * radius;
+            car.position.z = Math.sin(angle) * radius;
+
+            // Rotate car to face the direction of motion (tangent to circle)
+            car.rotation.y = angle + Math.PI / 2;
+
+            // Simulate drifting: tilt the car inward on turns
+            car.rotation.z = Math.sin(angle * 3) * driftTilt; // Oscillating tilt for dynamic drift feel
+
+            // Rotate wheels for motion effect
+            wheels.forEach((wheel, index) => {
+                wheel.rotation.x = time * 5; // Spin wheels
+                if (index % 2 === 1) wheel.rotation.x *= -1; // Opposite direction for inner/outer? Nah, all forward
+            });
+
+            // Camera follows the car with some offset
+            const camAngle = angle + Math.PI;
+            camera.position.x = car.position.x + Math.cos(camAngle) * 20;
+            camera.position.z = car.position.z + Math.sin(camAngle) * 20;
+            camera.position.y = 8 + Math.abs(Math.sin(angle * 2)) * 5; // Bobbing for excitement
+            camera.lookAt(car.position);
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
