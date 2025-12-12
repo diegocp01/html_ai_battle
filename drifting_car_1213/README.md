@@ -28,6 +28,9 @@ Create a 3D simulation of a formula 1 car performing a continuous drifting donut
 | opus-4.5-thinking-32k    | 57                    | 173                   | 1,297           | 12,524                     | 24                         | Const                | 45                                | 24               | 682           | y                  | 10.0                           | 10.0                                | 10.0            | 10.0                      |
 
 
+## Weighted Performance Model
+A single score that combines how well the model follows the prompt, how correctly the code works, and how good the UI looks.  
+**Sperf = 0.40(PA) + 0.35(FC) + 0.25(UI)** :contentReference[oaicite:0]{index=0}
 
 
 ---
@@ -43,7 +46,7 @@ Create a 3D simulation of a formula 1 car performing a continuous drifting donut
 ## 🧠 Observations
 • gpt-5.2-extended-thinking: Failed to produce a functional simulation. The output focused primarily on textual or parameter-based elements rather than motion or physical behavior. No meaningful drifting or animation was observed. Overall prompt adherence was low, resulting in a minimal and ineffective implementation.
 
-• gemini-3-pro: Successfully rendered a drifting scenario with a clear Tokyo Drift–style motion. While the overall execution was strong, the front tire behavior appeared visually inconsistent, slightly detracting from realism. Despite this, the motion and scene composition remained coherent and engaging.
+• gemini-3-pro: Successfully rendered a drifting scenario with a clear Drift style motion. While the overall execution was strong, the front tire behavior appeared visually inconsistent, slightly detracting from realism. Despite this, the motion and scene composition remained coherent and engaging.
 
 • grok-4.1-thinking: Rendered a visible scene, but physics execution was incorrect. The vehicle appeared to float vertically, and the intended drifting behavior was replaced by camera movement rather than object motion. Functional rendering was achieved, but physical realism and prompt adherence were weak.
 
