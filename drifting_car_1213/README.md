@@ -28,9 +28,9 @@ Create a 3D simulation of a formula 1 car performing a continuous drifting donut
 | opus-4.5-thinking-32k    | 57                    | 173                   | 1,297           | 12,524                     | 24                         | Const                | 45                                | 24               | 682           | y                  | 10.0                           | 10.0                                | 10.0            | 10.0                      |
 
 
-## Weighted Performance Model
+## Weighted Performance Score
 A single score that combines how well the model follows the prompt, how correctly the code works, and how good the UI looks.  
-**Sperf = 0.40(PA) + 0.35(FC) + 0.25(UI)** :contentReference[oaicite:0]{index=0}
+**performance_score = 0.40(prompt_adherence_score) + 0.35(functional_correctness_score) + 0.25(ui_score)**
 
 
 ---
