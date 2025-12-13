@@ -58,6 +58,6 @@ A single score that combines how well the model follows the prompt, how correctl
 
 X (Twitter) post showcasing the experiment:
 
-Link: 
+Link: https://x.com/diegocabezas01/status/1999825601604002211?s=20
 
 ---
