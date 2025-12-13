@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flower Blooming Animation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(to bottom, #87CEEB, #98FB98);
+            font-family: Arial, sans-serif;
+        }
+
+        .flower-container {
+            position: relative;
+            width: 200px;
+            height: 300px;
+        }
+
+        .pot {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 80px;
+            background: #8B4513;
+            border-radius: 0 0 20px 20px;
+            border: 5px solid #654321;
+        }
+
+        .pot::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 10px;
+            right: 10px;
+            height: 10px;
+            background: #8B4513;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .soil {
+            position: absolute;
+            bottom: 5px;
+            left: 10px;
+            right: 10px;
+            height: 20px;
+            background: #8B4513;
+            border-radius: 0 0 10px 10px;
+        }
+
+        .stem {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 0;
+            background: #228B22;
+            animation: growStem 3s ease-out 1s forwards;
+            border-radius: 2px;
+        }
+
+        @keyframes growStem {
+            to {
+                height: 150px;
+            }
+        }
+
+        .flower {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            animation: bloom 2s ease-out 4s forwards;
+        }
+
+        .center {
+            width: 20px;
+            height: 20px;
+            background: #FFD700;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px #FFD700;
+        }
+
+        .petal {
+            position: absolute;
+            width: 0;
+            height: 0;
+            background: #FF69B4;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            transform-origin: bottom center;
+            opacity: 0;
+        }
+
+        .petal:nth-child(1) {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(0deg) scale(0);
+            animation: petalBloom 1.5s ease-out 4.5s forwards;
+        }
+
+        .petal:nth-child(2) {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(72deg) scale(0);
+            animation: petalBloom 1.5s ease-out 4.7s forwards;
+        }
+
+        .petal:nth-child(3) {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(144deg) scale(0);
+            animation: petalBloom 1.5s ease-out 4.9s forwards;
+        }
+
+        .petal:nth-child(4) {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(216deg) scale(0);
+            animation: petalBloom 1.5s ease-out 5.1s forwards;
+        }
+
+        .petal:nth-child(5) {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(288deg) scale(0);
+            animation: petalBloom 1.5s ease-out 5.3s forwards;
+        }
+
+        @keyframes petalBloom {
+            to {
+                width: 30px;
+                height: 40px;
+                opacity: 1;
+                transform: translate(-50%, -50%) rotate(var(--rotation)) scale(1);
+            }
+        }
+
+        .petal {
+            --rotation: 0deg; /* This will be overridden in HTML if needed */
+        }
+
+        /* Override rotations in CSS for each petal */
+        .petal:nth-child(1) { --rotation: 0deg; }
+        .petal:nth-child(2) { --rotation: 72deg; }
+        .petal:nth-child(3) { --rotation: 144deg; }
+        .petal:nth-child(4) { --rotation: 216deg; }
+        .petal:nth-child(5) { --rotation: 288deg; }
+
+        @keyframes bloom {
+            to {
+                opacity: 1;
+            }
+        }
+
+        h3 {
+            text-align: center;
+            color: #333;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="flower-container">
+        <div class="pot">
+            <div class="soil"></div>
+        </div>
+        <div class="stem"></div>
+        <div class="flower">
+            <div class="center"></div>
+            <div class="petal"></div>
+            <div class="petal"></div>
+            <div class="petal"></div>
+            <div class="petal"></div>
+            <div class="petal"></div>
+        </div>
+    </div>
+    <h3>A Single Flower Blooms</h3>
+</body>
+</html>

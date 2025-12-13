@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blooming Flower Animation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #e0f7fa; /* Light blue sky */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+
+        .scene {
+            position: relative;
+            width: 300px;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+        }
+
+        /* --- The Pot --- */
+        .pot-container {
+            z-index: 10;
+            position: relative;
+        }
+
+        .pot {
+            width: 100px;
+            height: 80px;
+            background-color: #8d6e63;
+            clip-path: polygon(15% 100%, 85% 100%, 100% 0, 0 0);
+            position: relative;
+        }
+
+        .pot-rim {
+            width: 110px;
+            height: 20px;
+            background-color: #6d4c41;
+            border-radius: 5px;
+            position: absolute;
+            top: -20px; /* Sit on top of the pot */
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* --- The Plant --- */
+        .plant {
+            position: absolute;
+            bottom: 80px; /* Starts at the top of the pot */
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            width: 20px;
+        }
+
+        .stem {
+            width: 12px;
+            background-color: #66bb6a;
+            height: 0; /* Starts with no height */
+            border-radius: 5px;
+            position: relative;
+            transition: height 2s ease-in-out;
+        }
+
+        /* Leaves */
+        .leaf {
+            width: 40px;
+            height: 20px;
+            background-color: #66bb6a;
+            border-radius: 0 20px 0 20px;
+            position: absolute;
+            opacity: 0;
+            transition: all 0.5s ease-out;
+        }
+
+        .leaf.left {
+            left: -35px;
+            top: 40%;
+            transform: rotate(-30deg) scale(0);
+        }
+
+        .leaf.right {
+            right: -35px;
+            top: 60%;
+            transform: rotate(30deg) scale(0) scaleX(-1); /* Mirror */
+        }
+
+        /* Leaf Animation Classes */
+        .stem.grown .leaf {
+            opacity: 1;
+        }
+        .stem.grown .leaf.left {
+            transform: rotate(-10deg) scale(1);
+        }
+        .stem.grown .leaf.right {
+            transform: rotate(10deg) scale(1) scaleX(-1);
+        }
+
+        /* --- The Flower Head --- */
+        .flower-head {
+            position: absolute;
+            top: -10px; /* Slightly above top of stem */
+            width: 0;
+            height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+        }
+
+        .center {
+            width: 30px;
+            height: 30px;
+            background-color: #ffeb3b; /* Yellow center */
+            border-radius: 50%;
+            position: absolute;
+            z-index: 10;
+            transform: scale(0);
+            transition: transform 0.5s ease-out;
+        }
+
+        .petal {
+            width: 40px;
+            height: 80px;
+            background: linear-gradient(to top, #f48fb1, #f06292);
+            border-radius: 50% 50% 0 0; /* Tear drop shape */
+            position: absolute;
+            bottom: 0; /* Anchor at the center */
+            transform-origin: bottom center;
+            transform: scale(0);
+            z-index: 1;
+            opacity: 0.9;
+            transition: transform 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy effect */
+        }
+
+        /* --- Controls --- */
+        button {
+            margin-top: 20px;
+            padding: 10px 25px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #26a69a;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #00897b;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="scene">
+        <div class="plant">
+            <div class="stem" id="stem">
+                <div class="leaf left"></div>
+                <div class="leaf right"></div>
+                
+                <div class="flower-head" id="flowerHead">
+                    <div class="center" id="flowerCenter"></div>
+                    </div>
+            </div>
+        </div>
+
+        <div class="pot-container">
+            <div class="pot-rim"></div>
+            <div class="pot"></div>
+        </div>
+    </div>
+
+    <button onclick="bloomFlower()">Grow & Bloom</button>
+
+    <script>
+        const petalCount = 8;
+        const flowerHead = document.getElementById('flowerHead');
+        
+        // 1. Generate Petals dynamically
+        function createPetals() {
+            for (let i = 0; i < petalCount; i++) {
+                const petal = document.createElement('div');
+                petal.classList.add('petal');
+                // Calculate rotation for even spacing
+                const rotation = (360 / petalCount) * i;
+                // Store the final rotation in a data attribute or just set it via custom property logic
+                // We set the initial rotation but keep scale(0) via CSS class handling or inline styles
+                
+                // We will use a custom property to store the target rotation
+                petal.style.setProperty('--target-rot', rotation + 'deg');
+                
+                // Initially just rotated but scale 0
+                petal.style.transform = `rotate(${rotation}deg) scale(0)`;
+                
+                flowerHead.appendChild(petal);
+            }
+        }
+
+        createPetals();
+
+        function bloomFlower() {
+            const stem = document.getElementById('stem');
+            const center = document.getElementById('flowerCenter');
+            const petals = document.querySelectorAll('.petal');
+            
+            // Reset for replayability (optional simple reset)
+            stem.style.height = '0px';
+            stem.classList.remove('grown');
+            center.style.transform = 'scale(0)';
+            petals.forEach(p => {
+                const rot = p.style.getPropertyValue('--target-rot');
+                p.style.transform = `rotate(${rot}) scale(0)`;
+            });
+
+            // Small delay to allow reset to apply, then start animation
+            setTimeout(() => {
+                // 1. Grow Stem
+                stem.style.height = '200px';
+                
+                // 2. Show Leaves (halfway through stem growth)
+                setTimeout(() => {
+                    stem.classList.add('grown');
+                }, 1000);
+
+                // 3. Bloom Flower (after stem finishes)
+                setTimeout(() => {
+                    // Pop center
+                    center.style.transform = 'scale(1)';
+                    
+                    // Unfurl petals
+                    petals.forEach((petal, index) => {
+                        const targetRotation = petal.style.getPropertyValue('--target-rot');
+                        // Add a slight stagger delay based on index for a natural effect
+                        setTimeout(() => {
+                            petal.style.transform = `rotate(${targetRotation}) scale(1)`;
+                        }, index * 50); 
+                    });
+                    
+                }, 2000); // 2 seconds matches the stem CSS transition time
+
+            }, 100);
+        }
+        
+        // Auto start on load (optional)
+        // window.onload = bloomFlower;
+    </script>
+</body>
+</html>

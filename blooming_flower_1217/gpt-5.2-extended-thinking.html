@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flower Blooming in a Pot</title>
+  <style>
+    :root{
+      --t: 0;           /* master progress 0..1 */
+      --stem: 0;        /* stem growth 0..1 */
+      --leaf: 0;        /* leaf pop 0..1 */
+      --bloom: 0;       /* petals open 0..1 */
+      --pulse: 0;       /* center pulse 0..1 */
+      --sway: 0;        /* subtle sway -1..1 */
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:#eaf2ff;
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      background:
+        radial-gradient(1200px 700px at 50% 15%, rgba(255,255,255,0.12), transparent 55%),
+        radial-gradient(800px 600px at 15% 85%, rgba(122,255,219,0.14), transparent 60%),
+        radial-gradient(900px 700px at 85% 85%, rgba(255,155,245,0.12), transparent 60%),
+        linear-gradient(180deg, #0b1020, #070a14 60%, #04050b);
+    }
+
+    .wrap{
+      width:min(920px, 92vw);
+      height:min(560px, 78vh);
+      position:relative;
+      border-radius:28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      box-shadow:
+        0 30px 90px rgba(0,0,0,0.55),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      overflow:hidden;
+    }
+
+    /* soft ground */
+    .ground{
+      position:absolute;
+      left:-10%;
+      right:-10%;
+      bottom:-20%;
+      height:55%;
+      background: radial-gradient(70% 120% at 50% 0%, rgba(120,255,228,0.08), transparent 55%),
+                  radial-gradient(60% 90% at 30% 30%, rgba(255,160,240,0.06), transparent 60%),
+                  linear-gradient(180deg, rgba(12,16,34,0), rgba(0,0,0,0.35));
+      filter: blur(0.2px);
+    }
+
+    .scene{
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      padding:28px;
+    }
+
+    .plant{
+      position:relative;
+      width:360px;
+      height:420px;
+      transform: translateY(18px);
+    }
+
+    /* POT */
+    .pot{
+      position:absolute;
+      left:50%;
+      bottom:36px;
+      transform: translateX(-50%);
+      width:230px;
+      height:160px;
+      filter: drop-shadow(0 18px 30px rgba(0,0,0,0.55));
+    }
+
+    .pot .rim{
+      position:absolute;
+      left:50%;
+      top:0;
+      transform: translateX(-50%);
+      width:248px;
+      height:44px;
+      border-radius:16px 16px 18px 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.03));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .pot .body{
+      position:absolute;
+      left:50%;
+      top:28px;
+      transform: translateX(-50%);
+      width:230px;
+      height:132px;
+      border-radius: 0 0 28px 28px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.18)),
+        radial-gradient(140px 90px at 30% 25%, rgba(255,255,255,0.10), transparent 55%),
+        radial-gradient(180px 120px at 70% 80%, rgba(0,0,0,0.22), transparent 55%);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .pot .base{
+      position:absolute;
+      left:50%;
+      bottom:-8px;
+      transform: translateX(-50%);
+      width:180px;
+      height:24px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      filter: blur(0.2px);
+    }
+
+    .soil{
+      position:absolute;
+      left:50%;
+      top:12px;
+      transform: translateX(-50%);
+      width:220px;
+      height:34px;
+      border-radius: 999px;
+      background:
+        radial-gradient(80px 30px at 35% 35%, rgba(255,255,255,0.08), transparent 60%),
+        linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.20));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: inset 0 8px 18px rgba(0,0,0,0.35);
+    }
+
+    /* STEM */
+    .stem{
+      position:absolute;
+      left:50%;
+      bottom:170px;
+      width:16px;
+      height:210px;
+      transform-origin: 50% 100%;
+      transform:
+        translateX(-50%)
+        rotate(calc(var(--sway) * 2.8deg))
+        scaleY(var(--stem));
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.14), transparent 45%),
+        linear-gradient(180deg, rgba(160,255,190,0.95), rgba(60,200,120,0.95));
+      box-shadow:
+        0 12px 22px rgba(0,0,0,0.35),
+        inset 0 0 0 1px rgba(255,255,255,0.10);
+    }
+
+    /* LEAVES */
+    .leaf{
+      position:absolute;
+      width:86px;
+      height:46px;
+      border-radius: 86px 86px 86px 0;
+      background:
+        radial-gradient(40px 26px at 35% 35%, rgba(255,255,255,0.18), transparent 60%),
+        linear-gradient(180deg, rgba(170,255,210,0.95), rgba(40,175,110,0.95));
+      box-shadow:
+        0 10px 20px rgba(0,0,0,0.25),
+        inset 0 0 0 1px rgba(255,255,255,0.12);
+      transform-origin: 10% 90%;
+      opacity: clamp(0, var(--leaf), 1);
+      filter: saturate(1.05);
+    }
+
+    .leaf.left{
+      left:50%;
+      bottom:250px;
+      transform:
+        translateX(-46px)
+        rotate(calc(-38deg + (1 - var(--leaf)) * -18deg))
+        scale(calc(0.3 + 0.7 * var(--leaf)));
+    }
+
+    .leaf.right{
+      left:50%;
+      bottom:230px;
+      transform-origin: 90% 90%;
+      transform:
+        translateX(-4px)
+        scaleX(-1)
+        rotate(calc(-28deg + (1 - var(--leaf)) * 16deg))
+        scale(calc(0.3 + 0.7 * var(--leaf)));
+    }
+
+    /* BLOOM (PETALS + CENTER) */
+    .bloom{
+      position:absolute;
+      left:50%;
+      bottom:360px;
+      width:200px;
+      height:200px;
+      transform:
+        translateX(-50%)
+        rotate(calc(var(--sway) * 3.6deg))
+        scale(calc(0.92 + 0.08 * var(--bloom)));
+      transform-origin: 50% 70%;
+    }
+
+    .petal{
+      position:absolute;
+      left:50%;
+      top:50%;
+      width:56px;
+      height:92px;
+      border-radius: 999px;
+      transform-origin: 50% 92%;
+      background:
+        radial-gradient(22px 22px at 30% 25%, rgba(255,255,255,0.62), rgba(255,255,255,0.0) 65%),
+        linear-gradient(180deg, rgba(255,165,230,0.95), rgba(255,90,190,0.9));
+      box-shadow:
+        0 14px 20px rgba(0,0,0,0.22),
+        inset 0 0 0 1px rgba(255,255,255,0.16);
+      opacity: clamp(0, calc(var(--bloom) * 1.05), 1);
+      filter: saturate(1.1);
+      transform:
+        translate(-50%, -50%)
+        rotate(var(--a))
+        translateY(calc(-36px - 24px * var(--bloom)))
+        rotate(calc((1 - var(--bloom)) * 18deg))
+        scaleY(calc(0.10 + 0.90 * var(--bloom)))
+        scaleX(calc(0.84 + 0.16 * var(--bloom)));
+    }
+
+    .petal::after{
+      content:"";
+      position:absolute;
+      inset:10px 12px 18px 12px;
+      border-radius:999px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.22), transparent 60%);
+      transform: rotate(6deg);
+      opacity: 0.9;
+    }
+
+    .center{
+      position:absolute;
+      left:50%;
+      top:50%;
+      width:54px;
+      height:54px;
+      transform: translate(-50%, -50%) scale(calc(0.65 + 0.35 * var(--bloom)));
+      border-radius: 999px;
+      background:
+        radial-gradient(14px 14px at 35% 35%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%),
+        radial-gradient(circle at 35% 35%, rgba(255,240,145,0.98), rgba(255,180,50,0.98));
+      box-shadow:
+        0 14px 26px rgba(0,0,0,0.30),
+        0 0 calc(10px + 22px * var(--pulse)) rgba(255,200,90,0.35),
+        inset 0 0 0 1px rgba(255,255,255,0.18);
+      opacity: clamp(0, var(--bloom), 1);
+    }
+
+    .pollen{
+      position:absolute;
+      left:50%;
+      top:50%;
+      width:86px;
+      height:86px;
+      transform: translate(-50%, -50%) scale(calc(0.6 + 0.4 * var(--bloom)));
+      opacity: clamp(0, var(--bloom), 1);
+      pointer-events:none;
+    }
+
+    .dot{
+      position:absolute;
+      width:8px;
+      height:8px;
+      border-radius:999px;
+      background: rgba(255, 225, 120, 0.95);
+      box-shadow: 0 0 16px rgba(255, 210, 110, 0.35);
+      transform:
+        translate(-50%, -50%)
+        scale(calc(0.4 + 0.6 * var(--bloom)));
+      opacity: 0.9;
+    }
+
+    /* subtle vignette */
+    .wrap::after{
+      content:"";
+      position:absolute;
+      inset:-40px;
+      background: radial-gradient(900px 520px at 50% 35%, rgba(0,0,0,0), rgba(0,0,0,0.48) 70%);
+      pointer-events:none;
+    }
+
+    /* UI */
+    .ui{
+      position:absolute;
+      left:18px;
+      right:18px;
+      bottom:18px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      padding:12px 14px;
+      border-radius:18px;
+      background: rgba(0,0,0,0.30);
+      border: 1px solid rgba(255,255,255,0.10);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+    .btn{
+      appearance:none;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color:#eaf2ff;
+      border-radius:14px;
+      padding:10px 12px;
+      cursor:pointer;
+      font-weight:600;
+      letter-spacing:0.2px;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+      user-select:none;
+    }
+    .btn:hover{ background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.22); }
+    .btn:active{ transform: translateY(1px) scale(0.99); }
+
+    .slider{
+      flex:1;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width: 220px;
+    }
+    .slider label{
+      font-size:12px;
+      opacity:0.9;
+      white-space:nowrap;
+    }
+    input[type="range"]{
+      width:100%;
+      accent-color: #baf7ff;
+    }
+
+    .hint{
+      position:absolute;
+      left:18px;
+      top:16px;
+      padding:10px 12px;
+      border-radius:16px;
+      background: rgba(0,0,0,0.26);
+      border: 1px solid rgba(255,255,255,0.10);
+      font-size:13px;
+      opacity:0.9;
+      backdrop-filter: blur(10px);
+    }
+    .hint b{ font-weight:700; }
+
+    @media (max-width:520px){
+      .plant{ transform: translateY(28px) scale(0.9); }
+      .hint{ display:none; }
+      .ui{ flex-wrap:wrap; }
+      .slider{ min-width: 160px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <div class="hint"><b>Flower bloom</b>, press Play or scrub Progress.</div>
+
+    <div class="ground"></div>
+
+    <div class="scene">
+      <div class="plant" aria-label="A flower blooming in a pot">
+        <div class="bloom" id="bloom">
+          <!-- petals (angles in degrees) -->
+          <div class="petal" style="--a: 0deg"></div>
+          <div class="petal" style="--a: 36deg"></div>
+          <div class="petal" style="--a: 72deg"></div>
+          <div class="petal" style="--a: 108deg"></div>
+          <div class="petal" style="--a: 144deg"></div>
+          <div class="petal" style="--a: 180deg"></div>
+          <div class="petal" style="--a: 216deg"></div>
+          <div class="petal" style="--a: 252deg"></div>
+          <div class="petal" style="--a: 288deg"></div>
+          <div class="petal" style="--a: 324deg"></div>
+
+          <div class="center"></div>
+
+          <div class="pollen" id="pollen" aria-hidden="true">
+            <!-- dots positioned by JS -->
+          </div>
+        </div>
+
+        <div class="stem"></div>
+        <div class="leaf left"></div>
+        <div class="leaf right"></div>
+
+        <div class="pot" aria-hidden="true">
+          <div class="rim"></div>
+          <div class="body"></div>
+          <div class="soil"></div>
+          <div class="base"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ui" role="group" aria-label="Animation controls">
+      <button class="btn" id="play">Play</button>
+      <button class="btn" id="reset">Reset</button>
+
+      <div class="slider">
+        <label for="progress">Progress</label>
+        <input id="progress" type="range" min="0" max="1" step="0.001" value="0" />
+      </div>
+
+      <div class="slider" style="max-width:240px">
+        <label for="speed">Speed</label>
+        <input id="speed" type="range" min="0.25" max="2.5" step="0.01" value="1" />
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Small helpers
+    const clamp = (v, a=0, b=1) => Math.max(a, Math.min(b, v));
+    const lerp = (a,b,t) => a + (b-a)*t;
+
+    const easeOutCubic = t => 1 - Math.pow(1 - clamp(t), 3);
+    const easeInOutCubic = t => (t < 0.5) ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2;
+    const easeOutBack = (t, s=1.65) => {
+      t = clamp(t);
+      return 1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2);
+    };
+
+    const root = document.documentElement;
+    const progressEl = document.getElementById("progress");
+    const speedEl = document.getElementById("speed");
+    const playBtn = document.getElementById("play");
+    const resetBtn = document.getElementById("reset");
+    const pollen = document.getElementById("pollen");
+
+    // Create pollen dots
+    const DOTS = 14;
+    for (let i = 0; i < DOTS; i++) {
+      const d = document.createElement("div");
+      d.className = "dot";
+      pollen.appendChild(d);
+    }
+    const dots = [...pollen.querySelectorAll(".dot")];
+
+    function layoutPollen(seed = 0.123) {
+      // deterministic-ish placement
+      let x = seed * 9973;
+      for (let i = 0; i < dots.length; i++) {
+        x = (x * 16807) % 2147483647;
+        const r = 22 + (x % 18); // 22..39
+        x = (x * 48271) % 2147483647;
+        const a = (x % 360) * Math.PI / 180;
+        const px = 43 + Math.cos(a) * r;
+        const py = 43 + Math.sin(a) * r;
+        dots[i].style.left = px + "px";
+        dots[i].style.top  = py + "px";
+      }
+    }
+    layoutPollen();
+
+    let playing = false;
+    let t = 0;              // 0..1
+    let last = performance.now();
+
+    function setVars(tt) {
+      t = clamp(tt, 0, 1);
+      root.style.setProperty("--t", t);
+
+      // staged growth
+      const stem = easeOutCubic(t / 0.36);
+      const leaf = easeOutBack((t - 0.22) / 0.22);
+      const bloom = easeOutCubic((t - 0.46) / 0.42);
+
+      // center pulse after bloom
+      const after = clamp((t - 0.72) / 0.28);
+      const pulse = easeInOutCubic(after) * (0.5 + 0.5 * Math.sin((t * 9.2) * Math.PI * 2));
+
+      // gentle sway that increases slightly as it grows
+      const swayAmp = lerp(0.0, 1.0, easeOutCubic(t));
+      const sway = Math.sin((t * 1.25 + performance.now() / 1800) * Math.PI * 2) * 0.55 * swayAmp;
+
+      root.style.setProperty("--stem", clamp(stem));
+      root.style.setProperty("--leaf", clamp(leaf));
+      root.style.setProperty("--bloom", clamp(bloom));
+      root.style.setProperty("--pulse", clamp(pulse, 0, 1));
+      root.style.setProperty("--sway", sway.toFixed(4));
+
+      // A tiny wobble for each pollen dot as it finishes
+      const wob = clamp((t - 0.62) / 0.35);
+      dots.forEach((d, i) => {
+        const phase = (i / dots.length) * Math.PI * 2;
+        const wobble = Math.sin(performance.now() / 220 + phase) * 2.2 * wob;
+        d.style.transform = `translate(-50%, -50%) scale(${(0.4 + 0.6 * clamp(bloom)).toFixed(3)}) translateY(${wobble.toFixed(2)}px)`;
+        d.style.opacity = (0.35 + 0.55 * clamp(bloom)).toFixed(3);
+      });
+
+      // Keep slider in sync unless user scrubbing
+      if (!scrubbing) progressEl.value = t.toFixed(3);
+    }
+
+    function tick(now) {
+      const dt = (now - last) / 1000;
+      last = now;
+
+      if (playing) {
+        const speed = parseFloat(speedEl.value);
+        setVars(t + dt * 0.22 * speed); // seconds to bloom feel
+        if (t >= 1) {
+          playing = false;
+          playBtn.textContent = "Play";
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    let scrubbing = false;
+
+    progressEl.addEventListener("input", () => {
+      scrubbing = true;
+      playing = false;
+      playBtn.textContent = "Play";
+      setVars(parseFloat(progressEl.value));
+    });
+    progressEl.addEventListener("change", () => {
+      scrubbing = false;
+    });
+
+    playBtn.addEventListener("click", () => {
+      playing = !playing;
+      playBtn.textContent = playing ? "Pause" : "Play";
+      if (playing && t >= 1) setVars(0);
+    });
+
+    resetBtn.addEventListener("click", () => {
+      playing = false;
+      playBtn.textContent = "Play";
+      setVars(0);
+    });
+
+    // Start at 0
+    setVars(0);
+  </script>
+</body>
+</html>

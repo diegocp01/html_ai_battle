@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blooming Flower Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #87CEEB 0%, #B0E0E6 40%, #98D8AA 60%, #4A7C59 100%);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .scene {
+            position: relative;
+            width: 350px;
+            height: 450px;
+        }
+
+        /* Sun */
+        .sun {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, #FFD700, #FFA500);
+            border-radius: 50%;
+            box-shadow: 0 0 40px #FFD700, 0 0 60px #FFA500;
+            animation: pulseSun 3s ease-in-out infinite;
+        }
+
+        @keyframes pulseSun {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.9; }
+        }
+
+        /* Clouds */
+        .cloud {
+            position: absolute;
+            background: white;
+            border-radius: 50px;
+            opacity: 0.9;
+            animation: floatCloud 20s linear infinite;
+        }
+
+        .cloud::before, .cloud::after {
+            content: '';
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .cloud-1 {
+            width: 60px;
+            height: 25px;
+            top: 30px;
+            left: -60px;
+        }
+
+        .cloud-1::before {
+            width: 30px;
+            height: 30px;
+            top: -15px;
+            left: 10px;
+        }
+
+        .cloud-1::after {
+            width: 25px;
+            height: 25px;
+            top: -10px;
+            left: 30px;
+        }
+
+        @keyframes floatCloud {
+            from { transform: translateX(0); }
+            to { transform: translateX(450px); }
+        }
+
+        /* Pot Container */
+        .pot-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .pot-rim {
+            width: 130px;
+            height: 18px;
+            background: linear-gradient(180deg, #CD853F 0%, #8B4513 50%, #654321 100%);
+            border-radius: 8px 8px 0 0;
+            margin-left: -5px;
+        }
+
+        .pot {
+            width: 120px;
+            height: 85px;
+            background: linear-gradient(135deg, #D2691E 0%, #A0522D 30%, #8B4513 70%, #654321 100%);
+            clip-path: polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%);
+            border-radius: 0 0 15px 15px;
+            position: relative;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .pot-design {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 30px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-radius: 5px;
+        }
+
+        .soil {
+            position: absolute;
+            top: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 15px;
+            background: linear-gradient(180deg, #3E2723, #5D4037);
+            border-radius: 50%;
+        }
+
+        /* Stem */
+        .stem-container {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 0;
+            animation: growStem 2s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards;
+        }
+
+        @keyframes growStem {
+            to { height: 180px; }
+        }
+
+        .stem {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #228B22, #32CD32, #228B22);
+            border-radius: 5px;
+        }
+
+        /* Leaves */
+        .leaf {
+            position: absolute;
+            width: 45px;
+            height: 22px;
+            background: linear-gradient(135deg, #32CD32 0%, #228B22 100%);
+            transform: scale(0);
+            box-shadow: inset -2px -2px 5px rgba(0,0,0,0.2);
+        }
+
+        .leaf::after {
+            content: '';
+            position: absolute;
+            width: 80%;
+            height: 2px;
+            background: rgba(0,0,0,0.1);
+            top: 50%;
+            left: 10%;
+        }
+
+        .leaf-1 {
+            bottom: 170px;
+            left: calc(50% + 5px);
+            border-radius: 0 80% 0 80%;
+            transform-origin: left center;
+            animation: growLeafRight 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 1.8s forwards;
+        }
+
+        .leaf-2 {
+            bottom: 210px;
+            left: calc(50% - 50px);
+            border-radius: 80% 0 80% 0;
+            transform-origin: right center;
+            animation: growLeafLeft 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 2.1s forwards;
+        }
+
+        .leaf-3 {
+            bottom: 250px;
+            left: calc(50% + 5px);
+            border-radius: 0 80% 0 80%;
+            transform-origin: left center;
+            animation: growLeafRight 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 2.4s forwards;
+        }
+
+        @keyframes growLeafRight {
+            0% { transform: scale(0) rotate(0deg); }
+            100% { transform: scale(1) rotate(-25deg); }
+        }
+
+        @keyframes growLeafLeft {
+            0% { transform: scale(0) rotate(0deg); }
+            100% { transform: scale(1) rotate(25deg); }
+        }
+
+        /* Flower Head */
+        .flower-head {
+            position: absolute;
+            bottom: 300px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 130px;
+            height: 130px;
+            animation: sway 3s ease-in-out infinite;
+            animation-delay: 5s;
+        }
+
+        @keyframes sway {
+            0%, 100% { transform: translateX(-50%) rotate(-2deg); }
+            50% { transform: translateX(-50%) rotate(2deg); }
+        }
+
+        /* Petals */
+        .petal {
+            position: absolute;
+            width: 35px;
+            height: 50px;
+            left: 50%;
+            top: 50%;
+            transform-origin: center bottom;
+            opacity: 0;
+            border-radius: 50% 50% 45% 45%;
+        }
+
+        .petal-inner {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to top, #FF1493 0%, #FF69B4 40%, #FFB6C1 100%);
+            border-radius: inherit;
+            box-shadow: inset 0 0 15px rgba(255,255,255,0.4), 2px 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .petal:nth-child(1) { animation: bloomPetal 1s cubic-bezier(0.34, 1.56, 0.64, 1) 2.8s forwards; --angle: 0deg; }
+        .petal:nth-child(2) { animation: bloomPetal 1s cubic-bezier(0.34, 1.56, 0.64, 1) 2.9s forwards; --angle: 45deg; }
+        .petal:nth-child(3) { animation: bloomPetal 1s cubic-bezier(0.34, 1.56, 0.64, 1) 3.0s forwards; --angle: 90deg; }
+        .petal:nth-child(4) { animation: bloomPetal 1s cubic-bezier(0.34, 1.56, 0.64, 1) 3.1s forwards; --angle: 135deg; }
+        .petal:nth-child(5) { animation: bloomPetal 1s cubic-bezier(0.34, 1.56, 0.64, 1) 3.2s forwards; --angle: 180deg; }
+        .petal:nth-child(6) { animation: bloomPetal 1s cubic-bezier(0.34, 1.56, 0.64, 1) 3.3s forwards; --angle: 225deg; }
+        .petal:nth-child(7) { animation: bloomPetal 1s cubic-bezier(0.34, 1.56, 0.64, 1) 3.4s forwards; --angle: 270deg; }
+        .petal:nth-child(8) { animation: bloomPetal 1s cubic-bezier(0.34, 1.56, 0.64, 1) 3.5s forwards; --angle: 315deg; }
+
+        @keyframes bloomPetal {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -100%) rotate(var(--angle)) translateY(0) scale(0);
+            }
+            60% {
+                opacity: 1;
+                transform: translate(-50%, -100%) rotate(var(--angle)) translateY(-8px) scale(1.1);
+            }
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -100%) rotate(var(--angle)) translateY(-5px) scale(1);
+            }
+        }
+
+        /* Flower Center */
+        .flower-center {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            z-index: 10;
+            animation: showCenter 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 3.6s forwards;
+        }
+
+        .center-inner {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 35% 35%, #FFD700 0%, #FFA500 50%, #FF8C00 100%);
+            border-radius: 50%;
+            box-shadow: inset -4px -4px 10px rgba(0,0,0,0.2), 3px 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .center-dots {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        .center-dots::before {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #8B4513;
+            border-radius: 50%;
+            top: 30%;
+            left: 40%;
+        }
+
+        .center-dots::after {
+            content: '';
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: #8B4513;
+            border-radius: 50%;
+            top: 45%;
+            left: 55%;
+        }
+
+        @keyframes showCenter {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-180deg); }
+            100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+        }
+
+        /* Sparkles */
+        .sparkles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .sparkle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #FFD700;
+            border-radius: 50%;
+            opacity: 0;
+            box-shadow: 0 0 10px #FFD700;
+        }
+
+        .sparkle:nth-child(1) { top: 20%; left: 20%; animation: sparkle 0.6s ease-out 3.8s forwards; }
+        .sparkle:nth-child(2) { top: 15%; left: 70%; animation: sparkle 0.6s ease-out 3.9s forwards; }
+        .sparkle:nth-child(3) { top: 60%; left: 10%; animation: sparkle 0.6s ease-out 4.0s forwards; }
+        .sparkle:nth-child(4) { top: 70%; left: 80%; animation: sparkle 0.6s ease-out 4.1s forwards; }
+        .sparkle:nth-child(5) { top: 40%; left: 90%; animation: sparkle 0.6s ease-out 4.2s forwards; }
+
+        @keyframes sparkle {
+            0% { transform: scale(0); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        /* Button */
+        .replay-btn {
+            margin-top: 30px;
+            padding: 15px 35px;
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #FF69B4, #FF1493);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(255, 105, 180, 0.4);
+            letter-spacing: 1px;
+        }
+
+        .replay-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 10px 30px rgba(255, 105, 180, 0.6);
+        }
+
+        .replay-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        h1 {
+            color: #2E7D32;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌱 Watch Me Bloom! 🌸</h1>
+    
+    <div class="scene" id="scene">
+        <!-- Sun -->
+        <div class="sun"></div>
+        
+        <!-- Cloud -->
+        <div class="cloud cloud-1"></div>
+        
+        <!-- Sparkles -->
+        <div class="sparkles">
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+        </div>
+        
+        <!-- Flower Head -->
+        <div class="flower-head">
+            <div class="petal"><div class="petal-inner"></div></div>
+            <div class="petal"><div class="petal-inner"></div></div>
+            <div class="petal"><div class="petal-inner"></div></div>
+            <div class="petal"><div class="petal-inner"></div></div>
+            <div class="petal"><div class="petal-inner"></div></div>
+            <div class="petal"><div class="petal-inner"></div></div>
+            <div class="petal"><div class="petal-inner"></div></div>
+            <div class="petal"><div class="petal-inner"></div></div>
+            <div class="flower-center">
+                <div class="center-inner"></div>
+                <div class="center-dots"></div>
+            </div>
+        </div>
+        
+        <!-- Stem -->
+        <div class="stem-container">
+            <div class="stem"></div>
+        </div>
+        
+        <!-- Leaves -->
+        <div class="leaf leaf-1"></div>
+        <div class="leaf leaf-2"></div>
+        <div class="leaf leaf-3"></div>
+        
+        <!-- Pot -->
+        <div class="pot-container">
+            <div class="pot-rim"></div>
+            <div class="pot">
+                <div class="soil"></div>
+                <div class="pot-design"></div>
+            </div>
+        </div>
+    </div>
+    
+    <button class="replay-btn" onclick="replayAnimation()">🌸 Bloom Again</button>
+    
+    <script>
+        function replayAnimation() {
+            const scene = document.getElementById('scene');
+            const clone = scene.cloneNode(true);
+            scene.parentNode.replaceChild(clone, scene);
+        }
+    </script>
+</body>
+</html>

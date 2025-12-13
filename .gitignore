@@ -1,0 +1,26 @@
+Push to GitHub ALL
+
+Once
+``` bash
+git rm --cached .gitignore
+git commit -m "Remove .gitignore from repository"
+git push
+```
+
+Every update
+``` bash
+git status
+git add .
+git commit -m "draft Post 1217"
+git push
+```
+
+TODO: 
+Goal: start an experiment and write some research based on the results. 
+I Will do 1 of these HTML AI Battle tests per week, every Saturday morning and 
+evaluate also if the amount of lines of html is related to the performance, 
+performance over time, and time the models takes to reply. likes, date, time posted, 24 hours after posted metrics (ask llm for more)
+
+Track how many words as input, reasoning time
+
+Make the prompt short! 2 lines max
