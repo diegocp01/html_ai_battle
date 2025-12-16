@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouncing DVD Logo Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        // Logo properties
+        const logoWidth = 200;
+        const logoHeight = 120;
+        let x = width / 2 - logoWidth / 2;
+        let y = height / 2 - logoHeight / 2;
+        let vx = 300; // pixels per second
+        let vy = 200;
+        let color = '#000000'; // Initial black
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            // Clamp position to stay within bounds after resize
+            x = Math.max(0, Math.min(width - logoWidth, x));
+            y = Math.max(0, Math.min(height - logoHeight, y));
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let lastTime = 0;
+
+        function animate(currentTime) {
+            if (!lastTime) lastTime = currentTime;
+            const dt = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            // Update position
+            x += vx * dt;
+            y += vy * dt;
+
+            // Collision detection and reflection
+            let collided = false;
+
+            // Horizontal walls
+            if (x <= 0) {
+                x = 0;
+                vx = -vx;
+                collided = true;
+            } else if (x + logoWidth >= width) {
+                x = width - logoWidth;
+                vx = -vx;
+                collided = true;
+            }
+
+            // Vertical walls
+            if (y <= 0) {
+                y = 0;
+                vy = -vy;
+                collided = true;
+            } else if (y + logoHeight >= height) {
+                y = height - logoHeight;
+                vy = -vy;
+                collided = true;
+            }
+
+            // Change color on collision
+            if (collided) {
+                color = `rgb(${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)})`;
+            }
+
+            // Clear canvas
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw logo rectangle
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, logoWidth, logoHeight);
+
+            // Draw "DVD" text (simple logo representation)
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('DVD', x + logoWidth / 2, y + logoHeight / 2);
+
+            requestAnimationFrame(animate);
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

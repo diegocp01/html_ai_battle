@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouncing DVD Logo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden; /* Prevent scrollbars */
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #dvd-logo {
+            position: absolute;
+            width: 160px;
+            height: 70px;
+            will-change: transform; /* Hint to browser for GPU optimization */
+        }
+        
+        /* The SVG inside the container */
+        #dvd-logo svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="dvd-logo">
+        <svg viewBox="0 0 200 85" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.5 54.8c-7.6 0-14.8-1.5-14.8-13.8 0-11.4 7.5-13.8 14.8-13.8 6.4 0 14.6 1.8 14.6 13.8 0 12.8-8.8 13.8-14.6 13.8zm83.2-13.8c0-12-8.3-13.8-14.6-13.8-7.3 0-14.8 2.4-14.8 13.8 0 12.3 7.2 13.8 14.8 13.8 5.8 0 14.6-1 14.6-13.8zm-41.9 11.2c-2.3 3.6-5.8 5.3-10.4 5.3-13.7 0-12.1-14.8-9.4-23h13.2c-1.3 2.9-2.3 6.6-2.3 8.8 0 2.4 1.2 4.1 4.3 4.1 3.2 0 4.8-2.6 6-4.3l4.5-12h14.5c-4.3 11.5-8.9 23.3-13.6 34.6-1.5 3.6-2.5 5.8-5.3 5.8-2.6 0-4.3-1.8-4.3-5.3 0-1.8.6-4 1-5.7l1.8-5.3zm-69.8 0C-8.4 47-6.8 38.6-2.5 27.2h13.6c-4.8 11.6-9.4 23.3-14.2 34.6-1.5 3.6-2.5 5.8-5.3 5.8-2.6 0-4.3-1.8-4.3-5.3 0-1.8.6-4 1-5.7l1.8-5.3c-2.3 3.6-5.8 5.3-10.4 5.3-13.7 0-12.1-14.8-9.4-23h13.2c-1.3 2.9-2.3 6.6-2.3 8.8 0 2.4 1.2 4.1 4.3 4.1 3.2 0 4.8-2.6 6-4.3l4.5-12h14.5zM177 56.5c-4.3 0-6.8-2.3-6.8-6.1 0-3.2 2-6.6 6.5-6.6 3.6 0 6.1 2.3 6.1 6.1 0 3.8-2.8 6.6-5.8 6.6zm23-28h-31.1c-9.1 0-14.4 5.3-14.4 12.8 0 8.3 4.8 14.8 14.6 14.8h30.8v-6.3h-30.6c-4.8 0-6.8-2.8-6.8-6.3 0-4.3 2.8-7.3 7.3-7.3h30.1v-7.8zm-16.1 44.7c-26.6 0-45.2-3.8-45.2-9.6 0-3.3 5.8-6.1 15.3-7.8l2.8 2c-8.6 1.8-12.8 3.8-12.8 5.6 0 2.3 14.8 4.3 39.8 4.3 23.8 0 38.1-1.8 38.1-4.3 0-1.5-3.3-3-9.9-4.5l2.6-2.3c8.9 1.8 12.8 4.3 12.8 7.1.1 5.8-19.1 9.5-43.5 9.5z" fill="currentColor"/>
+        </svg>
+    </div>
+
+    <script>
+        // Configuration
+        const SPEED = 3.5; // Pixels per frame
+        const LOGO_WIDTH = 160;
+        const LOGO_HEIGHT = 70;
+        
+        // State
+        let x = Math.random() * (window.innerWidth - LOGO_WIDTH);
+        let y = Math.random() * (window.innerHeight - LOGO_HEIGHT);
+        let velX = SPEED;
+        let velY = SPEED;
+        
+        // DOM Elements
+        const logo = document.getElementById('dvd-logo');
+        
+        // Classic DVD Colors
+        const colors = [
+            '#ff0000', // Red
+            '#00ff00', // Green
+            '#0000ff', // Blue
+            '#ffff00', // Yellow
+            '#00ffff', // Cyan
+            '#ff00ff', // Magenta
+            '#ff8800'  // Orange
+        ];
+
+        let colorIndex = 0;
+
+        // Set initial color
+        logo.style.color = colors[0];
+
+        function changeColor() {
+            let newIndex;
+            // Ensure we don't pick the same color twice in a row
+            do {
+                newIndex = Math.floor(Math.random() * colors.length);
+            } while (newIndex === colorIndex);
+            
+            colorIndex = newIndex;
+            logo.style.color = colors[colorIndex];
+        }
+
+        function update() {
+            // Get current window dimensions
+            const winWidth = window.innerWidth;
+            const winHeight = window.innerHeight;
+
+            // Move
+            x += velX;
+            y += velY;
+
+            let hit = false;
+
+            // Check Right Collision
+            if (x + LOGO_WIDTH >= winWidth) {
+                x = winWidth - LOGO_WIDTH; // Snap to edge
+                velX = -Math.abs(velX);    // Force negative velocity
+                hit = true;
+            }
+            // Check Left Collision
+            else if (x <= 0) {
+                x = 0;                     // Snap to edge
+                velX = Math.abs(velX);     // Force positive velocity
+                hit = true;
+            }
+
+            // Check Bottom Collision
+            if (y + LOGO_HEIGHT >= winHeight) {
+                y = winHeight - LOGO_HEIGHT; // Snap to edge
+                velY = -Math.abs(velY);      // Force negative velocity
+                hit = true;
+            }
+            // Check Top Collision
+            else if (y <= 0) {
+                y = 0;                       // Snap to edge
+                velY = Math.abs(velY);       // Force positive velocity
+                hit = true;
+            }
+
+            // If we hit any wall (or corner), change color
+            if (hit) {
+                changeColor();
+            }
+
+            // Apply position
+            // Using translate3d for hardware acceleration
+            logo.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+
+            requestAnimationFrame(update);
+        }
+
+        // Handle Resizing
+        window.addEventListener('resize', () => {
+            // If the window shrinks quickly, the logo might get stuck outside.
+            // We pull it back inside the viewport immediately.
+            const winWidth = window.innerWidth;
+            const winHeight = window.innerHeight;
+
+            if (x + LOGO_WIDTH > winWidth) x = winWidth - LOGO_WIDTH;
+            if (y + LOGO_HEIGHT > winHeight) y = winHeight - LOGO_HEIGHT;
+        });
+
+        // Start the loop
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouncing DVD Logo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #dvd-container {
+            position: absolute;
+            will-change: transform;
+        }
+
+        #dvd-logo {
+            width: 150px;
+            height: auto;
+            filter: drop-shadow(0 0 20px currentColor);
+            transition: filter 0.3s ease;
+        }
+
+        #stats {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #stats h3 {
+            margin-bottom: 10px;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        #stats p {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        #stats span {
+            color: #4ecdc4;
+            font-weight: bold;
+        }
+
+        .corner-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+            opacity: 0;
+            z-index: 50;
+        }
+
+        .corner-flash.active {
+            animation: flash 0.5s ease-out;
+        }
+
+        @keyframes flash {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        #trail-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .controls button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .speed-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            color: white;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .speed-control input {
+            width: 150px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="trail-canvas"></canvas>
+    <div class="corner-flash" id="cornerFlash"></div>
+
+    <div id="stats">
+        <h3>📀 DVD Bounce Stats</h3>
+        <p>Total Bounces: <span id="totalBounces">0</span></p>
+        <p>Corner Hits: <span id="cornerHits">0</span></p>
+        <p>Current Speed: <span id="currentSpeed">3.0</span></p>
+        <p>Position: <span id="position">0, 0</span></p>
+        <p>Velocity: <span id="velocity">0, 0</span></p>
+    </div>
+
+    <div class="controls">
+        <button id="pauseBtn">⏸️ Pause</button>
+        <button id="resetBtn">🔄 Reset</button>
+        <button id="trailBtn">✨ Toggle Trail</button>
+    </div>
+
+    <div class="speed-control">
+        <label>Speed: <span id="speedValue">3</span></label>
+        <br>
+        <input type="range" id="speedSlider" min="1" max="10" value="3" step="0.5">
+    </div>
+
+    <div id="dvd-container">
+        <svg id="dvd-logo" viewBox="0 0 210 107" xmlns="http://www.w3.org/2000/svg">
+            <g fill="currentColor">
+                <!-- D -->
+                <path d="M20,20 L20,87 L50,87 C75,87 90,70 90,53.5 C90,37 75,20 50,20 Z M35,32 L48,32 C65,32 75,42 75,53.5 C75,65 65,75 48,75 L35,75 Z"/>
+                <!-- V -->
+                <path d="M95,20 L115,87 L130,87 L150,20 L135,20 L122.5,70 L110,20 Z"/>
+                <!-- D -->
+                <path d="M155,20 L155,87 L185,87 C210,87 225,70 225,53.5 C225,37 210,20 185,20 Z M170,32 L183,32 C200,32 210,42 210,53.5 C210,65 200,75 183,75 L170,75 Z"/>
+                <!-- Disc swoosh -->
+                <ellipse cx="122" cy="95" rx="60" ry="8" opacity="0.6"/>
+                <path d="M62,95 Q122,80 182,95 Q122,88 62,95" opacity="0.8"/>
+            </g>
+        </svg>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            baseSpeed: 3,
+            colors: [
+                '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', 
+                '#ffeaa7', '#dfe6e9', '#fd79a8', '#a29bfe',
+                '#6c5ce7', '#00b894', '#e17055', '#74b9ff',
+                '#ff7675', '#55a3ff', '#ffc048', '#ff85c0'
+            ],
+            trailLength: 50,
+            trailEnabled: true
+        };
+
+        // State
+        let state = {
+            x: 0,
+            y: 0,
+            vx: CONFIG.baseSpeed,
+            vy: CONFIG.baseSpeed,
+            width: 0,
+            height: 0,
+            logoWidth: 0,
+            logoHeight: 0,
+            totalBounces: 0,
+            cornerHits: 0,
+            currentColorIndex: 0,
+            isPaused: false,
+            lastTime: 0,
+            trail: []
+        };
+
+        // DOM Elements
+        const container = document.getElementById('dvd-container');
+        const logo = document.getElementById('dvd-logo');
+        const cornerFlash = document.getElementById('cornerFlash');
+        const trailCanvas = document.getElementById('trail-canvas');
+        const ctx = trailCanvas.getContext('2d');
+
+        // Stats elements
+        const statsElements = {
+            totalBounces: document.getElementById('totalBounces'),
+            cornerHits: document.getElementById('cornerHits'),
+            currentSpeed: document.getElementById('currentSpeed'),
+            position: document.getElementById('position'),
+            velocity: document.getElementById('velocity')
+        };
+
+        // Control elements
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const trailBtn = document.getElementById('trailBtn');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+
+        // Initialize
+        function init() {
+            updateDimensions();
+            
+            // Random starting position
+            state.x = Math.random() * (state.width - state.logoWidth);
+            state.y = Math.random() * (state.height - state.logoHeight);
+            
+            // Random starting direction
+            state.vx = (Math.random() > 0.5 ? 1 : -1) * CONFIG.baseSpeed;
+            state.vy = (Math.random() > 0.5 ? 1 : -1) * CONFIG.baseSpeed;
+            
+            // Set initial color
+            changeColor();
+            
+            // Start animation
+            state.lastTime = performance.now();
+            requestAnimationFrame(update);
+        }
+
+        function updateDimensions() {
+            state.width = window.innerWidth;
+            state.height = window.innerHeight;
+            state.logoWidth = container.offsetWidth;
+            state.logoHeight = container.offsetHeight;
+            
+            // Update trail canvas
+            trailCanvas.width = state.width;
+            trailCanvas.height = state.height;
+            
+            // Clamp position if window was resized
+            if (state.x + state.logoWidth > state.width) {
+                state.x = state.width - state.logoWidth;
+                if (state.x < 0) state.x = 0;
+            }
+            if (state.y + state.logoHeight > state.height) {
+                state.y = state.height - state.logoHeight;
+                if (state.y < 0) state.y = 0;
+            }
+        }
+
+        function changeColor() {
+            // Get a different color than current
+            let newIndex;
+            do {
+                newIndex = Math.floor(Math.random() * CONFIG.colors.length);
+            } while (newIndex === state.currentColorIndex && CONFIG.colors.length > 1);
+            
+            state.currentColorIndex = newIndex;
+            const color = CONFIG.colors[state.currentColorIndex];
+            logo.style.color = color;
+        }
+
+        function triggerCornerEffect() {
+            cornerFlash.classList.remove('active');
+            void cornerFlash.offsetWidth; // Force reflow
+            cornerFlash.classList.add('active');
+        }
+
+        function updateStats() {
+            statsElements.totalBounces.textContent = state.totalBounces;
+            statsElements.cornerHits.textContent = state.cornerHits;
+            statsElements.currentSpeed.textContent = Math.sqrt(state.vx * state.vx + state.vy * state.vy).toFixed(1);
+            statsElements.position.textContent = `${Math.round(state.x)}, ${Math.round(state.y)}`;
+            statsElements.velocity.textContent = `${state.vx.toFixed(1)}, ${state.vy.toFixed(1)}`;
+        }
+
+        function drawTrail() {
+            ctx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+            
+            if (!CONFIG.trailEnabled || state.trail.length < 2) return;
+            
+            ctx.beginPath();
+            ctx.moveTo(state.trail[0].x, state.trail[0].y);
+            
+            for (let i = 1; i < state.trail.length; i++) {
+                const point = state.trail[i];
+                ctx.lineTo(point.x, point.y);
+            }
+            
+            const gradient = ctx.createLinearGradient(
+                state.trail[0].x, state.trail[0].y,
+                state.trail[state.trail.length - 1].x, state.trail[state.trail.length - 1].y
+            );
+            gradient.addColorStop(0, 'transparent');
+            gradient.addColorStop(1, CONFIG.colors[state.currentColorIndex]);
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
+
+        function update(currentTime) {
+            if (!state.isPaused) {
+                // Calculate delta time for smooth animation
+                const deltaTime = (currentTime - state.lastTime) / 16.67; // Normalize to ~60fps
+                state.lastTime = currentTime;
+                
+                // Update position with delta time
+                const moveX = state.vx * deltaTime;
+                const moveY = state.vy * deltaTime;
+                
+                state.x += moveX;
+                state.y += moveY;
+                
+                let hitX = false;
+                let hitY = false;
+                
+                // Boundary collision detection with precise positioning
+                // Left boundary
+                if (state.x <= 0) {
+                    state.x = 0;
+                    state.vx = Math.abs(state.vx);
+                    hitX = true;
+                }
+                // Right boundary
+                else if (state.x >= state.width - state.logoWidth) {
+                    state.x = state.width - state.logoWidth;
+                    state.vx = -Math.abs(state.vx);
+                    hitX = true;
+                }
+                
+                // Top boundary
+                if (state.y <= 0) {
+                    state.y = 0;
+                    state.vy = Math.abs(state.vy);
+                    hitY = true;
+                }
+                // Bottom boundary
+                else if (state.y >= state.height - state.logoHeight) {
+                    state.y = state.height - state.logoHeight;
+                    state.vy = -Math.abs(state.vy);
+                    hitY = true;
+                }
+                
+                // Handle collisions
+                if (hitX || hitY) {
+                    changeColor();
+                    state.totalBounces++;
+                    
+                    // Corner hit detection (both boundaries hit simultaneously)
+                    if (hitX && hitY) {
+                        state.cornerHits++;
+                        triggerCornerEffect();
+                    }
+                }
+                
+                // Update trail
+                if (CONFIG.trailEnabled) {
+                    state.trail.push({
+                        x: state.x + state.logoWidth / 2,
+                        y: state.y + state.logoHeight / 2
+                    });
+                    
+                    if (state.trail.length > CONFIG.trailLength) {
+                        state.trail.shift();
+                    }
+                }
+                
+                // Apply transform (GPU accelerated)
+                container.style.transform = `translate3d(${state.x}px, ${state.y}px, 0)`;
+                
+                // Draw trail
+                drawTrail();
+                
+                // Update stats
+                updateStats();
+            }
+            
+            requestAnimationFrame(update);
+        }
+
+        // Event Listeners
+        window.addEventListener('resize', () => {
+            updateDimensions();
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            state.isPaused = !state.isPaused;
+            pauseBtn.textContent = state.isPaused ? '▶️ Play' : '⏸️ Pause';
+            if (!state.isPaused) {
+                state.lastTime = performance.now();
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            state.totalBounces = 0;
+            state.cornerHits = 0;
+            state.trail = [];
+            state.x = Math.random() * (state.width - state.logoWidth);
+            state.y = Math.random() * (state.height - state.logoHeight);
+            state.vx = (Math.random() > 0.5 ? 1 : -1) * CONFIG.baseSpeed;
+            state.vy = (Math.random() > 0.5 ? 1 : -1) * CONFIG.baseSpeed;
+            changeColor();
+            ctx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+        });
+
+        trailBtn.addEventListener('click', () => {
+            CONFIG.trailEnabled = !CONFIG.trailEnabled;
+            trailBtn.textContent = CONFIG.trailEnabled ? '✨ Trail On' : '✨ Trail Off';
+            if (!CONFIG.trailEnabled) {
+                state.trail = [];
+                ctx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+            }
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            speedValue.textContent = speed;
+            
+            // Maintain direction while changing speed
+            const dirX = state.vx > 0 ? 1 : -1;
+            const dirY = state.vy > 0 ? 1 : -1;
+            state.vx = dirX * speed;
+            state.vy = dirY * speed;
+            CONFIG.baseSpeed = speed;
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key.toLowerCase()) {
+                case ' ':
+                    pauseBtn.click();
+                    break;
+                case 'r':
+                    resetBtn.click();
+                    break;
+                case 't':
+                    trailBtn.click();
+                    break;
+                case 'arrowup':
+                    speedSlider.value = Math.min(10, parseFloat(speedSlider.value) + 0.5);
+                    speedSlider.dispatchEvent(new Event('input'));
+                    break;
+                case 'arrowdown':
+                    speedSlider.value = Math.max(1, parseFloat(speedSlider.value) - 0.5);
+                    speedSlider.dispatchEvent(new Event('input'));
+                    break;
+            }
+        });
+
+        // Start the simulation
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bouncing DVD Logo (physics-accurate)</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #07090f;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+    .hud {
+      position: fixed;
+      left: 12px;
+      top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.88);
+      font: 12px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      user-select: none;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .hud b { font-weight: 650; }
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      vertical-align: -1px;
+      margin-right: 6px;
+      box-shadow: 0 0 14px rgba(255,255,255,0.22);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="hud" id="hud">
+    <div><span class="dot" id="dot"></span><b>DVD Bounce</b></div>
+    <div id="stats" style="margin-top:6px;"></div>
+    <div style="margin-top:6px;opacity:.8;">Space: pause, R: reset</div>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      const hudStats = document.getElementById("stats");
+      const dot = document.getElementById("dot");
+
+      // State in CSS pixels (we handle DPR only for rendering).
+      const state = {
+        // Normalized position (0..1) within travel range so resizing stays consistent.
+        nx: 0.25,
+        ny: 0.35,
+        x: 0,
+        y: 0,
+
+        // Velocity in px/sec (constant magnitude, perfect reflections).
+        speed: 320,
+        dirX: 1,
+        dirY: 1,
+        vx: 320,
+        vy: 320,
+
+        // Logo size (responsive)
+        baseW: 220,
+        baseH: 110,
+        w: 220,
+        h: 110,
+
+        // Bounds (max top-left position)
+        maxX: 0,
+        maxY: 0,
+
+        // Color changes on every collision event
+        color: "hsl(200 90% 60%)",
+        collisions: 0,
+
+        paused: false,
+      };
+
+      const EPS = 1e-9;
+
+      function randomColor() {
+        const hue = Math.floor(Math.random() * 360);
+        return `hsl(${hue} 92% 62%)`;
+      }
+
+      function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+      function resize() {
+        const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+        const w = Math.max(1, window.innerWidth);
+        const h = Math.max(1, window.innerHeight);
+
+        canvas.style.width = w + "px";
+        canvas.style.height = h + "px";
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+
+        // Responsive logo size: keep it visible and always fit with margin.
+        const scale = Math.min(1, (w * 0.36) / state.baseW, (h * 0.22) / state.baseH);
+        state.w = Math.max(90, Math.floor(state.baseW * scale));
+        state.h = Math.max(45, Math.floor(state.baseH * scale));
+
+        state.maxX = Math.max(0, w - state.w);
+        state.maxY = Math.max(0, h - state.h);
+
+        // Recompute actual position from normalized coords.
+        state.x = (state.maxX > 0) ? state.nx * state.maxX : 0;
+        state.y = (state.maxY > 0) ? state.ny * state.maxY : 0;
+
+        // If resize causes immediate boundary contact, treat it like a collision.
+        let resizeCollision = false;
+        if (state.maxX === 0) state.vx = 0;
+        else state.vx = state.dirX * state.speed;
+
+        if (state.maxY === 0) state.vy = 0;
+        else state.vy = state.dirY * state.speed;
+
+        // Clamp and reflect if we are outside after resize.
+        if (state.x < 0) { state.x = 0; state.dirX = 1; state.vx = state.speed; resizeCollision = true; }
+        if (state.x > state.maxX) { state.x = state.maxX; state.dirX = -1; state.vx = -state.speed; resizeCollision = true; }
+        if (state.y < 0) { state.y = 0; state.dirY = 1; state.vy = state.speed; resizeCollision = true; }
+        if (state.y > state.maxY) { state.y = state.maxY; state.dirY = -1; state.vy = -state.speed; resizeCollision = true; }
+
+        if (resizeCollision) onCollision();
+
+        // Set transform so we draw in CSS pixels.
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function onCollision() {
+        state.color = randomColor();
+        state.collisions++;
+        dot.style.background = state.color;
+      }
+
+      // Continuous collision detection: resolve potentially multiple bounces within a frame.
+      function step(dt) {
+        // No movement possible if both ranges are zero.
+        if (state.maxX === 0 && state.maxY === 0) return;
+
+        let remaining = dt;
+        let guard = 0;
+
+        while (remaining > 0 && guard++ < 12) {
+          const x = state.x, y = state.y;
+          const vx = state.vx, vy = state.vy;
+
+          let tx = Infinity;
+          let ty = Infinity;
+
+          if (Math.abs(vx) > EPS) {
+            tx = (vx > 0) ? (state.maxX - x) / vx : (0 - x) / vx; // positive time
+            if (tx < 0) tx = Infinity;
+          }
+          if (Math.abs(vy) > EPS) {
+            ty = (vy > 0) ? (state.maxY - y) / vy : (0 - y) / vy;
+            if (ty < 0) ty = Infinity;
+          }
+
+          const tHit = Math.min(tx, ty);
+
+          // No collision within remaining time.
+          if (!isFinite(tHit) || tHit > remaining) {
+            state.x = x + vx * remaining;
+            state.y = y + vy * remaining;
+            remaining = 0;
+            break;
+          }
+
+          // Advance exactly to first collision.
+          state.x = x + vx * tHit;
+          state.y = y + vy * tHit;
+          remaining -= tHit;
+
+          // Detect which wall(s) we hit. Corner hits reflect both axes.
+          const hitX = Math.abs(tHit - tx) < 1e-7;
+          const hitY = Math.abs(tHit - ty) < 1e-7;
+
+          if (hitX) {
+            state.x = clamp(state.x, 0, state.maxX);
+            state.dirX *= -1;
+            state.vx = (state.maxX === 0) ? 0 : state.dirX * state.speed;
+          }
+          if (hitY) {
+            state.y = clamp(state.y, 0, state.maxY);
+            state.dirY *= -1;
+            state.vy = (state.maxY === 0) ? 0 : state.dirY * state.speed;
+          }
+
+          if (hitX || hitY) onCollision();
+
+          // If remaining is extremely tiny, stop to avoid floating loops.
+          if (remaining < 1e-6) { remaining = 0; break; }
+        }
+
+        // Keep normalized position updated for correct dynamic resizing.
+        state.nx = (state.maxX > 0) ? state.x / state.maxX : 0;
+        state.ny = (state.maxY > 0) ? state.y / state.maxY : 0;
+
+        // Safety clamps.
+        state.x = clamp(state.x, 0, state.maxX);
+        state.y = clamp(state.y, 0, state.maxY);
+      }
+
+      function drawBackground(w, h) {
+        // Subtle vignette + faint grid so motion is visible.
+        ctx.clearRect(0, 0, w, h);
+
+        const g = ctx.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
+        g.addColorStop(0, "#0b1020");
+        g.addColorStop(1, "#05060b");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.globalAlpha = 0.12;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(255,255,255,0.25)";
+        const step = 44;
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+        for (let y = 0; y <= h; y += step) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      function roundRectPath(x, y, w, h, r) {
+        const rr = Math.min(r, w * 0.5, h * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(x + rr, y);
+        ctx.arcTo(x + w, y, x + w, y + h, rr);
+        ctx.arcTo(x + w, y + h, x, y + h, rr);
+        ctx.arcTo(x, y + h, x, y, rr);
+        ctx.arcTo(x, y, x + w, y, rr);
+        ctx.closePath();
+      }
+
+      function drawDVDLogo(x, y, w, h, color) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Soft shadow
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = "black";
+        roundRectPath(6, 8, w, h, Math.min(w, h) * 0.22);
+        ctx.filter = "blur(8px)";
+        ctx.fill();
+        ctx.filter = "none";
+        ctx.globalAlpha = 1;
+
+        // Glassy base
+        roundRectPath(0, 0, w, h, Math.min(w, h) * 0.22);
+        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        ctx.fill();
+        ctx.lineWidth = Math.max(2, Math.floor(w * 0.015));
+        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.stroke();
+
+        // Emblem (ellipses + text)
+        const cx = w * 0.5;
+        const cy = h * 0.54;
+
+        ctx.lineWidth = Math.max(3, Math.floor(w * 0.02));
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.95;
+
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w * 0.40, h * 0.24, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w * 0.31, h * 0.18, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // Text
+        ctx.fillStyle = color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const fontSize = Math.floor(h * 0.44);
+        ctx.font = `900 italic ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
+        ctx.fillText("DVD", cx, h * 0.52);
+
+        // Small highlight
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = "white";
+        roundRectPath(w * 0.08, h * 0.10, w * 0.84, h * 0.22, h * 0.14);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        ctx.restore();
+      }
+
+      function render() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        drawBackground(w, h);
+        drawDVDLogo(state.x, state.y, state.w, state.h, state.color);
+
+        const speed = Math.hypot(state.vx, state.vy).toFixed(0);
+        hudStats.textContent =
+          `Collisions: ${state.collisions}  |  Speed: ${speed}px/s  |  Size: ${state.w}x${state.h}`;
+      }
+
+      function reset() {
+        state.nx = 0.2 + Math.random() * 0.6;
+        state.ny = 0.2 + Math.random() * 0.6;
+
+        // Random diagonal direction, constant speed.
+        state.dirX = Math.random() < 0.5 ? -1 : 1;
+        state.dirY = Math.random() < 0.5 ? -1 : 1;
+
+        state.color = randomColor();
+        dot.style.background = state.color;
+        state.collisions = 0;
+
+        resize(); // sets x,y from nx,ny and bounds
+
+        // Make sure we start moving even in tiny windows.
+        state.vx = (state.maxX === 0) ? 0 : state.dirX * state.speed;
+        state.vy = (state.maxY === 0) ? 0 : state.dirY * state.speed;
+      }
+
+      // Input
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space") state.paused = !state.paused;
+        if (e.key.toLowerCase() === "r") reset();
+      });
+
+      // Resize handling (keeps the same normalized position and resolves overlaps cleanly).
+      window.addEventListener("resize", resize, { passive: true });
+
+      // Main loop
+      let last = performance.now();
+      function loop(now) {
+        const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+        last = now;
+
+        if (!state.paused) step(dt);
+        render();
+
+        requestAnimationFrame(loop);
+      }
+
+      // Boot
+      reset();
+      resize();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>
