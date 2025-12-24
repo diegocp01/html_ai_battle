@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Side-Scrolling Platformer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #87CEEB; /* Sky blue background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #000;
+            background-color: #98FB98; /* Light green for ground level */
+        }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">
+        <p>Controls: Arrow Keys (Left/Right to move, Up to jump)</p>
+        <p>Goal: Reach the end of the level!</p>
+    </div>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game constants
+        const GRAVITY = 0.5;
+        const JUMP_STRENGTH = -12;
+        const MOVE_SPEED = 5;
+        const WORLD_WIDTH = 2000; // Wider world for scrolling
+
+        // Player object
+        const player = {
+            x: 50,
+            y: 300,
+            width: 20,
+            height: 20,
+            vx: 0,
+            vy: 0,
+            onGround: false,
+            color: '#FF0000' // Red for Mario-like
+        };
+
+        // Platforms (ground and floating ones)
+        const platforms = [
+            { x: 0, y: 350, width: WORLD_WIDTH, height: 50 }, // Ground
+            { x: 200, y: 250, width: 150, height: 20 },
+            { x: 400, y: 200, width: 100, height: 20 },
+            { x: 600, y: 250, width: 150, height: 20 },
+            { x: 900, y: 150, width: 200, height: 20 },
+            { x: 1200, y: 250, width: 150, height: 20 },
+            { x: 1500, y: 200, width: 100, height: 20 },
+            { x: 1700, y: 300, width: 300, height: 20 } // End platform
+        ];
+
+        // Camera
+        const camera = { x: 0 };
+
+        // Input handling
+        const keys = {};
+        window.addEventListener('keydown', (e) => { keys[e.key] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+        // Collision detection
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // Update player
+        function updatePlayer() {
+            // Horizontal movement
+            if (keys['ArrowLeft']) player.vx = -MOVE_SPEED;
+            else if (keys['ArrowRight']) player.vx = MOVE_SPEED;
+            else player.vx *= 0.8; // Friction
+
+            // Jump
+            if (keys['ArrowUp'] && player.onGround) {
+                player.vy = JUMP_STRENGTH;
+                player.onGround = false;
+            }
+
+            // Apply gravity
+            player.vy += GRAVITY;
+
+            // Update position
+            player.x += player.vx;
+            player.y += player.vy;
+
+            // Boundaries
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > WORLD_WIDTH) player.x = WORLD_WIDTH - player.width;
+
+            // Platform collisions
+            player.onGround = false;
+            for (let platform of platforms) {
+                if (checkCollision(player, platform)) {
+                    // Landing from above
+                    if (player.vy > 0 && player.y < platform.y) {
+                        player.y = platform.y - player.height;
+                        player.vy = 0;
+                        player.onGround = true;
+                    }
+                    // Hitting from below
+                    else if (player.vy < 0 && player.y > platform.y) {
+                        player.y = platform.y + platform.height;
+                        player.vy = 0;
+                    }
+                    // Side collisions (simple push back)
+                    else if (player.vx > 0) {
+                        player.x = platform.x - player.width;
+                    } else if (player.vx < 0) {
+                        player.x = platform.x + platform.width;
+                    }
+                }
+            }
+
+            // Fall off screen death (reset)
+            if (player.y > canvas.height) {
+                player.x = 50;
+                player.y = 300;
+                player.vx = 0;
+                player.vy = 0;
+            }
+        }
+
+        // Update camera
+        function updateCamera() {
+            camera.x = player.x - canvas.width / 2;
+            if (camera.x < 0) camera.x = 0;
+            if (camera.x > WORLD_WIDTH - canvas.width) camera.x = WORLD_WIDTH - canvas.width;
+        }
+
+        // Draw functions
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x - camera.x, player.y, player.width, player.height);
+            // Simple eyes
+            ctx.fillStyle = '#000';
+            ctx.fillRect(player.x - camera.x + 4, player.y + 4, 2, 2);
+            ctx.fillRect(player.x - camera.x + 12, player.y + 4, 2, 2);
+        }
+
+        function drawPlatforms() {
+            ctx.fillStyle = '#8B4513'; // Brown for platforms
+            for (let platform of platforms) {
+                ctx.fillRect(platform.x - camera.x, platform.y, platform.width, platform.height);
+            }
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw platforms first
+            drawPlatforms();
+
+            // Draw player
+            drawPlayer();
+        }
+
+        // Game loop
+        function gameLoop() {
+            updatePlayer();
+            updateCamera();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        gameLoop();
+    </script>
+</body>
+</html>

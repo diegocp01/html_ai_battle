@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heavy Smoke Rocket Launch</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(to top, #1a1a2e, #000000);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            font-family: sans-serif;
+        }
+
+        #scene {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* The Ground */
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 50px;
+            background: #222;
+            z-index: 10;
+        }
+
+        /* Launch Pad Structure */
+        .pad {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 20px;
+            background: #444;
+            z-index: 5;
+            border-radius: 5px 5px 0 0;
+        }
+
+        /* The Rocket */
+        #rocket {
+            position: absolute;
+            bottom: 70px; /* Sits on top of pad */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 120px;
+            z-index: 20;
+            transition: transform 0.1s; /* For shake effect */
+        }
+
+        /* Rocket Body */
+        .fuselage {
+            width: 100%;
+            height: 100%;
+            background: #e0e0e0;
+            border-radius: 50% 50% 5px 5px;
+            position: relative;
+            box-shadow: inset -5px 0 10px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        /* Red tip */
+        .fuselage::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background: #d32f2f;
+            border-radius: 50% 50% 0 0;
+        }
+
+        /* Window */
+        .window {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 16px;
+            background: #81d4fa;
+            border: 3px solid #555;
+            border-radius: 50%;
+        }
+
+        /* Fins */
+        .fin {
+            position: absolute;
+            bottom: 0;
+            width: 20px;
+            height: 30px;
+            background: #d32f2f;
+            z-index: -1;
+        }
+        .fin.left { left: -15px; border-radius: 100% 0 0 0; }
+        .fin.right { right: -15px; border-radius: 0 100% 0 0; }
+
+        /* Particle Container */
+        #particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 15; /* Behind rocket, in front of sky */
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.8;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #d32f2f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        button:hover { background: #b71c1c; }
+        button:disabled { background: #555; cursor: not-allowed; }
+
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <button id="launchBtn">INITIATE LAUNCH</button>
+    </div>
+
+    <div id="scene">
+        <div id="particles"></div>
+        
+        <div id="rocket">
+            <div class="fin left"></div>
+            <div class="fin right"></div>
+            <div class="fuselage">
+                <div class="window"></div>
+            </div>
+        </div>
+
+        <div class="pad"></div>
+        <div class="ground"></div>
+    </div>
+
+    <script>
+        const rocket = document.getElementById('rocket');
+        const particleContainer = document.getElementById('particles');
+        const launchBtn = document.getElementById('launchBtn');
+
+        let isLaunching = false;
+        let velocity = 0;
+        let altitude = 70; // Starting bottom pixels
+        let acceleration = 0.05;
+        let shakeIntensity = 0;
+        let particles = [];
+
+        // Particle Class
+        class Particle {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'smoke' or 'fire'
+                this.life = 1.0; // 100% life
+                this.decay = Math.random() * 0.01 + 0.005;
+                
+                // Random spread
+                this.vx = (Math.random() - 0.5) * (type === 'fire' ? 2 : 6); 
+                // Downward velocity, fire moves faster
+                this.vy = type === 'fire' ? (Math.random() * 5 + 2) : (Math.random() * 1 - 0.5);
+                
+                this.size = type === 'fire' ? (Math.random() * 10 + 5) : (Math.random() * 30 + 10);
+                
+                this.element = document.createElement('div');
+                this.element.classList.add('particle');
+                
+                // Color logic
+                if (type === 'fire') {
+                    const colors = ['#ffeb3b', '#ff9800', '#f44336'];
+                    this.element.style.background = colors[Math.floor(Math.random() * colors.length)];
+                } else {
+                    const gray = Math.floor(Math.random() * 50 + 100);
+                    this.element.style.background = `rgb(${gray}, ${gray}, ${gray})`;
+                }
+                
+                this.element.style.width = `${this.size}px`;
+                this.element.style.height = `${this.size}px`;
+                particleContainer.appendChild(this.element);
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+
+                // Smoke expands as it ages
+                if (this.type === 'smoke') {
+                    this.size += 0.5;
+                    this.vy *= 0.95; // Smoke slows down and lingers
+                }
+
+                this.element.style.width = `${this.size}px`;
+                this.element.style.height = `${this.size}px`;
+                this.element.style.left = `${this.x}px`;
+                this.element.style.bottom = `${this.y}px`; // Positioning from bottom
+                this.element.style.opacity = this.life;
+
+                if (this.life <= 0) {
+                    this.element.remove();
+                    return false; // Dead
+                }
+                return true; // Alive
+            }
+        }
+
+        launchBtn.addEventListener('click', () => {
+            if (isLaunching) return;
+            isLaunching = true;
+            launchBtn.disabled = true;
+            launchBtn.innerText = "SEQUENCE STARTED...";
+            startSequence();
+        });
+
+        function startSequence() {
+            let startTime = Date.now();
+            let phase = 'ignition'; // ignition -> liftoff -> space
+
+            function loop() {
+                const now = Date.now();
+                const elapsed = (now - startTime) / 1000;
+                
+                // 1. ENGINE IGNITION PHASE (0s - 3s)
+                if (elapsed < 3) {
+                    // Heavy shaking
+                    shakeIntensity = 3; 
+                    // Massive smoke generation
+                    spawnParticles(10, 'smoke');
+                    // Occasional fire flicker at base
+                    if(Math.random() > 0.8) spawnParticles(1, 'fire');
+                } 
+                
+                // 2. LIFTOFF PHASE (3s+)
+                else {
+                    phase = 'liftoff';
+                    shakeIntensity = Math.max(0, 3 - (velocity * 2)); // Shake reduces as it stabilizes
+                    
+                    // Acceleration logic
+                    velocity += acceleration;
+                    altitude += velocity;
+                    
+                    // Visuals
+                    spawnParticles(5, 'fire'); // Constant fire trail
+                    spawnParticles(2, 'smoke'); // Smoke trail
+                }
+
+                // Apply physics to Rocket
+                const shakeX = (Math.random() - 0.5) * shakeIntensity;
+                const shakeY = (Math.random() - 0.5) * shakeIntensity;
+                
+                rocket.style.bottom = `${altitude + shakeY}px`;
+                rocket.style.transform = `translateX(calc(-50% + ${shakeX}px))`;
+
+                // Reset logic if it goes off screen
+                if (altitude > window.innerHeight + 200) {
+                    reset();
+                    return; 
+                }
+
+                updateParticles();
+                requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        function spawnParticles(count, type) {
+            const rect = rocket.getBoundingClientRect();
+            // Calculate center bottom of rocket relative to viewport
+            const centerX = rect.left + rect.width / 2;
+            const bottomY = window.innerHeight - rect.bottom; 
+
+            for (let i = 0; i < count; i++) {
+                // Spawn slightly random around the nozzle
+                particles.push(new Particle(centerX, bottomY, type));
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const alive = particles[i].update();
+                if (!alive) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function reset() {
+            alert("Orbit reached! Resetting...");
+            isLaunching = false;
+            velocity = 0;
+            altitude = 70;
+            particles.forEach(p => p.element.remove());
+            particles = [];
+            rocket.style.bottom = '70px';
+            rocket.style.transform = 'translateX(-50%)';
+            launchBtn.disabled = false;
+            launchBtn.innerText = "INITIATE LAUNCH";
+        }
+    </script>
+</body>
+</html>

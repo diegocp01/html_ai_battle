@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blooming Flower Animation</title>
+    <style>
+        :root {
+            --pot-color: #e67e22;
+            --stem-color: #2ecc71;
+            --petal-color: #ff7675;
+            --center-color: #f1c40f;
+            --bg-color: #f0f3f5;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        .container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* --- The Pot --- */
+        .pot {
+            width: 100px;
+            height: 80px;
+            background-color: var(--pot-color);
+            clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%);
+            position: relative;
+            z-index: 10;
+            box-shadow: inset 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .pot-top {
+            width: 110px;
+            height: 15px;
+            background-color: #d35400;
+            border-radius: 5px;
+            margin-bottom: -5px;
+            z-index: 11;
+        }
+
+        /* --- The Stem --- */
+        .stem {
+            width: 8px;
+            height: 0; /* Animated to 150px */
+            background-color: var(--stem-color);
+            border-radius: 4px;
+            position: absolute;
+            bottom: 75px;
+            transition: height 2s ease-out;
+        }
+
+        /* --- The Leaves --- */
+        .leaf {
+            width: 30px;
+            height: 15px;
+            background-color: var(--stem-color);
+            position: absolute;
+            border-radius: 50% 50% 0 50%;
+            opacity: 0;
+            transition: opacity 1s ease-in;
+        }
+
+        .leaf.left {
+            left: -25px;
+            top: 60px;
+            transform: rotate(-20deg);
+        }
+
+        .leaf.right {
+            right: -25px;
+            top: 40px;
+            transform: rotate(200deg);
+        }
+
+        /* --- The Flower Head --- */
+        .flower-head {
+            position: absolute;
+            bottom: 150px; /* Aligns with full stem height */
+            transform: scale(0);
+            transition: transform 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .center {
+            width: 30px;
+            height: 30px;
+            background-color: var(--center-color);
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .petal {
+            position: absolute;
+            width: 40px;
+            height: 70px;
+            background-color: var(--petal-color);
+            border-radius: 50% 50% 50% 50% / 80% 80% 20% 20%;
+            transform-origin: bottom center;
+            opacity: 0.9;
+        }
+
+        /* Positioning 6 petals in a circle */
+        .p1 { transform: translateY(-35px) rotate(0deg); }
+        .p2 { transform: translateY(-35px) rotate(60deg); }
+        .p3 { transform: translateY(-35px) rotate(120deg); }
+        .p4 { transform: translateY(-35px) rotate(180deg); }
+        .p5 { transform: translateY(-35px) rotate(240deg); }
+        .p6 { transform: translateY(-35px) rotate(300deg); }
+
+        /* --- Animation States --- */
+        .blooming .stem {
+            height: 150px;
+        }
+
+        .blooming .leaf {
+            opacity: 1;
+        }
+
+        .blooming .flower-head {
+            transform: scale(1);
+        }
+
+        /* --- UI Elements --- */
+        .controls {
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        button {
+            padding: 10px 25px;
+            font-size: 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button:active {
+            transform: translateY(2px);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="garden">
+        <div class="flower-head">
+            <div class="petal p1"></div>
+            <div class="petal p2"></div>
+            <div class="petal p3"></div>
+            <div class="petal p4"></div>
+            <div class="petal p5"></div>
+            <div class="petal p6"></div>
+            <div class="center"></div>
+        </div>
+
+        <div class="stem">
+            <div class="leaf left"></div>
+            <div class="leaf right"></div>
+        </div>
+
+        <div class="pot-top"></div>
+        <div class="pot"></div>
+
+        <div class="controls">
+            <button onclick="bloom()">Water the Flower</button>
+            <p id="status" style="color: #7f8c8d; margin-top: 15px;">Click to watch it grow!</p>
+        </div>
+    </div>
+
+    <script>
+        function bloom() {
+            const garden = document.getElementById('garden');
+            const status = document.getElementById('status');
+            const btn = document.querySelector('button');
+
+            if (!garden.classList.contains('blooming')) {
+                garden.classList.add('blooming');
+                status.innerText = "It's blooming!";
+                btn.innerText = "Reset";
+            } else {
+                garden.classList.remove('blooming');
+                status.innerText = "Ready to grow again.";
+                btn.innerText = "Water the Flower";
+            }
+        }
+    </script>
+</body>
+</html>

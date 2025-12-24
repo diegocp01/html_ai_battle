@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JS Platformer Adventure</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #333;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            background-color: #5c94fc; /* Classic Mario Sky Blue */
+            border: 4px solid #000;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px #000;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">Score: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreElement = document.getElementById('score');
+
+// Game Constants
+const GRAVITY = 0.8;
+const FRICTION = 0.8;
+const TILE_SIZE = 40;
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 480;
+
+canvas.width = CANVAS_WIDTH;
+canvas.height = CANVAS_HEIGHT;
+
+// Game State
+let score = 0;
+let cameraX = 0;
+const keys = {};
+
+// Level Design (0 = empty, 1 = brick, 2 = question block, 3 = coin, 4 = pipe)
+const levelMap = [
+    "                                                                               ",
+    "                                                                               ",
+    "                                                                               ",
+    "          3 3 3                                                                ",
+    "          2 1 2                                                                ",
+    "                                                                               ",
+    "                                                                               ",
+    "                  3 3 3                                                        ",
+    "    1 2 1         1 1 1                     4                                  ",
+    "                                            4                                  ",
+    "                                    1 1                                        ",
+    "GGGGGGGGGGGGGGGGGGGGGGGGGGGG   GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+];
+
+class Player {
+    constructor() {
+        this.width = 32;
+        this.height = 40;
+        this.x = 100;
+        this.y = canvas.height - 150;
+        this.velX = 0;
+        this.velY = 0;
+        this.speed = 5;
+        this.jumpStrength = 15;
+        this.grounded = false;
+        this.color = "#ff4444";
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        // Simple character shape
+        ctx.fillRect(this.x - cameraX, this.y, this.width, this.height);
+        // Eye
+        ctx.fillStyle = "white";
+        ctx.fillRect(this.x - cameraX + 20, this.y + 10, 8, 8);
+    }
+
+    update() {
+        // Horizontal Movement
+        if (keys['ArrowRight'] || keys['d']) {
+            if (this.velX < this.speed) this.velX++;
+        }
+        if (keys['ArrowLeft'] || keys['a']) {
+            if (this.velX > -this.speed) this.velX--;
+        }
+
+        // Jump
+        if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && this.grounded) {
+            this.velY = -this.jumpStrength;
+            this.grounded = false;
+        }
+
+        this.velX *= FRICTION;
+        this.velY += GRAVITY;
+
+        this.x += this.velX;
+        this.y += this.velY;
+
+        // Reset grounded state to check in collision
+        this.grounded = false;
+
+        // Bound check (bottom of screen = death)
+        if (this.y > canvas.height) {
+            this.reset();
+        }
+    }
+
+    reset() {
+        this.x = 100;
+        this.y = canvas.height - 150;
+        this.velX = 0;
+        this.velY = 0;
+        score = 0;
+        scoreElement.innerText = score;
+        cameraX = 0;
+    }
+}
+
+class Enemy {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 30;
+        this.height = 30;
+        this.velX = -2;
+    }
+
+    draw() {
+        ctx.fillStyle = "#550000";
+        ctx.fillRect(this.x - cameraX, this.y, this.width, this.height);
+    }
+
+    update() {
+        this.x += this.velX;
+    }
+}
+
+const player = new Player();
+const platforms = [];
+const coins = [];
+const enemies = [];
+
+// Parse Level Map
+function initLevel() {
+    levelMap.forEach((row, y) => {
+        [...row].forEach((char, x) => {
+            const posX = x * TILE_SIZE;
+            const posY = y * TILE_SIZE;
+
+            if (char === 'G' || char === '1' || char === '2' || char === '4') {
+                platforms.push({
+                    x: posX, y: posY, 
+                    width: TILE_SIZE, height: TILE_SIZE, 
+                    type: char 
+                });
+            } else if (char === '3') {
+                coins.push({ x: posX + 10, y: posY + 10, width: 20, height: 20, collected: false });
+            }
+        });
+    });
+    
+    // Add a few enemies
+    enemies.push(new Enemy(600, 300));
+    enemies.push(new Enemy(1200, 300));
+}
+
+function checkCollision(objA, objB) {
+    return objA.x < objB.x + objB.width &&
+           objA.x + objA.width > objB.x &&
+           objA.y < objB.y + objB.height &&
+           objA.y + objA.height > objB.y;
+}
+
+function update() {
+    player.update();
+
+    // Camera follow
+    if (player.x > canvas.width / 2) {
+        cameraX = player.x - canvas.width / 2;
+    }
+
+    // Platform Collisions
+    platforms.forEach(plat => {
+        if (checkCollision(player, plat)) {
+            // Determine collision side
+            let dx = (player.x + player.width / 2) - (plat.x + plat.width / 2);
+            let dy = (player.y + player.height / 2) - (plat.y + plat.height / 2);
+            let width = (player.width + plat.width) / 2;
+            let height = (player.height + plat.height) / 2;
+            let crossWidth = width * dy;
+            let crossHeight = height * dx;
+
+            if (Math.abs(dx) <= width && Math.abs(dy) <= height) {
+                if (crossWidth > crossHeight) {
+                    if (crossWidth > -crossHeight) {
+                        // Top collision
+                        player.y = plat.y + plat.height;
+                        player.velY = 0;
+                    } else {
+                        // Left collision
+                        player.x = plat.x - player.width;
+                        player.velX = 0;
+                    }
+                } else {
+                    if (crossWidth > -crossHeight) {
+                        // Right collision
+                        player.x = plat.x + plat.width;
+                        player.velX = 0;
+                    } else {
+                        // Bottom collision (standing on platform)
+                        player.y = plat.y - player.height;
+                        player.velY = 0;
+                        player.grounded = true;
+                    }
+                }
+            }
+        }
+    });
+
+    // Coin Collection
+    coins.forEach(coin => {
+        if (!coin.collected && checkCollision(player, coin)) {
+            coin.collected = true;
+            score += 10;
+            scoreElement.innerText = score;
+        }
+    });
+
+    // Enemy Update and Collision
+    enemies.forEach((enemy, index) => {
+        enemy.update();
+        if (checkCollision(player, enemy)) {
+            if (player.velY > 0) { // Stomp
+                enemies.splice(index, 1);
+                player.velY = -10;
+                score += 50;
+                scoreElement.innerText = score;
+            } else {
+                player.reset();
+            }
+        }
+    });
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Platforms
+    platforms.forEach(plat => {
+        if (plat.type === 'G') ctx.fillStyle = '#884400'; // Ground
+        else if (plat.type === '1') ctx.fillStyle = '#b03014'; // Brick
+        else if (plat.type === '2') ctx.fillStyle = '#f0a000'; // Question
+        else if (plat.type === '4') ctx.fillStyle = '#228822'; // Pipe
+        
+        ctx.fillRect(plat.x - cameraX, plat.y, plat.width, plat.height);
+        ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+        ctx.strokeRect(plat.x - cameraX, plat.y, plat.width, plat.height);
+    });
+
+    // Draw Coins
+    ctx.fillStyle = "gold";
+    coins.forEach(coin => {
+        if (!coin.collected) {
+            ctx.beginPath();
+            ctx.arc(coin.x - cameraX + 10, coin.y + 10, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+
+    // Draw Enemies
+    enemies.forEach(enemy => enemy.draw());
+
+    // Draw Player
+    player.draw();
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Input Handling
+window.addEventListener('keydown', e => keys[e.key] = true);
+window.addEventListener('keyup', e => keys[e.key] = false);
+
+// Start Game
+initLevel();
+gameLoop();
+
+</script>
+</body>
+</html>

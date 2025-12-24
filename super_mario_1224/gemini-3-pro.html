@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JS Platformer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 450px;
+            background-color: #87CEEB; /* Sky Blue */
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        /* Canvas covering the container */
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+        }
+
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            text-shadow: 3px 3px 0 #000;
+            text-align: center;
+            display: none;
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            text-shadow: 1px 1px 0 #000;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">Score: <span id="score">0</span></div>
+    <div id="message">GAME OVER<br><span style="font-size:20px">Press R to Restart</span></div>
+    <div id="controls-hint">Controls: Arrows / WASD to Move & Jump</div>
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const msgEl = document.getElementById('message');
+
+    // --- Game Constants & Variables ---
+    const GRAVITY = 0.5;
+    const FRICTION = 0.8;
+    const JUMP_FORCE = -12;
+    const SPEED = 5;
+    
+    let keys = {
+        right: false,
+        left: false,
+        up: false
+    };
+
+    let gameActive = true;
+    let score = 0;
+    
+    // Camera / Scroll offset
+    let cameraOffsetX = 0;
+
+    // --- Entities ---
+    
+    const player = {
+        x: 100,
+        y: 100,
+        width: 30,
+        height: 30,
+        dx: 0,
+        dy: 0,
+        color: '#ff4757', // Red Mario-ish color
+        grounded: false
+    };
+
+    // Platform Level Design (x, y, w, h)
+    // 800 is one screen width. The level extends beyond.
+    const platforms = [
+        // Ground
+        { x: 0, y: 400, w: 1000, h: 50, type: 'ground' },
+        { x: 1150, y: 400, w: 1000, h: 50, type: 'ground' }, // Gap from 1000 to 1150
+        
+        // Platforms
+        { x: 300, y: 300, w: 100, h: 20, type: 'platform' },
+        { x: 500, y: 220, w: 100, h: 20, type: 'platform' },
+        { x: 700, y: 320, w: 100, h: 20, type: 'platform' },
+        
+        // Over the gap
+        { x: 950, y: 280, w: 80, h: 20, type: 'platform' },
+        { x: 1080, y: 200, w: 80, h: 20, type: 'platform' },
+
+        // Staircase
+        { x: 1400, y: 350, w: 50, h: 50, type: 'box' },
+        { x: 1450, y: 300, w: 50, h: 100, type: 'box' },
+        { x: 1500, y: 250, w: 50, h: 150, type: 'box' },
+        
+        // High platform
+        { x: 1650, y: 200, w: 200, h: 20, type: 'platform' },
+
+        // Final Ground
+        { x: 2000, y: 400, w: 500, h: 50, type: 'ground' }
+    ];
+
+    const goal = { x: 2300, y: 340, w: 20, h: 60, reached: false };
+    
+    // --- Input Handling ---
+
+    document.addEventListener('keydown', (e) => {
+        if(e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+        if(e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+        if(e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') {
+            if (player.grounded) {
+                player.dy = JUMP_FORCE;
+                player.grounded = false;
+            }
+        }
+        if(e.code === 'KeyR' && !gameActive) resetGame();
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if(e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+        if(e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    });
+
+    // --- Physics & Logic ---
+
+    function update() {
+        if (!gameActive) return;
+
+        // 1. Apply Forces
+        if (keys.right) player.dx = SPEED;
+        else if (keys.left) player.dx = -SPEED;
+        else player.dx *= FRICTION; // Friction checks
+
+        player.dy += GRAVITY;
+        
+        player.x += player.dx;
+        player.y += player.dy;
+
+        // 2. Collision Detection (Simple AABB)
+        player.grounded = false;
+
+        platforms.forEach(plat => {
+            if (player.x < plat.x + plat.w &&
+                player.x + player.width > plat.x &&
+                player.y < plat.y + plat.h &&
+                player.y + player.height > plat.y) {
+                
+                // Collision happened. Resolve it.
+                // Calculate overlap
+                let overlapX = (player.width + plat.w) / 2 - Math.abs((player.x + player.width/2) - (plat.x + plat.w/2));
+                let overlapY = (player.height + plat.h) / 2 - Math.abs((player.y + player.height/2) - (plat.y + plat.h/2));
+
+                if (overlapX < overlapY) {
+                    // Horizontal Collision
+                    if (player.dx > 0) player.x = plat.x - player.width;
+                    else player.x = plat.x + plat.w;
+                    player.dx = 0;
+                } else {
+                    // Vertical Collision
+                    if (player.dy > 0) { // Landing on top
+                        player.y = plat.y - player.height;
+                        player.grounded = true;
+                        player.dy = 0;
+                    } else { // Hitting head on bottom
+                        player.y = plat.y + plat.h;
+                        player.dy = 0;
+                    }
+                }
+            }
+        });
+
+        // 3. Win/Lose Conditions
+        // Fall off world
+        if (player.y > canvas.height + 100) {
+            endGame("YOU DIED");
+        }
+
+        // Reach Goal
+        if (player.x < goal.x + goal.w &&
+            player.x + player.width > goal.x &&
+            player.y < goal.y + goal.h &&
+            player.y + player.height > goal.y) {
+            endGame("YOU WIN!");
+        }
+
+        // 4. Camera Follow
+        // Keep player somewhat centered
+        // We scroll the "world" by changing cameraOffsetX
+        // If player passes 40% of screen width, move camera
+        if (player.x > cameraOffsetX + canvas.width * 0.4) {
+            cameraOffsetX = player.x - canvas.width * 0.4;
+        }
+        // Don't scroll left past 0
+        if (cameraOffsetX < 0) cameraOffsetX = 0;
+        
+        // Update Score (based on distance)
+        score = Math.floor(player.x / 10);
+        scoreEl.innerText = score;
+    }
+
+    // --- Rendering ---
+
+    function draw() {
+        // Clear screen
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        // Shift everything by camera offset
+        ctx.translate(-cameraOffsetX, 0);
+
+        // Draw Platforms
+        platforms.forEach(plat => {
+            if (plat.type === 'ground') ctx.fillStyle = '#654321'; // Dirt brown
+            else if (plat.type === 'box') ctx.fillStyle = '#B8860B'; // Wood
+            else ctx.fillStyle = '#228B22'; // Green grass
+
+            ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+            
+            // Decorative top border for grass
+            if(plat.type !== 'box') {
+                ctx.fillStyle = '#32CD32';
+                ctx.fillRect(plat.x, plat.y, plat.w, 5);
+            }
+        });
+
+        // Draw Goal
+        ctx.fillStyle = '#FFD700'; // Gold pole
+        ctx.fillRect(goal.x, goal.y, 5, 60);
+        ctx.fillStyle = 'red'; // Flag
+        ctx.beginPath();
+        ctx.moveTo(goal.x + 5, goal.y);
+        ctx.lineTo(goal.x + 25, goal.y + 10);
+        ctx.lineTo(goal.x + 5, goal.y + 20);
+        ctx.fill();
+
+        // Draw Player
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+        
+        // Draw Eyes (to see direction)
+        ctx.fillStyle = 'white';
+        if (keys.left) {
+            ctx.fillRect(player.x + 2, player.y + 5, 8, 8);
+        } else {
+            ctx.fillRect(player.x + 20, player.y + 5, 8, 8);
+        }
+
+        ctx.restore();
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    function endGame(text) {
+        gameActive = false;
+        msgEl.innerHTML = `${text}<br><span style="font-size:20px">Press R to Restart</span>`;
+        msgEl.style.display = 'block';
+    }
+
+    function resetGame() {
+        player.x = 100;
+        player.y = 100;
+        player.dx = 0;
+        player.dy = 0;
+        cameraOffsetX = 0;
+        gameActive = true;
+        msgEl.style.display = 'none';
+    }
+
+    // Start
+    loop();
+
+</script>
+</body>
+</html>

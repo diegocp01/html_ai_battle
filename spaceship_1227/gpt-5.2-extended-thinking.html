@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rocket Launch Animation</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #070a12; overflow: hidden; }
+    #wrap { position: fixed; inset: 0; display: grid; place-items: center; }
+    canvas { width: 100vw; height: 100vh; display: block; }
+    .hud {
+      position: fixed; left: 14px; top: 14px;
+      color: rgba(255,255,255,0.92);
+      font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      user-select: none;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      backdrop-filter: blur(6px);
+      max-width: 360px;
+    }
+    .hud b { font-weight: 700; }
+    .hud .row { display: flex; gap: 10px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.92);
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn:hover { background: rgba(255,255,255,0.12); }
+    .pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.22);
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 6px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: #7CFFB2; box-shadow: 0 0 12px rgba(124,255,178,0.6); }
+    .sub { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="c"></canvas>
+  </div>
+
+  <div class="hud">
+    <div><b>Rocket Launch</b> (single-file HTML)</div>
+    <div class="sub">Ignition with heavy smoke, then slow liftoff that accelerates.</div>
+    <div class="pill"><span class="dot" id="dot"></span><span id="phase">Ready</span></div>
+    <div class="row">
+      <button class="btn" id="restart">Restart</button>
+      <button class="btn" id="pause">Pause</button>
+      <button class="btn" id="slowmo">Slow-mo</button>
+    </div>
+    <div class="sub" style="margin-top:8px;">Tip: click anywhere to restart.</div>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      const phaseEl = document.getElementById("phase");
+      const dotEl = document.getElementById("dot");
+      const restartBtn = document.getElementById("restart");
+      const pauseBtn = document.getElementById("pause");
+      const slowBtn = document.getElementById("slowmo");
+
+      const DPR = Math.min(2, window.devicePixelRatio || 1);
+
+      function resize() {
+        canvas.width = Math.floor(innerWidth * DPR);
+        canvas.height = Math.floor(innerHeight * DPR);
+        canvas.style.width = innerWidth + "px";
+        canvas.style.height = innerHeight + "px";
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      // ---------- Helpers ----------
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+
+      // ---------- Stars ----------
+      let stars = [];
+      function seedStars() {
+        stars = [];
+        const n = Math.floor((innerWidth * innerHeight) / 9000);
+        for (let i = 0; i < n; i++) {
+          stars.push({
+            x: Math.random() * innerWidth,
+            y: Math.random() * innerHeight,
+            r: Math.random() < 0.9 ? rand(0.6, 1.4) : rand(1.4, 2.4),
+            tw: rand(0, Math.PI * 2),
+            sp: rand(0.4, 1.2),
+            a: rand(0.25, 0.9),
+          });
+        }
+      }
+      seedStars();
+
+      // ---------- Particles (smoke) ----------
+      const smoke = [];
+      function spawnSmoke(x, y, count, opts = {}) {
+        const {
+          spreadX = 30,
+          spreadY = 10,
+          vX = [-30, 30],
+          vY = [-10, 30],
+          size = [10, 28],
+          grow = [10, 26],
+          life = [1.4, 3.6],
+          dark = [30, 80],     // 0..255
+          alpha = [0.22, 0.65],
+          buoyancy = [-10, -30] // negative means drift up
+        } = opts;
+
+        for (let i = 0; i < count; i++) {
+          const s0 = rand(size[0], size[1]);
+          smoke.push({
+            x: x + rand(-spreadX, spreadX),
+            y: y + rand(-spreadY, spreadY),
+            vx: rand(vX[0], vX[1]),
+            vy: rand(vY[0], vY[1]),
+            r: s0,
+            rGrow: rand(grow[0], grow[1]),
+            a0: rand(alpha[0], alpha[1]),
+            life: rand(life[0], life[1]),
+            t: 0,
+            shade: Math.floor(rand(dark[0], dark[1])),
+            buoy: rand(buoyancy[0], buoyancy[1]),
+          });
+        }
+      }
+
+      // ---------- Sparks ----------
+      const sparks = [];
+      function spawnSparks(x, y, count) {
+        for (let i = 0; i < count; i++) {
+          const ang = rand(Math.PI * 0.9, Math.PI * 2.1);
+          const spd = rand(120, 320);
+          sparks.push({
+            x, y,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd,
+            r: rand(1.0, 2.4),
+            life: rand(0.25, 0.6),
+            t: 0,
+          });
+        }
+      }
+
+      // ---------- Rocket ----------
+      const rocket = {
+        x: 0,
+        y: 0,         // screen y (px)
+        vy: 0,        // px/s upward (negative)
+        a: 0,         // px/s^2 upward (negative)
+        wobble: 0,
+      };
+
+      // Ground and pad
+      function groundY() { return innerHeight * 0.80; }
+      function padX() { return innerWidth * 0.50; }
+
+      // Timeline (seconds)
+      const T_IGNITE = 2.2;     // ignition build-up
+      const T_HOLD  = 0.9;     // roaring on pad
+      const T_LIFTOFF = T_IGNITE + T_HOLD;
+
+      // States
+      let t = 0;
+      let last = performance.now();
+      let paused = false;
+      let slowmo = false;
+
+      // Camera shake
+      let shake = 0;
+
+      function reset() {
+        t = 0;
+        smoke.length = 0;
+        sparks.length = 0;
+        rocket.x = padX();
+        rocket.y = groundY() - 120;
+        rocket.vy = 0;
+        rocket.a = 0;
+        rocket.wobble = 0;
+        shake = 0;
+        phaseEl.textContent = "Ready";
+        dotEl.style.background = "#7CFFB2";
+        dotEl.style.boxShadow = "0 0 12px rgba(124,255,178,0.6)";
+        seedStars();
+      }
+
+      reset();
+
+      // Controls
+      restartBtn.onclick = reset;
+      canvas.addEventListener("pointerdown", reset);
+
+      pauseBtn.onclick = () => {
+        paused = !paused;
+        pauseBtn.textContent = paused ? "Resume" : "Pause";
+      };
+      slowBtn.onclick = () => {
+        slowmo = !slowmo;
+        slowBtn.textContent = slowmo ? "Normal" : "Slow-mo";
+      };
+
+      // ---------- Drawing ----------
+      function drawBackground(dt, camShakeX, camShakeY) {
+        // Sky gradient
+        const g = ctx.createLinearGradient(0, 0, 0, innerHeight);
+        g.addColorStop(0, "#05060b");
+        g.addColorStop(0.45, "#070a12");
+        g.addColorStop(1, "#0c0f1a");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
+
+        // Stars
+        ctx.save();
+        ctx.translate(camShakeX * 0.25, camShakeY * 0.25);
+        for (const s of stars) {
+          s.tw += dt * s.sp;
+          const tw = 0.55 + 0.45 * Math.sin(s.tw);
+          const a = s.a * tw;
+          ctx.globalAlpha = a;
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+
+        // Subtle horizon haze
+        const hy = groundY();
+        const h = ctx.createLinearGradient(0, hy - 160, 0, hy + 120);
+        h.addColorStop(0, "rgba(255,255,255,0)");
+        h.addColorStop(0.5, "rgba(160,180,255,0.06)");
+        h.addColorStop(1, "rgba(0,0,0,0.2)");
+        ctx.fillStyle = h;
+        ctx.fillRect(0, hy - 180, innerWidth, 300);
+      }
+
+      function drawGround(camShakeX, camShakeY) {
+        const gy = groundY();
+        ctx.save();
+        ctx.translate(camShakeX, camShakeY);
+
+        // Ground slab
+        ctx.fillStyle = "#0b0e16";
+        ctx.fillRect(0, gy, innerWidth, innerHeight - gy);
+
+        // Pad
+        const px = padX();
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.fillRect(px - 130, gy - 16, 260, 16);
+
+        // Launch tower silhouette
+        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        ctx.fillRect(px + 120, gy - 260, 16, 260);
+        ctx.fillRect(px + 116, gy - 260, 24, 10);
+
+        // A few small lights
+        ctx.fillStyle = "rgba(255,200,120,0.28)";
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath();
+          ctx.arc(px + 128, gy - 220 + i * 50, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      function drawRocket(x, y, flamePower, camShakeX, camShakeY) {
+        ctx.save();
+        ctx.translate(camShakeX, camShakeY);
+
+        // Rocket wobble during ignition
+        const wob = rocket.wobble;
+        ctx.translate(x, y);
+        ctx.rotate(wob);
+
+        // Body
+        const bodyW = 44;
+        const bodyH = 130;
+        const noseH = 34;
+
+        // Shadow
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.beginPath();
+        ctx.ellipse(8, 8, bodyW * 0.60, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Main cylinder
+        const bodyGrad = ctx.createLinearGradient(-bodyW/2, -bodyH/2, bodyW/2, bodyH/2);
+        bodyGrad.addColorStop(0, "#e9edf7");
+        bodyGrad.addColorStop(0.45, "#cfd7ea");
+        bodyGrad.addColorStop(1, "#a8b4cf");
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.roundRect(-bodyW/2, -bodyH/2, bodyW, bodyH, 22);
+        ctx.fill();
+
+        // Nose cone
+        const noseGrad = ctx.createLinearGradient(0, -bodyH/2 - noseH, 0, -bodyH/2);
+        noseGrad.addColorStop(0, "#ffffff");
+        noseGrad.addColorStop(1, "#cfd7ea");
+        ctx.fillStyle = noseGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, -bodyH/2 - noseH);
+        ctx.quadraticCurveTo(bodyW/2, -bodyH/2 - 8, bodyW/2, -bodyH/2);
+        ctx.lineTo(-bodyW/2, -bodyH/2);
+        ctx.quadraticCurveTo(-bodyW/2, -bodyH/2 - 8, 0, -bodyH/2 - noseH);
+        ctx.closePath();
+        ctx.fill();
+
+        // Window
+        ctx.fillStyle = "rgba(20,30,60,0.65)";
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, -20, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Stripe
+        ctx.fillStyle = "rgba(255,100,80,0.85)";
+        ctx.fillRect(-bodyW/2, 10, bodyW, 10);
+
+        // Fins
+        ctx.fillStyle = "rgba(220,230,250,0.75)";
+        ctx.beginPath();
+        ctx.moveTo(-bodyW/2, bodyH/2 - 24);
+        ctx.lineTo(-bodyW/2 - 18, bodyH/2 + 6);
+        ctx.lineTo(-bodyW/2, bodyH/2 + 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(bodyW/2, bodyH/2 - 24);
+        ctx.lineTo(bodyW/2 + 18, bodyH/2 + 6);
+        ctx.lineTo(bodyW/2, bodyH/2 + 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // Engine nozzle
+        ctx.fillStyle = "rgba(40,50,70,0.9)";
+        ctx.beginPath();
+        ctx.roundRect(-14, bodyH/2 - 6, 28, 14, 6);
+        ctx.fill();
+
+        // Flame
+        if (flamePower > 0) {
+          const flick = (0.8 + 0.2 * Math.sin(performance.now() * 0.03)) * flamePower;
+          const flameH = lerp(18, 64, flick);
+          const flameW = lerp(12, 24, flick);
+
+          const flameGrad = ctx.createLinearGradient(0, bodyH/2 + 4, 0, bodyH/2 + flameH);
+          flameGrad.addColorStop(0, "rgba(255,255,255,0.95)");
+          flameGrad.addColorStop(0.15, "rgba(255,220,140,0.95)");
+          flameGrad.addColorStop(0.5, "rgba(255,140,60,0.90)");
+          flameGrad.addColorStop(1, "rgba(255,70,20,0.0)");
+
+          ctx.fillStyle = flameGrad;
+          ctx.beginPath();
+          ctx.moveTo(0, bodyH/2 + flameH);
+          ctx.quadraticCurveTo(flameW, bodyH/2 + flameH * 0.6, flameW * 0.55, bodyH/2 + 6);
+          ctx.quadraticCurveTo(0, bodyH/2 - 2, -flameW * 0.55, bodyH/2 + 6);
+          ctx.quadraticCurveTo(-flameW, bodyH/2 + flameH * 0.6, 0, bodyH/2 + flameH);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      // ---------- Update ----------
+      function update(dt) {
+        t += dt;
+
+        // Phase logic
+        let flamePower = 0;
+        let smokeRate = 0;
+
+        // Camera shake behavior
+        const preIgnite = clamp(t / T_IGNITE, 0, 1);
+
+        if (t < T_IGNITE) {
+          phaseEl.textContent = "Engine chilldown";
+          dotEl.style.background = "#7CFFB2";
+          dotEl.style.boxShadow = "0 0 12px rgba(124,255,178,0.6)";
+          flamePower = 0.15 * preIgnite;
+          smokeRate = 6 + 18 * preIgnite;
+          shake = lerp(0, 3.2, preIgnite);
+        } else if (t < T_LIFTOFF) {
+          phaseEl.textContent = "Ignition";
+          dotEl.style.background = "#FFD37C";
+          dotEl.style.boxShadow = "0 0 14px rgba(255,211,124,0.65)";
+          const tt = clamp((t - T_IGNITE) / T_HOLD, 0, 1);
+          flamePower = 0.35 + 0.65 * easeOutCubic(tt);
+          smokeRate = 26 + 70 * easeOutCubic(tt);
+          shake = 3.2 + 4.5 * tt;
+          rocket.wobble = 0.004 * Math.sin(t * 18) + 0.006 * Math.sin(t * 7);
+        } else {
+          phaseEl.textContent = "Liftoff";
+          dotEl.style.background = "#FF7C7C";
+          dotEl.style.boxShadow = "0 0 16px rgba(255,124,124,0.7)";
+          const tt = (t - T_LIFTOFF);
+
+          // Slow start, then accelerating upward
+          // vy is negative (up), a is more negative over time
+          const a0 = -60;          // initial upward acceleration (px/s^2)
+          const ramp = -45;        // acceleration ramp (px/s^3)
+          rocket.a = a0 + ramp * clamp(tt, 0, 8);
+
+          // Add a bit of steering wobble early
+          rocket.wobble = 0.005 * Math.sin(t * 5) * Math.exp(-tt * 0.2);
+
+          rocket.vy += rocket.a * dt;
+          rocket.vy = clamp(rocket.vy, -1400, 0);
+          rocket.y += rocket.vy * dt;
+
+          flamePower = 0.85 + 0.25 * (0.5 + 0.5 * Math.sin(t * 20));
+          flamePower = clamp(flamePower, 0.7, 1.0);
+
+          // Smoke reduces slightly as it climbs
+          smokeRate = 70 * Math.exp(-tt * 0.12) + 22;
+
+          // Shake fades with altitude
+          shake = (7.5 * Math.exp(-tt * 0.35)) + 1.2;
+        }
+
+        // Spawn particles
+        const nozzleX = rocket.x;
+        const nozzleY = rocket.y + 65;
+
+        // Heavy smoke at pad (extra ground plume)
+        if (t < T_LIFTOFF) {
+          const groundBoost = clamp(t / (T_IGNITE + 0.4), 0, 1);
+          const extra = Math.floor(10 + 30 * groundBoost);
+          spawnSmoke(nozzleX, groundY() - 10, extra, {
+            spreadX: 80,
+            spreadY: 16,
+            vX: [-120, 120],
+            vY: [-10, 90],
+            size: [18, 48],
+            grow: [18, 42],
+            life: [1.8, 4.8],
+            dark: [20, 70],
+            alpha: [0.20, 0.62],
+            buoyancy: [-6, -24]
+          });
+        }
+
+        // Engine exhaust smoke
+        const sCount = Math.floor(smokeRate * dt);
+        if (sCount > 0) {
+          spawnSmoke(nozzleX, nozzleY + 6, sCount, {
+            spreadX: 20,
+            spreadY: 10,
+            vX: [-90, 90],
+            vY: [10, 160],
+            size: [10, 26],
+            grow: [14, 34],
+            life: [1.2, 3.2],
+            dark: [25, 85],
+            alpha: [0.16, 0.55],
+            buoyancy: [-8, -26]
+          });
+        }
+
+        // Occasional sparks on ignition
+        if (t > T_IGNITE && t < T_LIFTOFF && Math.random() < 0.35) {
+          spawnSparks(nozzleX + rand(-8, 8), nozzleY + 8, Math.floor(rand(4, 10)));
+        }
+
+        // Update smoke
+        for (let i = smoke.length - 1; i >= 0; i--) {
+          const p = smoke[i];
+          p.t += dt;
+          const k = p.t / p.life;
+          if (k >= 1) { smoke.splice(i, 1); continue; }
+
+          // Drag and buoyancy
+          p.vx *= Math.pow(0.22, dt);
+          p.vy *= Math.pow(0.35, dt);
+          p.vy += p.buoy * dt;
+
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+
+          p.r = lerp(p.r, p.r + p.rGrow, dt * 0.7);
+        }
+
+        // Update sparks
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const s = sparks[i];
+          s.t += dt;
+          const k = s.t / s.life;
+          if (k >= 1) { sparks.splice(i, 1); continue; }
+          s.vx *= Math.pow(0.16, dt);
+          s.vy += 700 * dt; // gravity
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+        }
+
+        return { flamePower };
+      }
+
+      function render(dt, flamePower) {
+        // Camera shake
+        const mag = shake;
+        const camShakeX = (Math.random() - 0.5) * mag;
+        const camShakeY = (Math.random() - 0.5) * mag;
+
+        drawBackground(dt, camShakeX, camShakeY);
+
+        // Smoke behind rocket
+        ctx.save();
+        ctx.translate(camShakeX, camShakeY);
+        for (const p of smoke) {
+          const k = clamp(p.t / p.life, 0, 1);
+          const a = p.a0 * (1 - k);
+          const shade = p.shade;
+          ctx.globalAlpha = a;
+          ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+
+        // Sparks
+        ctx.save();
+        ctx.translate(camShakeX, camShakeY);
+        for (const s of sparks) {
+          const k = clamp(s.t / s.life, 0, 1);
+          ctx.globalAlpha = 1 - k;
+          ctx.fillStyle = "rgba(255,200,120,0.9)";
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+
+        drawGround(camShakeX, camShakeY);
+
+        // Rocket
+        drawRocket(rocket.x, rocket.y, flamePower, camShakeX, camShakeY);
+
+        // Heat shimmer glow near nozzle
+        if (flamePower > 0.15) {
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          const gx = rocket.x + camShakeX;
+          const gy = (rocket.y + 78) + camShakeY;
+          const r = lerp(24, 60, flamePower);
+          const grad = ctx.createRadialGradient(gx, gy, 2, gx, gy, r);
+          grad.addColorStop(0, "rgba(255,180,90,0.18)");
+          grad.addColorStop(1, "rgba(255,90,30,0)");
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(gx, gy, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Vignette
+        ctx.save();
+        const vg = ctx.createRadialGradient(innerWidth/2, innerHeight*0.45, innerWidth*0.2, innerWidth/2, innerHeight*0.5, innerWidth*0.75);
+        vg.addColorStop(0, "rgba(0,0,0,0)");
+        vg.addColorStop(1, "rgba(0,0,0,0.35)");
+        ctx.fillStyle = vg;
+        ctx.fillRect(0, 0, innerWidth, innerHeight);
+        ctx.restore();
+      }
+
+      // ---------- Main loop ----------
+      function tick(now) {
+        requestAnimationFrame(tick);
+
+        const rawDt = (now - last) / 1000;
+        last = now;
+
+        if (paused) return;
+
+        const dt = clamp(rawDt, 0, 1/20) * (slowmo ? 0.35 : 1);
+
+        // Clear in case (we paint full frame anyway)
+        const { flamePower } = update(dt);
+        render(dt, flamePower);
+
+        // If it flies out of view, keep the illusion going by clamping and thinning smoke
+        if (rocket.y < -220) {
+          rocket.y = -220;
+          rocket.vy *= 0.98;
+        }
+      }
+
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>

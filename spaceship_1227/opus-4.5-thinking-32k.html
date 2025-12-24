@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rocket Launch Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: linear-gradient(to bottom, #0a0a1a 0%, #1a2a4a 40%, #2a4a6a 70%, #4a6a8a 100%);
+            height: 100vh;
+            font-family: 'Courier New', monospace;
+        }
+
+        .scene {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #particleCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 60%;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(to bottom, #2d2d2d 0%, #1a1a1a 50%, #0d0d0d 100%);
+        }
+
+        .ground::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(to right, transparent 0%, #555 20%, #555 80%, transparent 100%);
+        }
+
+        .launch-pad {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+
+        .pad-platform {
+            width: 160px;
+            height: 25px;
+            background: linear-gradient(to bottom, #666 0%, #444 50%, #333 100%);
+            border-radius: 3px;
+            position: relative;
+        }
+
+        .pad-platform::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 15px;
+            background: linear-gradient(to bottom, #555 0%, #333 100%);
+            border-radius: 0 0 5px 5px;
+        }
+
+        .tower {
+            position: absolute;
+            bottom: 25px;
+            width: 15px;
+            background: repeating-linear-gradient(
+                0deg,
+                #888 0px,
+                #888 5px,
+                #666 5px,
+                #666 10px
+            );
+        }
+
+        .tower-left {
+            left: -25px;
+            height: 220px;
+        }
+
+        .tower-right {
+            right: -25px;
+            height: 220px;
+        }
+
+        .arm {
+            position: absolute;
+            height: 8px;
+            background: #777;
+            transform-origin: left center;
+        }
+
+        .arm-left {
+            right: 0;
+            width: 35px;
+            top: 150px;
+        }
+
+        .arm-right {
+            left: 0;
+            width: 35px;
+            top: 150px;
+        }
+
+        .rocket-container {
+            position: absolute;
+            bottom: 105px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 6;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+        }
+
+        .rocket {
+            position: relative;
+            width: 50px;
+            height: 160px;
+        }
+
+        .nose-cone {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 45px;
+            background: linear-gradient(135deg, #ff4444 0%, #cc2222 50%, #aa1111 100%);
+            border-radius: 50% 50% 0 0;
+            clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+        }
+
+        .nose-cone::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 8px;
+            background: radial-gradient(circle, #ffff00 0%, #ff8800 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ffaa00;
+        }
+
+        .body-upper {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 34px;
+            height: 50px;
+            background: linear-gradient(90deg, #ccc 0%, #fff 30%, #fff 70%, #ccc 100%);
+        }
+
+        .body-lower {
+            position: absolute;
+            top: 88px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 38px;
+            height: 45px;
+            background: linear-gradient(90deg, #bbb 0%, #eee 30%, #eee 70%, #bbb 100%);
+        }
+
+        .window {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: radial-gradient(circle at 30% 30%, #7ec8e3 0%, #3a8fb7 50%, #1a5f87 100%);
+            border-radius: 50%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 2px solid #555;
+            box-shadow: inset -2px -2px 4px rgba(0,0,0,0.3);
+        }
+
+        .window-1 { top: 50px; }
+        .window-2 { top: 70px; }
+
+        .stripe {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #cc2222;
+        }
+
+        .stripe-1 {
+            top: 95px;
+            width: 38px;
+            height: 8px;
+        }
+
+        .stripe-2 {
+            top: 115px;
+            width: 38px;
+            height: 4px;
+        }
+
+        .usa-text {
+            position: absolute;
+            top: 105px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 6px;
+            font-weight: bold;
+            color: #333;
+            letter-spacing: 2px;
+        }
+
+        .fin {
+            position: absolute;
+            bottom: 20px;
+            width: 20px;
+            height: 35px;
+            background: linear-gradient(135deg, #cc2222 0%, #991111 100%);
+        }
+
+        .fin-left {
+            left: -8px;
+            clip-path: polygon(100% 0%, 100% 100%, 0% 100%);
+            transform: skewY(20deg);
+        }
+
+        .fin-right {
+            right: -8px;
+            clip-path: polygon(0% 0%, 100% 100%, 0% 100%);
+            transform: skewY(-20deg);
+        }
+
+        .fin-center {
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 30px;
+            bottom: 22px;
+            clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+        }
+
+        .engine-section {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 20px;
+            background: linear-gradient(to bottom, #444 0%, #222 100%);
+            border-radius: 0 0 5px 5px;
+        }
+
+        .nozzle {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 18px;
+            height: 12px;
+            background: linear-gradient(to bottom, #333 0%, #111 100%);
+            border-radius: 0 0 8px 8px;
+        }
+
+        .flames-container {
+            position: absolute;
+            bottom: -130px;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .flame {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+        }
+
+        .flame-core {
+            width: 14px;
+            height: 70px;
+            background: linear-gradient(to bottom, 
+                #ffffff 0%, 
+                #ffffaa 20%, 
+                #ffff00 40%, 
+                #ffaa00 60%, 
+                #ff6600 80%, 
+                transparent 100%);
+            animation: flameCore 0.05s infinite alternate;
+            box-shadow: 0 0 20px #ffaa00, 0 0 40px #ff6600;
+        }
+
+        .flame-mid {
+            width: 24px;
+            height: 90px;
+            background: linear-gradient(to bottom, 
+                rgba(255,200,100,0.9) 0%, 
+                rgba(255,150,50,0.7) 40%, 
+                rgba(255,100,0,0.5) 70%, 
+                transparent 100%);
+            animation: flameMid 0.08s infinite alternate;
+            z-index: -1;
+        }
+
+        .flame-outer {
+            width: 35px;
+            height: 110px;
+            background: linear-gradient(to bottom, 
+                rgba(255,150,50,0.6) 0%, 
+                rgba(255,80,0,0.4) 50%, 
+                rgba(200,50,0,0.2) 80%, 
+                transparent 100%);
+            animation: flameOuter 0.1s infinite alternate;
+            z-index: -2;
+        }
+
+        @keyframes flameCore {
+            0% { transform: translateX(-50%) scaleX(0.9) scaleY(0.95); }
+            100% { transform: translateX(-50%) scaleX(1.1) scaleY(1.05); }
+        }
+
+        @keyframes flameMid {
+            0% { transform: translateX(-50%) scaleX(0.95) scaleY(0.98); }
+            100% { transform: translateX(-50%) scaleX(1.05) scaleY(1.02); }
+        }
+
+        @keyframes flameOuter {
+            0% { transform: translateX(-50%) scaleX(0.9); }
+            100% { transform: translateX(-50%) scaleX(1.1); }
+        }
+
+        .glow {
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, rgba(255,150,50,0.5) 0%, transparent 70%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ff88;
+            font-size: 14px;
+            z-index: 100;
+            text-shadow: 0 0 10px rgba(0,255,136,0.5);
+        }
+
+        .hud-item {
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            background: rgba(0,0,0,0.5);
+            border-left: 3px solid #00ff88;
+        }
+
+        .status-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+            z-index: 100;
+        }
+
+        .status-text {
+            color: #ffaa00;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255,170,0,0.5);
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-right: 3px solid #ffaa00;
+        }
+
+        .countdown-display {
+            font-size: 72px;
+            color: #ff4444;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255,68,68,0.8);
+            margin-top: 10px;
+        }
+
+        .launch-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 50px;
+            font-size: 18px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(to bottom, #00aa55 0%, #008844 50%, #006633 100%);
+            color: white;
+            border: 2px solid #00ff88;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 100;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            box-shadow: 0 0 20px rgba(0,255,136,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+            transition: all 0.2s;
+        }
+
+        .launch-btn:hover {
+            background: linear-gradient(to bottom, #00cc66 0%, #00aa55 50%, #008844 100%);
+            box-shadow: 0 0 30px rgba(0,255,136,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+
+        .launch-btn:disabled {
+            background: linear-gradient(to bottom, #444 0%, #333 100%);
+            border-color: #666;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .shake {
+            animation: shake 0.1s infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-3px, 1px); }
+            40% { transform: translate(2px, -2px); }
+            60% { transform: translate(-2px, 2px); }
+            80% { transform: translate(3px, -1px); }
+        }
+
+        .ground-light {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 200px;
+            background: radial-gradient(ellipse at center bottom, rgba(255,150,50,0.4) 0%, transparent 70%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 4;
+        }
+    </style>
+</head>
+<body>
+    <div class="scene" id="scene">
+        <div class="stars" id="stars"></div>
+        
+        <canvas id="particleCanvas"></canvas>
+        
+        <div class="hud" id="hud">
+            <div class="hud-item">ALTITUDE: <span id="altitude">0</span> m</div>
+            <div class="hud-item">VELOCITY: <span id="velocity">0</span> m/s</div>
+            <div class="hud-item">THRUST: <span id="thrust">0</span>%</div>
+        </div>
+        
+        <div class="status-display">
+            <div class="status-text" id="status">AWAITING LAUNCH COMMAND</div>
+            <div class="countdown-display" id="countdown"></div>
+        </div>
+        
+        <div class="ground-light" id="groundLight"></div>
+        
+        <div class="rocket-container" id="rocketContainer">
+            <div class="glow" id="glow"></div>
+            <div class="rocket">
+                <div class="nose-cone"></div>
+                <div class="body-upper">
+                    <div class="window window-1"></div>
+                    <div class="window window-2"></div>
+                </div>
+                <div class="body-lower"></div>
+                <div class="stripe stripe-1"></div>
+                <div class="stripe stripe-2"></div>
+                <div class="usa-text">USA</div>
+                <div class="fin fin-left"></div>
+                <div class="fin fin-right"></div>
+                <div class="fin fin-center"></div>
+                <div class="engine-section">
+                    <div class="nozzle"></div>
+                </div>
+                <div class="flames-container" id="flames">
+                    <div class="flame flame-outer"></div>
+                    <div class="flame flame-mid"></div>
+                    <div class="flame flame-core"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="launch-pad" id="launchPad">
+            <div class="tower tower-left">
+                <div class="arm arm-left" id="armLeft"></div>
+            </div>
+            <div class="tower tower-right">
+                <div class="arm arm-right" id="armRight"></div>
+            </div>
+            <div class="pad-platform"></div>
+        </div>
+        
+        <div class="ground"></div>
+        
+        <button class="launch-btn" id="launchBtn">Initiate Launch</button>
+    </div>
+
+    <script>
+        // Initialize stars
+        const starsContainer = document.getElementById('stars');
+        for (let i = 0; i < 150; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            const size = Math.random() * 2.5 + 0.5;
+            star.style.width = size + 'px';
+            star.style.height = size + 'px';
+            star.style.opacity = Math.random() * 0.7 + 0.3;
+            star.style.animation = `twinkle ${2 + Math.random() * 3}s infinite`;
+            star.style.animationDelay = Math.random() * 2 + 's';
+            starsContainer.appendChild(star);
+        }
+
+        // Add twinkle animation
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            @keyframes twinkle {
+                0%, 100% { opacity: 0.3; }
+                50% { opacity: 1; }
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+        // Canvas setup for particles
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Particle system
+        class Particle {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                
+                if (type === 'smoke') {
+                    this.vx = (Math.random() - 0.5) * 4;
+                    this.vy = -Math.random() * 2 - 1;
+                    this.size = Math.random() * 40 + 20;
+                    this.life = 1;
+                    this.decay = 0.008 + Math.random() * 0.005;
+                    this.color = `rgba(${180 + Math.random() * 40}, ${180 + Math.random() * 40}, ${180 + Math.random() * 40}`;
+                    this.gravity = 0.02;
+                    this.expansion = 1 + Math.random() * 0.5;
+                } else if (type === 'spark') {
+                    this.vx = (Math.random() - 0.5) * 8;
+                    this.vy = Math.random() * 5 + 2;
+                    this.size = Math.random() * 4 + 2;
+                    this.life = 1;
+                    this.decay = 0.02 + Math.random() * 0.02;
+                    this.color = `rgba(255, ${150 + Math.random() * 100}, ${Math.random() * 50}`;
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+                
+                if (this.type === 'smoke') {
+                    this.vy -= this.gravity;
+                    this.size *= this.expansion;
+                    this.expansion = 1 + (this.expansion - 1) * 0.98;
+                    this.vx *= 0.99;
+                } else if (this.type === 'spark') {
+                    this.vy += 0.1;
+                    this.size *= 0.98;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `${this.color}, ${this.life * 0.6})`;
+                ctx.fill();
+            }
+        }
+
+        let particles = [];
+        let isLaunching = false;
+        let animationId = null;
+
+        const rocketContainer = document.getElementById('rocketContainer');
+        const flames = document.getElementById('flames');
+        const glow = document.getElementById('glow');
+        const groundLight = document.getElementById('groundLight');
+        const status = document.getElementById('status');
+        const countdown = document.getElementById('countdown');
+        const launchBtn = document.getElementById('launchBtn');
+        const scene = document.getElementById('scene');
+        const armLeft = document.getElementById('armLeft');
+        const armRight = document.getElementById('armRight');
+        const altitudeEl = document.getElementById('altitude');
+        const velocityEl = document.getElementById('velocity');
+        const thrustEl = document.getElementById('thrust');
+
+        function createParticles(x, y, count, type) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x + (Math.random() - 0.5) * 40, y, type));
+            }
+        }
+
+        function updateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            particles = particles.filter(p => p.life > 0);
+            
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function launch() {
+            if (isLaunching) return;
+            isLaunching = true;
+            launchBtn.disabled = true;
+
+            // Start particle animation loop
+            function animateParticles() {
+                updateParticles();
+                animationId = requestAnimationFrame(animateParticles);
+            }
+            animateParticles();
+
+            // Countdown phase
+            status.textContent = 'LAUNCH SEQUENCE INITIATED';
+            await sleep(1000);
+
+            for (let i = 10; i >= 0; i--) {
+                countdown.textContent = i;
+                
+                if (i === 7) {
+                    status.textContent = 'FUEL PRESSURIZATION';
+                    thrustEl.textContent = '10';
+                }
+                
+                if (i === 5) {
+                    status.textContent = 'ENGINE START';
+                    flames.style.opacity = '0.3';
+                    flames.style.transform = 'translateX(-50%) scaleY(0.5)';
+                    glow.style.opacity = '0.3';
+                    groundLight.style.opacity = '0.2';
+                    thrustEl.textContent = '30';
+                    
+                    // Start smoke
+                    const smokeInterval = setInterval(() => {
+                        const rect = rocketContainer.getBoundingClientRect();
+                        createParticles(canvas.width / 2, rect.bottom - 20, 3, 'smoke');
+                    }, 50);
+                    setTimeout(() => clearInterval(smokeInterval), 1000);
+                }
+                
+                if (i === 3) {
+                    status.textContent = 'MAIN ENGINE THROTTLE UP';
+                    flames.style.opacity = '0.7';
+                    flames.style.transform = 'translateX(-50%) scaleY(0.8)';
+                    glow.style.opacity = '0.6';
+                    groundLight.style.opacity = '0.4';
+                    scene.classList.add('shake');
+                    thrustEl.textContent = '65';
+                }
+                
+                if (i === 1) {
+                    status.textContent = 'FULL THRUST';
+                    flames.style.opacity = '1';
+                    flames.style.transform = 'translateX(-50%) scaleY(1)';
+                    glow.style.opacity = '1';
+                    groundLight.style.opacity = '0.7';
+                    thrustEl.textContent = '100';
+                }
+                
+                await sleep(1000);
+            }
+
+            countdown.textContent = 'LIFTOFF!';
+            status.textContent = 'WE HAVE LIFTOFF!';
+
+            // Retract arms
+            armLeft.style.transition = 'transform 0.5s';
+            armRight.style.transition = 'transform 0.5s';
+            armLeft.style.transform = 'rotate(-30deg)';
+            armRight.style.transform = 'rotate(30deg)';
+
+            // Heavy smoke at liftoff
+            let smokeIntensity = 15;
+            const heavySmokeInterval = setInterval(() => {
+                const rect = rocketContainer.getBoundingClientRect();
+                createParticles(canvas.width / 2, rect.bottom, smokeIntensity, 'smoke');
+                createParticles(canvas.width / 2, rect.bottom, 2, 'spark');
+            }, 30);
+
+            // Liftoff animation with realistic acceleration
+            let rocketY = 0;
+            let velocity = 0;
+            let acceleration = 0.15;
+            let altitude = 0;
+            let startTime = performance.now();
+            const maxDuration = 12000;
+
+            function animateLiftoff(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / maxDuration, 1);
+                
+                // Gradually increase acceleration (simulating reducing gravity effect)
+                acceleration = 0.15 + progress * 0.8;
+                velocity += acceleration;
+                rocketY += velocity;
+                altitude = Math.floor(rocketY * 2);
+                
+                rocketContainer.style.transform = `translateX(-50%) translateY(-${rocketY}px)`;
+                
+                // Update HUD
+                altitudeEl.textContent = altitude.toLocaleString();
+                velocityEl.textContent = Math.floor(velocity * 20);
+                
+                // Scale flames based on velocity
+                const flameScale = 1 + Math.min(velocity * 0.02, 1.5);
+                flames.style.transform = `translateX(-50%) scaleY(${flameScale}) scaleX(${1 + velocity * 0.005})`;
+                
+                // Reduce smoke intensity as rocket rises
+                smokeIntensity = Math.max(5, 15 - progress * 10);
+                
+                // Update ground light
+                groundLight.style.opacity = Math.max(0, 0.7 - progress);
+                
+                if (rocketY < window.innerHeight + 500) {
+                    requestAnimationFrame(animateLiftoff);
+                } else {
+                    // Launch complete
+                    clearInterval(heavySmokeInterval);
+                    scene.classList.remove('shake');
+                    status.textContent = 'LAUNCH SUCCESSFUL - NOMINAL TRAJECTORY';
+                    countdown.textContent = '';
+                    
+                    setTimeout(() => {
+                        cancelAnimationFrame(animationId);
+                        resetLaunch();
+                    }, 3000);
+                }
+            }
+
+            requestAnimationFrame(animateLiftoff);
+        }
+
+        function resetLaunch() {
+            isLaunching = false;
+            launchBtn.disabled = false;
+            particles = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            rocketContainer.style.transform = 'translateX(-50%) translateY(0)';
+            flames.style.opacity = '0';
+            flames.style.transform = 'translateX(-50%) scaleY(1)';
+            glow.style.opacity = '0';
+            groundLight.style.opacity = '0';
+            armLeft.style.transform = 'rotate(0deg)';
+            armRight.style.transform = 'rotate(0deg)';
+            
+            status.textContent = 'AWAITING LAUNCH COMMAND';
+            countdown.textContent = '';
+            altitudeEl.textContent = '0';
+            velocityEl.textContent = '0';
+            thrustEl.textContent = '0';
+        }
+
+        launchBtn.addEventListener('click', launch);
+    </script>
+</body>
+</html>

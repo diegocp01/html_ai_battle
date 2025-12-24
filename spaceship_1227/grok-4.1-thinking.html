@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rocket Launch Animation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 15%;
+            background: linear-gradient(to top, #228B22, #32CD32);
+        }
+
+        #launch-pad {
+            position: absolute;
+            bottom: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 20px;
+            background: #666;
+            border-radius: 10px;
+        }
+
+        #rocket {
+            position: absolute;
+            bottom: 35%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 80px;
+            background: linear-gradient(to bottom, #FF4500, #DC143C);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            transition: none;
+            z-index: 10;
+        }
+
+        #rocket::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 15px;
+            background: #FFD700;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+        }
+
+        #flame {
+            position: absolute;
+            bottom: 35%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 50px;
+            background: linear-gradient(to top, transparent, #FF4500, #FFD700, #FFA500);
+            clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
+            opacity: 0;
+            z-index: 5;
+        }
+
+        .smoke-particle {
+            position: absolute;
+            background: radial-gradient(circle, rgba(169,169,169,0.8) 0%, rgba(128,128,128,0.6) 50%, rgba(169,169,169,0) 100%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes rise {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(0.5);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-200px) scale(2);
+            }
+        }
+
+        @keyframes launch {
+            0% {
+                bottom: 35%;
+            }
+            100% {
+                bottom: 100vh;
+            }
+        }
+
+        .launched {
+            animation: launch 6s ease-in forwards;
+        }
+
+        .ignited {
+            animation: flicker 0.1s infinite alternate;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.8; transform: translateX(-50%) scaleY(1); }
+            100% { opacity: 1; transform: translateX(-50%) scaleY(1.2); }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="ground"></div>
+        <div id="launch-pad"></div>
+        <div id="rocket"></div>
+        <div id="flame"></div>
+    </div>
+
+    <script>
+        const rocket = document.getElementById('rocket');
+        const flame = document.getElementById('flame');
+        const container = document.getElementById('container');
+
+        // Ignition phase
+        setTimeout(() => {
+            flame.style.opacity = '1';
+            flame.classList.add('ignited');
+            // Start heavy smoke during ignition
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => createSmoke(), i * 100);
+            }
+        }, 500);
+
+        // Liftoff after ignition
+        setTimeout(() => {
+            rocket.classList.add('launched');
+            // Continuous smoke during launch
+            const smokeInterval = setInterval(() => {
+                if (parseFloat(getComputedStyle(rocket).bottom) > 90) {
+                    clearInterval(smokeInterval);
+                } else {
+                    createSmoke();
+                }
+            }, 150);
+        }, 2000);
+
+        function createSmoke() {
+            const particle = document.createElement('div');
+            particle.classList.add('smoke-particle');
+            const size = Math.random() * 10 + 5;
+            particle.style.width = size + 'px';
+            particle.style.height = size + 'px';
+            particle.style.left = (50 + (Math.random() - 0.5) * 40) + '%';
+            particle.style.bottom = '35%';
+            particle.style.opacity = Math.random() * 0.5 + 0.3;
+            container.appendChild(particle);
+
+            // Animate smoke rising
+            particle.style.animation = 'rise 3s ease-out forwards';
+
+            // Remove after animation
+            setTimeout(() => {
+                container.removeChild(particle);
+            }, 3000);
+        }
+
+        // Adjust flame position with rocket during launch (using JS for sync)
+        const observer = new MutationObserver(() => {
+            if (rocket.classList.contains('launched')) {
+                const rocketBottom = getComputedStyle(rocket).bottom;
+                flame.style.bottom = rocketBottom;
+            }
+        });
+        observer.observe(rocket, { attributes: true, attributeFilter: ['class'] });
+    </script>
+</body>
+</html>
