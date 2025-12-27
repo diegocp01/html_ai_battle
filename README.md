@@ -32,6 +32,12 @@ X (Twitter) posts showcasing the experiments:
 
 **Speedometer:** https://x.com/diegocabezas01/status/1995561697084670443?s=20
 
+**DVD Logo:** https://x.com/diegocabezas01/status/2002364713133387793?s=20
+
+**Flower Blooming:** https://x.com/diegocabezas01/status/2001400005312287181?s=20
+
+**Super Mario Bros:** https://x.com/diegocabezas01/status/2003817172502503505?s=20
+
 
 ---
 

@@ -1,0 +1,5 @@
+LLM Model,LLM Reasoning Time (s),LLM Response Time (s),Reasoning Total words,Reasoning Total characters,Reasoning Total sentences,Reasoning top keyword,Reasoning top keyword repetitions,Input Word Count,Lines of HTML,Code in Reasoning?,prompt_adherence_score (0-10),functional_correctness_score (0-10),ui_score (0-10),Performance Score (0-10)
+gpt-5.2-extended-thinking,10,116,77,454,5,animation,3,13,570,n,10.0,9.0,8.5,9.3
+gemini-3-pro,22,55,616,"3,675",42,dog,18,13,361,n,9.0,7.0,7.0,7.8
+grok-4.1-thinking,160,167,494,"3,006",38,ball,28,13,116,n,8.0,7.0,6.5,7.3
+opus-4.5-thinking-32k,8,82,166,925,3,ball,9,13,615,n,9.5,9.0,8.5,9.1
