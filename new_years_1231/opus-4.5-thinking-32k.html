@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Year's Eve Fireworks 2026</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(to bottom, #000005, #0a0a1a 40%, #1a1a3a);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+        }
+        
+        .btn {
+            background: linear-gradient(145deg, #ff416c, #ff4b2b);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 18px 50px;
+            font-size: 22px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            box-shadow: 0 5px 30px rgba(255, 65, 108, 0.5),
+                        0 0 60px rgba(255, 75, 43, 0.3),
+                        inset 0 -3px 10px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            animation: pulse 2s infinite;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+        
+        .btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 50px rgba(255, 65, 108, 0.8),
+                        0 0 100px rgba(255, 75, 43, 0.6);
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { 
+                box-shadow: 0 5px 30px rgba(255, 65, 108, 0.5),
+                            0 0 60px rgba(255, 75, 43, 0.3);
+            }
+            50% { 
+                box-shadow: 0 5px 50px rgba(255, 65, 108, 0.8),
+                            0 0 100px rgba(255, 75, 43, 0.5);
+            }
+        }
+        
+        .instructions {
+            position: fixed;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 18px;
+            text-align: center;
+            z-index: 100;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px 30px;
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .countdown {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 200px;
+            font-weight: bold;
+            color: #fff;
+            z-index: 200;
+            text-shadow: 0 0 50px #ff0, 0 0 100px #f80, 0 0 150px #f00;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .show-countdown {
+            animation: countdownPop 0.8s ease-out forwards;
+        }
+
+        @keyframes countdownPop {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="fireworks"></canvas>
+    
+    <div class="instructions">🎆 Click anywhere to launch fireworks! 🎆</div>
+    <div class="countdown" id="countdown"></div>
+    
+    <div class="controls">
+        <button class="btn" id="finaleBtn" onclick="startGrandFinale()">✨ Grand Finale ✨</button>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('fireworks');
+        const ctx = canvas.getContext('2d');
+        const countdownEl = document.getElementById('countdown');
+        const finaleBtn = document.getElementById('finaleBtn');
+        
+        let width, height;
+        
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // Physics
+        const GRAVITY = 0.06;
+        const DRAG = 0.985;
+        const PARTICLE_FADE = 0.016;
+        
+        // Storage
+        let rockets = [];
+        let particles = [];
+        let glowingTexts = [];
+        let stars = [];
+        
+        // Color palettes
+        const palettes = [
+            ['#ff0040', '#ff4080', '#ff80a0', '#ffc0d0'],
+            ['#00ff88', '#40ffaa', '#80ffcc', '#c0ffee'],
+            ['#0088ff', '#40aaff', '#80ccff', '#c0e0ff'],
+            ['#ff8800', '#ffaa40', '#ffcc80', '#ffe0c0'],
+            ['#ff00ff', '#ff40ff', '#ff80ff', '#ffc0ff'],
+            ['#ffff00', '#ffff40', '#ffff80', '#ffffc0'],
+            ['#00ffff', '#40ffff', '#80ffff', '#c0ffff'],
+            ['#ffffff', '#ffe0e0', '#e0ffe0', '#e0e0ff']
+        ];
+        
+        // Create twinkling stars
+        for (let i = 0; i < 150; i++) {
+            stars.push({
+                x: Math.random() * 2000,
+                y: Math.random() * 800,
+                size: Math.random() * 1.5 + 0.5,
+                speed: Math.random() * 0.02 + 0.01,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+        
+        // Rocket class
+        class Rocket {
+            constructor(startX, startY, targetX, targetY, color = null) {
+                this.x = startX;
+                this.y = startY;
+                this.startY = startY;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                
+                const dist = Math.sqrt((targetX - startX) ** 2 + (targetY - startY) ** 2);
+                const time = 50 + dist / 20;
+                
+                this.vx = (targetX - startX) / time;
+                this.vy = -12 - Math.random() * 3;
+                
+                this.palette = color || palettes[Math.floor(Math.random() * palettes.length)];
+                this.trail = [];
+                this.life = 1;
+            }
+            
+            update() {
+                // Store trail
+                this.trail.push({ x: this.x, y: this.y, life: 1 });
+                if (this.trail.length > 15) this.trail.shift();
+                
+                // Fade trail
+                this.trail.forEach(t => t.life *= 0.85);
+                
+                // Physics
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += GRAVITY * 0.6;
+                
+                // Check if reached target or apex
+                if (this.vy >= -1 || this.y <= this.targetY) {
+                    this.explode();
+                    return true;
+                }
+                return false;
+            }
+            
+            explode() {
+                const count = 100 + Math.floor(Math.random() * 60);
+                const shapes = ['sphere', 'ring', 'burst', 'willow', 'chrysanthemum'];
+                const shape = shapes[Math.floor(Math.random() * shapes.length)];
+                
+                for (let i = 0; i < count; i++) {
+                    let angle, speed, color;
+                    
+                    switch(shape) {
+                        case 'ring':
+                            angle = (Math.PI * 2 * i) / count;
+                            speed = 4 + Math.random() * 2;
+                            break;
+                        case 'burst':
+                            angle = Math.random() * Math.PI * 2;
+                            speed = 1 + Math.random() * 6;
+                            break;
+                        case 'willow':
+                            angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+                            speed = 3 + Math.random() * 3;
+                            break;
+                        case 'chrysanthemum':
+                            angle = (Math.PI * 2 * i) / count;
+                            speed = 2 + Math.random() * 4 + Math.sin(i * 0.5) * 2;
+                            break;
+                        default:
+                            angle = Math.random() * Math.PI * 2;
+                            speed = 2 + Math.random() * 4;
+                    }
+                    
+                    color = this.palette[Math.floor(Math.random() * this.palette.length)];
+                    
+                    particles.push(new Particle(
+                        this.x, this.y,
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed,
+                        color,
+                        shape === 'willow' ? 0.008 : PARTICLE_FADE
+                    ));
+                }
+                
+                // Center flash
+                particles.push(new Particle(this.x, this.y, 0, 0, '#ffffff', 0.1, 15));
+                
+                // Sparkles
+                for (let i = 0; i < 30; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 3;
+                    particles.push(new Particle(
+                        this.x, this.y,
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed,
+                        '#ffffff',
+                        0.03,
+                        1
+                    ));
+                }
+            }
+            
+            draw() {
+                // Trail
+                ctx.lineWidth = 2;
+                for (let i = 1; i < this.trail.length; i++) {
+                    const t = this.trail[i];
+                    const prev = this.trail[i-1];
+                    ctx.beginPath();
+                    ctx.moveTo(prev.x, prev.y);
+                    ctx.lineTo(t.x, t.y);
+                    ctx.strokeStyle = `rgba(255, 200, 100, ${t.life * 0.8})`;
+                    ctx.stroke();
+                }
+                
+                // Rocket head
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                
+                // Glow
+                const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 25);
+                grd.addColorStop(0, 'rgba(255, 200, 100, 0.6)');
+                grd.addColorStop(0.5, 'rgba(255, 150, 50, 0.2)');
+                grd.addColorStop(1, 'transparent');
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 25, 0, Math.PI * 2);
+                ctx.fillStyle = grd;
+                ctx.fill();
+            }
+        }
+        
+        // Particle class
+        class Particle {
+            constructor(x, y, vx, vy, color, fadeRate = PARTICLE_FADE, size = null) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.alpha = 1;
+                this.fadeRate = fadeRate;
+                this.size = size || (2 + Math.random() * 2);
+                this.trail = [];
+            }
+            
+            update() {
+                this.trail.push({ x: this.x, y: this.y, alpha: this.alpha });
+                if (this.trail.length > 6) this.trail.shift();
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += GRAVITY;
+                this.vx *= DRAG;
+                this.vy *= DRAG;
+                this.alpha -= this.fadeRate;
+                
+                return this.alpha <= 0;
+            }
+            
+            draw() {
+                // Trail
+                for (let i = 0; i < this.trail.length; i++) {
+                    const t = this.trail[i];
+                    const a = (i / this.trail.length) * this.alpha * 0.3;
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, this.size * 0.6, 0, Math.PI * 2);
+                    ctx.fillStyle = this.hexToRgba(this.color, a);
+                    ctx.fill();
+                }
+                
+                // Main particle
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.hexToRgba(this.color, this.alpha);
+                ctx.fill();
+                
+                // Glow
+                const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size * 4);
+                grd.addColorStop(0, this.hexToRgba(this.color, this.alpha * 0.4));
+                grd.addColorStop(1, 'transparent');
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 4, 0, Math.PI * 2);
+                ctx.fillStyle = grd;
+                ctx.fill();
+            }
+            
+            hexToRgba(hex, alpha) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+        }
+        
+        // Glowing text particle for finale
+        class GlowingText {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.alpha = 0;
+                this.targetAlpha = 1;
+                this.size = 4;
+                this.pulsePhase = Math.random() * Math.PI * 2;
+            }
+            
+            update() {
+                this.alpha += (this.targetAlpha - this.alpha) * 0.1;
+                this.pulsePhase += 0.1;
+                return false;
+            }
+            
+            draw() {
+                const pulse = 1 + Math.sin(this.pulsePhase) * 0.3;
+                const size = this.size * pulse;
+                
+                // Core
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.fill();
+                
+                // Color glow
+                const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, size * 6);
+                grd.addColorStop(0, this.hexToRgba(this.color, this.alpha * 0.8));
+                grd.addColorStop(0.4, this.hexToRgba(this.color, this.alpha * 0.3));
+                grd.addColorStop(1, 'transparent');
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, size * 6, 0, Math.PI * 2);
+                ctx.fillStyle = grd;
+                ctx.fill();
+            }
+            
+            hexToRgba(hex, alpha) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+        }
+        
+        // Launch on click
+        canvas.addEventListener('click', (e) => {
+            const targetY = Math.min(e.clientY, height * 0.6);
+            rockets.push(new Rocket(
+                e.clientX + (Math.random() - 0.5) * 100,
+                height,
+                e.clientX,
+                targetY - 50 - Math.random() * 100
+            ));
+        });
+        
+        // Grand Finale
+        function startGrandFinale() {
+            finaleBtn.disabled = true;
+            
+            // Countdown
+            let count = 3;
+            
+            function showCount() {
+                if (count > 0) {
+                    countdownEl.textContent = count;
+                    countdownEl.classList.remove('show-countdown');
+                    void countdownEl.offsetWidth;
+                    countdownEl.classList.add('show-countdown');
+                    count--;
+                    setTimeout(showCount, 800);
+                } else {
+                    countdownEl.textContent = '🎆';
+                    countdownEl.classList.remove('show-countdown');
+                    void countdownEl.offsetWidth;
+                    countdownEl.classList.add('show-countdown');
+                    grandFinale();
+                    setTimeout(() => {
+                        finaleBtn.disabled = false;
+                    }, 8000);
+                }
+            }
+            showCount();
+        }
+        
+        function grandFinale() {
+            glowingTexts = [];
+            
+            // Create text canvas
+            const textCanvas = document.createElement('canvas');
+            const textCtx = textCanvas.getContext('2d');
+            
+            const text = 'HELLO 2026';
+            const fontSize = Math.min(width / 8, 120);
+            
+            textCtx.font = `bold ${fontSize}px Arial, sans-serif`;
+            const metrics = textCtx.measureText(text);
+            
+            textCanvas.width = metrics.width + 40;
+            textCanvas.height = fontSize * 1.4;
+            
+            textCtx.font = `bold ${fontSize}px Arial, sans-serif`;
+            textCtx.fillStyle = '#fff';
+            textCtx.textBaseline = 'middle';
+            textCtx.fillText(text, 20, textCanvas.height / 2);
+            
+            // Sample pixels
+            const imageData = textCtx.getImageData(0, 0, textCanvas.width, textCanvas.height);
+            const points = [];
+            const step = 6;
+            
+            const offsetX = (width - textCanvas.width) / 2;
+            const offsetY = height * 0.35;
+            
+            for (let y = 0; y < textCanvas.height; y += step) {
+                for (let x = 0; x < textCanvas.width; x += step) {
+                    const i = (y * textCanvas.width + x) * 4;
+                    if (imageData.data[i + 3] > 128) {
+                        points.push({
+                            x: x + offsetX,
+                            y: y + offsetY
+                        });
+                    }
+                }
+            }
+            
+            // Rainbow colors for text
+            const textColors = ['#ff0040', '#ff8800', '#ffff00', '#00ff88', '#00ccff', '#8844ff', '#ff44aa'];
+            
+            // Launch rockets to form text
+            points.forEach((point, i) => {
+                setTimeout(() => {
+                    const colorIndex = Math.floor((point.x - offsetX) / (textCanvas.width / textColors.length));
+                    const color = textColors[Math.min(colorIndex, textColors.length - 1)];
+                    
+                    // Create glowing text particle
+                    glowingTexts.push(new GlowingText(point.x, point.y, color));
+                    
+                    // Launch a small rocket
+                    if (Math.random() < 0.3) {
+                        const startX = point.x + (Math.random() - 0.5) * 200;
+                        rockets.push(new Rocket(startX, height, point.x, point.y, [color, '#ffffff', color]));
+                    }
+                }, i * 15 + Math.random() * 50);
+            });
+            
+            // Background fireworks
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const x = Math.random() * width;
+                    rockets.push(new Rocket(
+                        x,
+                        height,
+                        x + (Math.random() - 0.5) * 200,
+                        height * 0.15 + Math.random() * height * 0.35
+                    ));
+                }, Math.random() * 4000);
+            }
+            
+            // Clear glowing text after display
+            setTimeout(() => {
+                glowingTexts = [];
+            }, 7000);
+        }
+        
+        // Animation loop
+        let time = 0;
+        function animate() {
+            time += 0.016;
+            
+            // Clear with fade effect
+            ctx.fillStyle = 'rgba(0, 0, 10, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Draw stars
+            ctx.fillStyle = '#fff';
+            stars.forEach(star => {
+                const twinkle = 0.4 + Math.sin(time * star.speed * 60 + star.phase) * 0.6;
+                ctx.globalAlpha = twinkle;
+                ctx.beginPath();
+                ctx.arc(
+                    star.x % width,
+                    star.y,
+                    star.size,
+                    0, Math.PI * 2
+                );
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            
+            // Update and draw glowing texts
+            glowingTexts.forEach(gt => {
+                gt.update();
+                gt.draw();
+            });
+            
+            // Update and draw rockets
+            rockets = rockets.filter(rocket => {
+                const dead = rocket.update();
+                if (!dead) rocket.draw();
+                return !dead;
+            });
+            
+            // Update and draw particles
+            particles = particles.filter(particle => {
+                const dead = particle.update();
+                if (!dead) particle.draw();
+                return !dead;
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
+        
+        // Ambient fireworks
+        setInterval(() => {
+            if (Math.random() < 0.25 && rockets.length < 8 && glowingTexts.length === 0) {
+                const x = width * 0.1 + Math.random() * width * 0.8;
+                rockets.push(new Rocket(
+                    x,
+                    height,
+                    x + (Math.random() - 0.5) * 150,
+                    height * 0.2 + Math.random() * height * 0.25
+                ));
+            }
+        }, 1500);
+    </script>
+</body>
+</html>

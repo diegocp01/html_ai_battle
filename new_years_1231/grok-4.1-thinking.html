@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Year's Eve Fireworks 2026</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #finale {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(#ff0, #f80);
+            color: #000;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255,255,0,0.5);
+            z-index: 10;
+        }
+        #finale:hover {
+            background: linear-gradient(#fff, #ff0);
+        }
+        #finale:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <button id="finale">Grand Finale</button>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        const gravity = 0.08;
+        const drag = 0.97;
+
+        let particles = [];
+        let fireworks = [];
+
+        class Particle {
+            constructor(x, y, vx, vy, color, size) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.size = size;
+                this.alpha = 1;
+            }
+
+            update() {
+                this.vx *= drag;
+                this.vy *= drag;
+                this.vy += gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 0.006; // slow fade for lingering glow
+            }
+
+            draw() {
+                if (this.alpha <= 0) return;
+                ctx.globalAlpha = this.alpha;
+                ctx.shadowBlur = this.size * 8;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class Firework {
+            constructor(targetX, targetY, isFinale = false) {
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.isFinale = isFinale;
+
+                // Start from bottom; for finale, launch from random ground positions for angled shots
+                this.x = isFinale ? Math.random() * width : targetX;
+                this.y = height;
+
+                const dist = height - targetY;
+                if (dist < 100) return; // too low, skip (rare)
+
+                const baseSpeed = Math.sqrt(2 * gravity * dist);
+                const speed = baseSpeed + Math.random() * (isFinale ? 15 : 40);
+
+                this.vy = -speed;
+                const tApex = speed / gravity; // approximate time to apex in frames
+                this.vx = (targetX - this.x) / tApex;
+
+                this.hue = Math.random() * 360;
+                this.exploded = false;
+            }
+
+            update() {
+                if (this.exploded) return;
+
+                // Rocket trail (bright sparkling tail)
+                for (let i = 0; i < 8; i++) {
+                    const trailHue = this.hue + Math.random() * 20;
+                    const trailColor = `hsl(${trailHue}, 100%, 80%)`;
+                    const tvx = Math.random() * 4 - 2;
+                    const tvy = Math.random() * 4 - 2;
+                    particles.push(new Particle(this.x, this.y, tvx, tvy, trailColor, Math.random() * 2 + 1));
+                }
+
+                // Rocket physics
+                this.vy += gravity;
+                this.vx *= 0.99; // slight air resistance
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Explode at apex (when rising stops)
+                if (this.vy >= 0) {
+                    this.explode();
+                    this.exploded = true;
+                }
+            }
+
+            explode() {
+                const numParticles = this.isFinale ? 80 : 200; // fewer per explosion in finale (many more fireworks overall)
+                for (let i = 0; i < numParticles; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 7 + 2;
+                    const vx = Math.cos(angle) * speed;
+                    const vy = Math.sin(angle) * speed;
+                    const phue = (this.hue + Math.random() * 60 - 30 + 360) % 360;
+                    const color = `hsl(${phue}, 100%, 50%)`;
+                    const size = Math.random() * 3 + 2;
+                    particles.push(new Particle(this.x, this.y, vx, vy, color, size));
+                }
+            }
+        }
+
+        function animate() {
+            // Fade old frames for trailing effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Reset shadow/glow settings
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+
+            // Update and draw particles
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            // Remove dead particles
+            particles = particles.filter(p => p.alpha > 0 && p.y < height + 100);
+
+            // Update fireworks
+            fireworks.forEach(f => f.update());
+
+            // Remove exploded fireworks
+            fireworks = fireworks.filter(f => !f.exploded);
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // Click to launch a single firework aimed at click position
+        canvas.addEventListener('click', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            fireworks.push(new Firework(mx, my));
+        });
+
+        // Grand Finale button
+        document.getElementById('finale').addEventListener('click', () => {
+            const button = document.getElementById('finale');
+            button.disabled = true;
+            button.textContent = 'HAPPY 2026!';
+
+            // Offscreen canvas to generate text pixel positions
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = 1400;
+            offCanvas.height = 300;
+            const octx = offCanvas.getContext('2d');
+            octx.font = 'bold 220px Arial';
+            octx.fillStyle = 'white';
+            octx.textAlign = 'center';
+            octx.textBaseline = 'middle';
+            octx.fillText('HELLO 2026', offCanvas.width / 2, offCanvas.height / 2);
+
+            const imgData = octx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+            const data = imgData.data;
+
+            const step = 5; // density control (lower = more fireworks)
+            const targets = [];
+
+            for (let i = 0; i < offCanvas.width; i += step) {
+                for (let j = 0; j < offCanvas.height; j += step) {
+                    const index = (j * offCanvas.width + i) * 4 + 3;
+                    if (data[index] > 128) {
+                        const tx = (i / offCanvas.width) * width * 0.9 + width * 0.05;
+                        const ty = (j / offCanvas.height) * height * 0.35 + height * 0.15;
+                        targets.push({ x: tx, y: ty });
+                    }
+                }
+            }
+
+            // Shuffle for varied launch order
+            targets.sort(() => Math.random() - 0.5);
+
+            // Launch all fireworks for the text
+            targets.forEach(t => {
+                fireworks.push(new Firework(t.x, t.y, true));
+            });
+        });
+    </script>
+</body>
+</html>

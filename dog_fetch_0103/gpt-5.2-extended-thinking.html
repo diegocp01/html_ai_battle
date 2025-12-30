@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dog Fetch Animation</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0b1020; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #wrap { position: fixed; inset: 0; display: grid; place-items: center; }
+    canvas { width: min(1100px, 100vw); height: min(650px, 100vh); border-radius: 18px; box-shadow: 0 18px 60px rgba(0,0,0,0.45); background: #0b1020; }
+    .hud {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      top: 14px; width: min(1100px, calc(100vw - 20px));
+      display: flex; gap: 10px; align-items: center; justify-content: space-between;
+      pointer-events: none;
+    }
+    .panel {
+      pointer-events: auto;
+      display: flex; gap: 10px; align-items: center;
+      background: rgba(10, 15, 35, 0.55); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.10);
+      padding: 10px 12px; border-radius: 14px; color: rgba(255,255,255,0.92);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.28);
+    }
+    .panel small { opacity: 0.85; line-height: 1.2; }
+    button {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.10);
+      color: rgba(255,255,255,0.92);
+      padding: 9px 12px; border-radius: 12px;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+    button:hover { transform: translateY(-1px); background: rgba(255,255,255,0.14); }
+    button:active { transform: translateY(0px); }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px;
+      padding: 2px 6px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.08);
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="c" aria-label="A cartoon dog fetching a ball animation"></canvas>
+  </div>
+
+  <div class="hud">
+    <div class="panel">
+      <div>
+        <div style="font-weight: 650; letter-spacing: 0.2px;">Fetch!</div>
+        <small>Click anywhere on the ground to throw the ball. Press <span class="kbd">Space</span> for a random throw.</small>
+      </div>
+    </div>
+    <div class="panel">
+      <button id="btnThrow" title="Throw to a random spot">Random throw</button>
+      <button id="btnPause" title="Pause or resume">Pause</button>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d");
+
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      function resize() {
+        const cssW = canvas.getBoundingClientRect().width;
+        const cssH = canvas.getBoundingClientRect().height;
+        canvas.width = Math.round(cssW * dpr);
+        canvas.height = Math.round(cssH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener("resize", resize);
+
+      // World layout in CSS pixels
+      function groundY() { return canvas.getBoundingClientRect().height * 0.78; }
+      function horizonY() { return canvas.getBoundingClientRect().height * 0.55; }
+
+      const state = {
+        paused: false,
+        t: 0,
+        last: performance.now(),
+        message: "",
+        msgT: 0
+      };
+
+      const dog = {
+        // base positions
+        homeX: 170,
+        x: 170,
+        y: 0,
+        dir: 1,               // 1 right, -1 left
+        speed: 280,           // px/sec
+        runPhase: 0,
+        tailPhase: 0,
+        state: "idle",        // idle, toBall, backHome
+        hasBall: false
+      };
+
+      const ball = {
+        x: 0,
+        y: 0,
+        r: 12,
+        thrown: false,
+        attach: false
+      };
+
+      function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+      function lerp(a, b, t) { return a + (b - a) * t; }
+
+      function setMessage(text, seconds = 1.1) {
+        state.message = text;
+        state.msgT = seconds;
+      }
+
+      function throwBall(targetX) {
+        const w = canvas.getBoundingClientRect().width;
+        const gY = groundY();
+        const margin = 70;
+
+        const x = clamp(targetX, margin, w - margin);
+        ball.x = x;
+        ball.y = gY - 8;
+        ball.thrown = true;
+        ball.attach = false;
+
+        dog.state = "toBall";
+        dog.hasBall = false;
+
+        setMessage("Go get it!", 0.9);
+      }
+
+      function randomThrow() {
+        const w = canvas.getBoundingClientRect().width;
+        const x = lerp(w * 0.40, w * 0.92, Math.random());
+        throwBall(x);
+      }
+
+      function onPointer(e) {
+        const rect = canvas.getBoundingClientRect();
+        const px = (e.clientX - rect.left);
+        const py = (e.clientY - rect.top);
+
+        // Only allow throws on the ground band
+        if (py < horizonY()) return;
+        throwBall(px);
+      }
+
+      canvas.addEventListener("pointerdown", onPointer);
+
+      document.getElementById("btnThrow").addEventListener("click", randomThrow);
+      document.getElementById("btnPause").addEventListener("click", () => {
+        state.paused = !state.paused;
+        document.getElementById("btnPause").textContent = state.paused ? "Resume" : "Pause";
+      });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space") { e.preventDefault(); randomThrow(); }
+        if (e.code === "KeyP") { state.paused = !state.paused; document.getElementById("btnPause").textContent = state.paused ? "Resume" : "Pause"; }
+      });
+
+      // Drawing helpers
+      function circle(x, y, r, fill, stroke) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); }
+      }
+
+      function roundRect(x, y, w, h, r, fill, stroke) {
+        const rr = Math.min(r, w * 0.5, h * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(x + rr, y);
+        ctx.arcTo(x + w, y, x + w, y + h, rr);
+        ctx.arcTo(x + w, y + h, x, y + h, rr);
+        ctx.arcTo(x, y + h, x, y, rr);
+        ctx.arcTo(x, y, x + w, y, rr);
+        ctx.closePath();
+        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); }
+      }
+
+      function drawBackground(w, h) {
+        // Sky gradient
+        const g = ctx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, "#0a1030");
+        g.addColorStop(0.45, "#1d3b8a");
+        g.addColorStop(0.75, "#1a5aa0");
+        g.addColorStop(1, "#1b6f7e");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+
+        // Subtle stars
+        ctx.globalAlpha = 0.18;
+        for (let i = 0; i < 60; i++) {
+          const sx = (i * 97) % w;
+          const sy = (i * 53) % Math.floor(h * 0.45);
+          circle(sx, sy, (i % 3) + 0.7, "white");
+        }
+        ctx.globalAlpha = 1;
+
+        // Sun
+        circle(w * 0.12, h * 0.16, 34, "rgba(255,220,140,0.90)");
+        circle(w * 0.12, h * 0.16, 62, "rgba(255,220,140,0.12)");
+
+        // Distant hills
+        const hy = horizonY();
+        ctx.fillStyle = "rgba(10, 70, 90, 0.65)";
+        ctx.beginPath();
+        ctx.moveTo(0, hy + 55);
+        ctx.quadraticCurveTo(w * 0.20, hy - 20, w * 0.42, hy + 50);
+        ctx.quadraticCurveTo(w * 0.62, hy + 110, w * 0.82, hy + 40);
+        ctx.quadraticCurveTo(w * 0.92, hy + 15, w, hy + 65);
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fill();
+
+        // Ground
+        const gy = groundY();
+        const gg = ctx.createLinearGradient(0, gy - 70, 0, h);
+        gg.addColorStop(0, "rgba(40,170,110,0.95)");
+        gg.addColorStop(1, "rgba(20,120,80,0.98)");
+        ctx.fillStyle = gg;
+        ctx.fillRect(0, gy, w, h - gy);
+
+        // Ground texture
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        for (let i = 0; i < 140; i++) {
+          const x = (i * 41) % w;
+          const y = gy + 10 + ((i * 23) % Math.floor(h - gy - 14));
+          roundRect(x, y, 10, 2, 1, "rgba(0,0,0,0.35)");
+        }
+        ctx.globalAlpha = 1;
+
+        // Fence
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, gy + 16);
+        ctx.lineTo(w, gy + 16);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      function drawSpeech(w, h) {
+        if (!state.message || state.msgT <= 0) return;
+        const text = state.message;
+
+        ctx.save();
+        const x = dog.x + dog.dir * 20;
+        const y = groundY() - 140;
+
+        const padX = 14;
+        const padY = 10;
+        ctx.font = "600 14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+        const tw = ctx.measureText(text).width;
+        const boxW = tw + padX * 2;
+        const boxH = 34;
+
+        ctx.globalAlpha = 0.92;
+        roundRect(x - boxW * 0.5, y - boxH, boxW, boxH, 12, "rgba(10,15,35,0.80)", "rgba(255,255,255,0.12)");
+
+        // Tail bubble
+        ctx.beginPath();
+        const bx = x, by = y - 4;
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx - 10, by + 12);
+        ctx.lineTo(bx + 10, by + 10);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(10,15,35,0.80)";
+        ctx.fill();
+
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.fillText(text, x - tw * 0.5, y - 14);
+
+        ctx.restore();
+      }
+
+      function drawBall() {
+        if (!ball.thrown) return;
+
+        const bx = ball.attach ? (dog.x + dog.dir * 34) : ball.x;
+        const by = ball.attach ? (dog.y - 26) : ball.y;
+
+        // Shadow
+        ctx.globalAlpha = 0.25;
+        circle(bx, groundY() + 18, ball.r * 1.05, "rgba(0,0,0,0.6)");
+        ctx.globalAlpha = 1;
+
+        // Ball with highlight
+        circle(bx, by, ball.r, "#ff4d4d", "rgba(255,255,255,0.25)");
+        circle(bx - 4, by - 5, ball.r * 0.28, "rgba(255,255,255,0.75)");
+      }
+
+      function drawDog() {
+        const gY = groundY();
+        dog.y = gY - 8;
+
+        const x = dog.x;
+        const y = dog.y;
+        const dir = dog.dir;
+
+        const running = (dog.state !== "idle");
+        const phase = dog.runPhase;
+        const bob = running ? Math.sin(phase * 2) * 2.2 : 0;
+        const tailWag = Math.sin(dog.tailPhase) * 0.55;
+
+        // Drop shadow
+        ctx.globalAlpha = 0.22;
+        ctx.beginPath();
+        ctx.ellipse(x, gY + 20, 54, 14, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0,0.65)";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Colors
+        const fur = "#c58a52";
+        const furDark = "#9a643a";
+        const snout = "#e6c2a2";
+        const outline = "rgba(0,0,0,0.25)";
+
+        // Legs (behind)
+        const legSpread = running ? 10 : 6;
+        const stride = running ? Math.sin(phase) * legSpread : 0;
+
+        function leg(lx, forward, back) {
+          ctx.strokeStyle = outline;
+          ctx.lineWidth = 6;
+          ctx.lineCap = "round";
+
+          ctx.beginPath();
+          ctx.moveTo(lx, y + 18 + bob);
+          ctx.lineTo(lx + forward * dir, y + 42 + bob);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(lx, y + 24 + bob);
+          ctx.lineTo(lx + back * dir, y + 52 + bob);
+          ctx.stroke();
+
+          ctx.strokeStyle = furDark;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(lx, y + 18 + bob);
+          ctx.lineTo(lx + forward * dir, y + 42 + bob);
+          ctx.stroke();
+        }
+
+        // Body
+        ctx.save();
+        ctx.translate(x, y + bob);
+
+        // Tail
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 8;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(-44 * dir, 6);
+        ctx.quadraticCurveTo((-70 * dir), -6 + tailWag * 12, (-56 * dir), -22 + tailWag * 10);
+        ctx.stroke();
+
+        ctx.strokeStyle = furDark;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(-44 * dir, 6);
+        ctx.quadraticCurveTo((-70 * dir), -6 + tailWag * 12, (-56 * dir), -22 + tailWag * 10);
+        ctx.stroke();
+
+        // Rear legs
+        leg(-18, -stride, stride);
+        leg(-2, stride, -stride);
+
+        // Torso
+        ctx.beginPath();
+        ctx.ellipse(0, 10, 54, 26, 0, 0, Math.PI * 2);
+        ctx.fillStyle = fur;
+        ctx.fill();
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Chest patch
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.ellipse(14 * dir, 16, 22, 12, 0.35 * dir, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Front legs
+        leg(18, stride, -stride);
+        leg(34, -stride, stride);
+
+        // Head
+        ctx.save();
+        ctx.translate(62 * dir, -6);
+
+        // Ear
+        ctx.beginPath();
+        ctx.moveTo(-8 * dir, -18);
+        ctx.quadraticCurveTo(-22 * dir, -40, -6 * dir, -38);
+        ctx.quadraticCurveTo(10 * dir, -36, 2 * dir, -14);
+        ctx.closePath();
+        ctx.fillStyle = furDark;
+        ctx.fill();
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Head circle
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 26, 22, 0, 0, Math.PI * 2);
+        ctx.fillStyle = fur;
+        ctx.fill();
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Snout
+        ctx.beginPath();
+        ctx.ellipse(18 * dir, 8, 18, 12, 0, 0, Math.PI * 2);
+        ctx.fillStyle = snout;
+        ctx.fill();
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Nose
+        circle(30 * dir, 6, 4.6, "#2a1e1c");
+        circle(28 * dir, 4, 1.6, "rgba(255,255,255,0.7)");
+
+        // Eye
+        const eyeX = 8 * dir;
+        circle(eyeX, -2, 3.6, "#1b1414");
+        circle(eyeX - 1.2 * dir, -3.2, 1.3, "rgba(255,255,255,0.75)");
+
+        // Mouth line (with ball "bite")
+        ctx.strokeStyle = "rgba(40,20,20,0.35)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(16 * dir, 14);
+        ctx.quadraticCurveTo(22 * dir, 18, 30 * dir, 14);
+        ctx.stroke();
+
+        ctx.restore(); // head
+
+        // Collar
+        ctx.strokeStyle = "rgba(0,0,0,0.22)";
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.arc(42 * dir, 12, 16, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(70,220,180,0.85)";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(42 * dir, 12, 16, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+
+        // Tag
+        circle(55 * dir, 24, 4.2, "rgba(255,255,255,0.78)");
+
+        ctx.restore(); // body group
+      }
+
+      // Physics update
+      function update(dt) {
+        state.t += dt;
+
+        const gY = groundY();
+
+        // Message decay
+        if (state.msgT > 0) state.msgT -= dt;
+        if (state.msgT <= 0) state.message = "";
+
+        // Idle breathing
+        dog.tailPhase += dt * (dog.state === "idle" ? 4.0 : 7.0);
+
+        // If ball has not been thrown, place it near home
+        if (!ball.thrown) {
+          ball.x = dog.homeX + 220;
+          ball.y = gY - 8;
+        }
+
+        // Dog logic
+        if (dog.state === "idle") {
+          dog.runPhase += dt * 2.6;
+          dog.hasBall = false;
+          ball.attach = false;
+          return;
+        }
+
+        const targetX = (dog.state === "toBall") ? ball.x : dog.homeX;
+        const dx = targetX - dog.x;
+
+        dog.dir = dx >= 0 ? 1 : -1;
+
+        // Move
+        const speed = dog.speed * (dog.state === "toBall" ? 1.05 : 1.0);
+        const step = clamp(dx, -speed * dt, speed * dt);
+        dog.x += step;
+
+        // Run animation speed
+        dog.runPhase += dt * 10.0;
+
+        // Grab ball
+        if (dog.state === "toBall" && Math.abs(dx) < 20) {
+          dog.hasBall = true;
+          ball.attach = true;
+          dog.state = "backHome";
+          setMessage("Got it!", 0.8);
+        }
+
+        // Return home, drop ball, pause, then idle
+        if (dog.state === "backHome" && Math.abs(dx) < 16) {
+          dog.hasBall = false;
+          ball.attach = false;
+          ball.thrown = false;
+          dog.state = "idle";
+          setMessage("Good dog.", 1.0);
+        }
+      }
+
+      // Main render
+      function render() {
+        const w = canvas.getBoundingClientRect().width;
+        const h = canvas.getBoundingClientRect().height;
+
+        ctx.clearRect(0, 0, w, h);
+        drawBackground(w, h);
+
+        // Ball first so dog can appear in front when carrying it
+        drawBall();
+        drawDog();
+        drawSpeech(w, h);
+
+        // Tiny hint near ground
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace";
+        ctx.fillText("Click on the ground to throw", 16, h - 16);
+        ctx.restore();
+      }
+
+      function tick(now) {
+        const dt = Math.min(0.033, Math.max(0, (now - state.last) / 1000));
+        state.last = now;
+
+        if (!state.paused) update(dt);
+        render();
+
+        requestAnimationFrame(tick);
+      }
+
+      // Init
+      resize();
+      dog.x = dog.homeX;
+      dog.y = groundY() - 8;
+      ball.thrown = false;
+
+      setMessage("Click to throw!", 1.2);
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>

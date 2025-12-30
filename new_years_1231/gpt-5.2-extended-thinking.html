@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>New Year Fireworks: HELLO 2026</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 80%, #0b1020 0%, #050713 55%, #02030b 100%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      user-select: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .ui {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .panel {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(10, 14, 30, 0.55);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+
+    .title {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.1;
+      gap: 2px;
+    }
+    .title b { font-size: 14px; letter-spacing: 0.2px; color: rgba(255,255,255,0.92); }
+    .title span { font-size: 12px; color: rgba(255,255,255,0.65); }
+
+    button {
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.92);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-weight: 650;
+      letter-spacing: 0.2px;
+      transition: transform 0.08s ease, background 0.18s ease, border-color 0.18s ease;
+      outline: none;
+    }
+    button:hover {
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.28);
+    }
+    button:active { transform: scale(0.98); }
+
+    .hint {
+      pointer-events: none;
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(10, 14, 30, 0.55);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.78);
+      font-size: 12.5px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      z-index: 5;
+      text-align: center;
+      max-width: 92vw;
+    }
+
+    .toast {
+      pointer-events: none;
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(20, 26, 55, 0.55);
+      border: 1px solid rgba(255,255,255,0.14);
+      color: rgba(255,255,255,0.8);
+      font-size: 12.5px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: 6;
+      text-align: center;
+      max-width: 92vw;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+
+  <div class="ui">
+    <div class="panel">
+      <div class="title">
+        <b>New Year Fireworks</b>
+        <span>Click anywhere to launch a rocket ✨</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <button id="finaleBtn" title="Launch the text finale">Grand Finale: HELLO 2026</button>
+      <button id="clearBtn" title="Clear the sky">Clear</button>
+    </div>
+  </div>
+
+  <div class="hint">Tip: Hold click and drag to paint launches across the horizon</div>
+  <div class="toast" id="toast">Grand Finale started</div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      const finaleBtn = document.getElementById("finaleBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const toast = document.getElementById("toast");
+
+      let W = 0, H = 0, DPR = 1;
+
+      function resize() {
+        DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        W = Math.floor(window.innerWidth);
+        H = Math.floor(window.innerHeight);
+        canvas.width = Math.floor(W * DPR);
+        canvas.height = Math.floor(H * DPR);
+        canvas.style.width = W + "px";
+        canvas.style.height = H + "px";
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      }
+      window.addEventListener("resize", resize, { passive: true });
+      resize();
+
+      // Physics
+      const GRAVITY = 0.08;       // particles
+      const ROCKET_GRAVITY = 0.02;
+      const DRAG = 0.985;
+      const TEXT_DRAG = 0.90;
+
+      // Scene
+      const rockets = [];
+      const particles = [];
+      const embers = [];
+
+      // Color palettes
+      const palettes = [
+        ["#ff3b3b", "#ffb703", "#fb5607", "#ff006e", "#ffd6a5"],
+        ["#00f5d4", "#00bbf9", "#4361ee", "#7209b7", "#b5179e"],
+        ["#a8ff3e", "#57ffcd", "#00e5ff", "#f5f5ff", "#ffd166"],
+        ["#f72585", "#b5179e", "#7209b7", "#3a0ca3", "#4cc9f0"],
+      ];
+
+      function rand(min, max) { return Math.random() * (max - min) + min; }
+      function randi(min, max) { return Math.floor(rand(min, max)); }
+      function pick(arr) { return arr[randi(0, arr.length)]; }
+      function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+      // Subtle stars
+      const stars = [];
+      function seedStars() {
+        stars.length = 0;
+        const n = Math.floor((W * H) / 35000);
+        for (let i = 0; i < n; i++) {
+          stars.push({
+            x: Math.random() * W,
+            y: Math.random() * H * 0.7,
+            r: Math.random() * 1.2 + 0.2,
+            a: Math.random() * 0.6 + 0.15,
+            tw: Math.random() * 0.02 + 0.005,
+          });
+        }
+      }
+      seedStars();
+      window.addEventListener("resize", seedStars, { passive: true });
+
+      class Rocket {
+        constructor(x, targetY, opts = {}) {
+          this.x = x;
+          this.y = H + rand(10, 40);
+          this.vx = rand(-0.6, 0.6) * (opts.spread ?? 1);
+          this.vy = rand(-9.5, -12.0) * (opts.power ?? 1);
+          this.targetY = targetY;
+          this.color = opts.color || "#ffffff";
+          this.trail = [];
+          this.isText = !!opts.isText;
+          this.textPoints = opts.textPoints || null;
+          this.textPalette = opts.textPalette || null;
+          this.fuse = 0;
+          this.maxFuse = opts.maxFuse ?? rand(55, 85);
+          this.sparkRate = opts.sparkRate ?? 2;
+        }
+
+        update() {
+          this.vy += ROCKET_GRAVITY;
+          this.x += this.vx;
+          this.y += this.vy;
+
+          // Keep trails
+          this.trail.push({ x: this.x, y: this.y });
+          if (this.trail.length > 16) this.trail.shift();
+
+          // Sparks
+          if (Math.random() < 0.6) {
+            for (let i = 0; i < this.sparkRate; i++) {
+              embers.push(new Ember(this.x, this.y, this.vx * 0.2, this.vy * 0.2));
+            }
+          }
+
+          this.fuse++;
+
+          // Explode
+          const reachedApex = this.vy >= -0.2;
+          const reachedTarget = this.y <= this.targetY;
+          const fuseOut = this.fuse > this.maxFuse;
+
+          if (reachedApex || reachedTarget || fuseOut) {
+            this.explode();
+            return false;
+          }
+
+          // Wrap sideways a bit
+          if (this.x < -50) this.x = W + 50;
+          if (this.x > W + 50) this.x = -50;
+
+          return true;
+        }
+
+        explode() {
+          if (this.isText && this.textPoints && this.textPoints.length) {
+            explodeText(this.x, this.y, this.textPoints, this.textPalette);
+            // Add a small regular burst too
+            explodeBurst(this.x, this.y, pick(palettes), 60, 3.6);
+          } else {
+            explodeBurst(this.x, this.y, pick(palettes), randi(90, 150), rand(3.2, 5.2));
+          }
+        }
+
+        draw(ctx) {
+          // Rocket head
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          ctx.fillStyle = "rgba(255,255,255,0.95)";
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Trail
+          ctx.strokeStyle = "rgba(255,255,255,0.20)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let i = 0; i < this.trail.length; i++) {
+            const p = this.trail[i];
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      class Particle {
+        constructor(x, y, vx, vy, color, life, size, opts = {}) {
+          this.x = x;
+          this.y = y;
+          this.vx = vx;
+          this.vy = vy;
+          this.color = color;
+          this.life = life;
+          this.maxLife = life;
+          this.size = size;
+
+          // Text mode
+          this.seek = !!opts.seek;
+          this.tx = opts.tx ?? x;
+          this.ty = opts.ty ?? y;
+          this.seekStrength = opts.seekStrength ?? 0.018;
+          this.seekDamping = opts.seekDamping ?? 0.88;
+          this.gravityScale = opts.gravityScale ?? 1;
+          this.drag = opts.drag ?? DRAG;
+
+          // Twinkle
+          this.tw = rand(0.85, 1.15);
+          this.phase = rand(0, Math.PI * 2);
+        }
+
+        update() {
+          // If text particle, pull toward target
+          if (this.seek) {
+            const dx = this.tx - this.x;
+            const dy = this.ty - this.y;
+            this.vx += dx * this.seekStrength;
+            this.vy += dy * this.seekStrength;
+
+            this.vx *= this.seekDamping;
+            this.vy *= this.seekDamping;
+          }
+
+          this.vy += GRAVITY * this.gravityScale;
+          this.vx *= this.drag;
+          this.vy *= this.drag;
+
+          this.x += this.vx;
+          this.y += this.vy;
+
+          this.life--;
+
+          // Small bounce near bottom for fun (only non-text)
+          if (!this.seek && this.y > H - 2) {
+            this.y = H - 2;
+            this.vy *= -0.35;
+            this.vx *= 0.85;
+          }
+
+          return this.life > 0;
+        }
+
+        draw(ctx) {
+          const t = this.life / this.maxLife;
+          const alpha = clamp(t, 0, 1);
+
+          const twinkle = (0.65 + 0.35 * Math.sin(this.phase + (1 - t) * 10)) * this.tw;
+          const r = this.size * (0.8 + 0.6 * (1 - t)) * twinkle;
+
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+
+          // Glow core
+          ctx.fillStyle = withAlpha(this.color, 0.95 * alpha);
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Soft halo
+          ctx.fillStyle = withAlpha(this.color, 0.22 * alpha);
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, r * 2.6, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+        }
+      }
+
+      class Ember {
+        constructor(x, y, vx, vy) {
+          this.x = x;
+          this.y = y;
+          this.vx = vx + rand(-0.6, 0.6);
+          this.vy = vy + rand(-0.2, 0.5);
+          this.life = randi(18, 36);
+          this.maxLife = this.life;
+          this.size = rand(0.6, 1.6);
+        }
+        update() {
+          this.vy += 0.03;
+          this.vx *= 0.97;
+          this.vy *= 0.97;
+          this.x += this.vx;
+          this.y += this.vy;
+          this.life--;
+          return this.life > 0;
+        }
+        draw(ctx) {
+          const t = this.life / this.maxLife;
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          ctx.fillStyle = `rgba(255, 230, 160, ${0.15 * t})`;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size * (1 + (1 - t) * 2.5), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      function withAlpha(hex, a) {
+        // hex like #rrggbb
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r},${g},${b},${a})`;
+      }
+
+      function explodeBurst(x, y, palette, count, speed) {
+        const base = pick(palette);
+        for (let i = 0; i < count; i++) {
+          const ang = Math.random() * Math.PI * 2;
+          const sp = rand(speed * 0.35, speed) * rand(0.6, 1.1);
+          const vx = Math.cos(ang) * sp;
+          const vy = Math.sin(ang) * sp;
+          const color = Math.random() < 0.65 ? pick(palette) : base;
+          const life = randi(55, 115);
+          const size = rand(1.2, 2.6);
+          particles.push(new Particle(x, y, vx, vy, color, life, size, {
+            seek: false,
+            gravityScale: 1,
+            drag: DRAG,
+          }));
+        }
+      }
+
+      function explodeText(x, y, points, palette) {
+        // Particles that "settle" into letter shapes and glow for longer.
+        const pal = palette || ["#ffffff", "#ffe066", "#ffd6ff", "#bde0fe", "#caffbf", "#ffadad"];
+        const jitter = 10;
+
+        for (let i = 0; i < points.length; i++) {
+          const p = points[i];
+
+          // Start near explosion
+          const sx = x + rand(-jitter, jitter);
+          const sy = y + rand(-jitter, jitter);
+
+          // Give a little outward kick, then let attraction take over
+          const ang = Math.random() * Math.PI * 2;
+          const sp = rand(0.2, 2.0);
+          const vx = Math.cos(ang) * sp;
+          const vy = Math.sin(ang) * sp;
+
+          const color = Math.random() < 0.25 ? "#ffffff" : pick(pal);
+          const life = randi(120, 190);
+          const size = rand(1.4, 2.8);
+
+          particles.push(new Particle(sx, sy, vx, vy, color, life, size, {
+            seek: true,
+            tx: p.x,
+            ty: p.y,
+            seekStrength: 0.020,
+            seekDamping: 0.90,
+            gravityScale: 0.18,
+            drag: TEXT_DRAG,
+          }));
+        }
+
+        // A few extra glitter sparks
+        explodeBurst(x, y, pal, 40, 2.4);
+      }
+
+      // Text point sampling
+      function getTextPoints(text) {
+        const off = document.createElement("canvas");
+        const octx = off.getContext("2d");
+
+        const targetWidth = Math.min(1100, Math.floor(W * 0.92));
+        const fontSize = Math.floor(Math.max(64, Math.min(170, targetWidth / 7)));
+
+        off.width = targetWidth;
+        off.height = Math.floor(fontSize * 2.2);
+
+        octx.clearRect(0, 0, off.width, off.height);
+        octx.fillStyle = "#fff";
+        octx.textAlign = "center";
+        octx.textBaseline = "middle";
+        octx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
+
+        octx.fillText(text, off.width / 2, off.height / 2);
+
+        const img = octx.getImageData(0, 0, off.width, off.height).data;
+
+        const step = Math.max(5, Math.floor(fontSize / 18)); // controls density
+        const pts = [];
+
+        for (let y = 0; y < off.height; y += step) {
+          for (let x = 0; x < off.width; x += step) {
+            const idx = (y * off.width + x) * 4 + 3;
+            if (img[idx] > 140) {
+              pts.push({ x, y });
+            }
+          }
+        }
+
+        // Map to screen space
+        const skyY = Math.floor(H * 0.26);
+        const left = Math.floor((W - off.width) / 2);
+        const top = clamp(skyY - Math.floor(off.height / 2), 40, Math.floor(H * 0.5));
+
+        for (let i = 0; i < pts.length; i++) {
+          pts[i].x = pts[i].x + left;
+          pts[i].y = pts[i].y + top;
+        }
+
+        // Cap points for performance
+        const maxPoints = 2600;
+        if (pts.length > maxPoints) {
+          // Shuffle and slice
+          for (let i = pts.length - 1; i > 0; i--) {
+            const j = (Math.random() * (i + 1)) | 0;
+            const tmp = pts[i];
+            pts[i] = pts[j];
+            pts[j] = tmp;
+          }
+          pts.length = maxPoints;
+        }
+
+        return pts;
+      }
+
+      function partitionPoints(points, chunkSize) {
+        const chunks = [];
+        for (let i = 0; i < points.length; i += chunkSize) {
+          chunks.push(points.slice(i, i + chunkSize));
+        }
+        return chunks;
+      }
+
+      function centroid(points) {
+        let sx = 0, sy = 0;
+        for (const p of points) { sx += p.x; sy += p.y; }
+        const n = Math.max(1, points.length);
+        return { x: sx / n, y: sy / n };
+      }
+
+      function launchRocket(x, yTarget = null, opts = {}) {
+        const ty = yTarget ?? rand(H * 0.18, H * 0.45);
+        rockets.push(new Rocket(x, ty, opts));
+      }
+
+      // Input handling
+      let pointerDown = false;
+      let lastLaunch = 0;
+
+      function canLaunchNow() {
+        const now = performance.now();
+        if (now - lastLaunch < 70) return false;
+        lastLaunch = now;
+        return true;
+      }
+
+      function pointerPos(ev) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: (ev.clientX - rect.left),
+          y: (ev.clientY - rect.top),
+        };
+      }
+
+      function isOverUI(ev) {
+        // If user clicks on a button, do not also launch
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        return !!(el && (el.tagName === "BUTTON" || el.closest(".panel")));
+      }
+
+      canvas.addEventListener("pointerdown", (ev) => {
+        if (isOverUI(ev)) return;
+        pointerDown = true;
+        const p = pointerPos(ev);
+        if (canLaunchNow()) launchRocket(p.x);
+      });
+
+      canvas.addEventListener("pointermove", (ev) => {
+        if (!pointerDown) return;
+        if (isOverUI(ev)) return;
+        const p = pointerPos(ev);
+        if (canLaunchNow()) launchRocket(p.x);
+      });
+
+      window.addEventListener("pointerup", () => { pointerDown = false; }, { passive: true });
+
+      // Buttons
+      let finaleRunning = false;
+
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add("show");
+        window.clearTimeout(showToast._t);
+        showToast._t = window.setTimeout(() => toast.classList.remove("show"), 1400);
+      }
+
+      clearBtn.addEventListener("click", () => {
+        rockets.length = 0;
+        particles.length = 0;
+        embers.length = 0;
+        // Hard clear
+        ctx.fillStyle = "#02030b";
+        ctx.fillRect(0, 0, W, H);
+      });
+
+      finaleBtn.addEventListener("click", () => {
+        if (finaleRunning) return;
+        finaleRunning = true;
+        showToast("Grand Finale started");
+
+        const text = "HELLO 2026";
+        const points = getTextPoints(text);
+        const chunks = partitionPoints(points, 140);
+
+        // Prettier palette for text glow
+        const textPalette = ["#ffffff", "#ffe066", "#ffd6ff", "#bde0fe", "#caffbf", "#ffadad", "#9bf6ff"];
+
+        // 1) Warm-up barrage of normal fireworks
+        for (let i = 0; i < 18; i++) {
+          const delay = i * 120;
+          setTimeout(() => {
+            launchRocket(rand(W * 0.1, W * 0.9), rand(H * 0.12, H * 0.5), {
+              power: rand(0.95, 1.2),
+              spread: rand(0.9, 1.2),
+              sparkRate: randi(1, 3)
+            });
+          }, delay);
+        }
+
+        // 2) Text forming fireworks, multiple rockets that explode into letter points
+        const startDelay = 2300;
+        chunks.forEach((chunk, idx) => {
+          const c = centroid(chunk);
+          const delay = startDelay + idx * 110;
+
+          setTimeout(() => {
+            const fromX = clamp(c.x + rand(-W * 0.18, W * 0.18), 40, W - 40);
+            const targetY = clamp(c.y + rand(-40, 40), 50, H * 0.62);
+
+            launchRocket(fromX, targetY, {
+              isText: true,
+              textPoints: chunk,
+              textPalette,
+              power: 1.15,
+              spread: 1.0,
+              maxFuse: 120,
+              sparkRate: 2
+            });
+          }, delay);
+        });
+
+        // 3) Final pop on the sides for drama
+        const sideDelay = startDelay + chunks.length * 110 + 500;
+        setTimeout(() => {
+          for (let i = 0; i < 10; i++) {
+            const x = i % 2 === 0 ? rand(20, W * 0.18) : rand(W * 0.82, W - 20);
+            launchRocket(x, rand(H * 0.14, H * 0.42), { power: 1.25, spread: 1.1 });
+          }
+        }, sideDelay);
+
+        // Allow re-run after a while
+        setTimeout(() => { finaleRunning = false; }, 9000);
+      });
+
+      // Auto ambient launches sometimes
+      let autoTimer = 0;
+
+      // Render loop
+      let last = performance.now();
+
+      function drawBackground() {
+        // Motion trails
+        ctx.fillStyle = "rgba(2, 3, 11, 0.22)";
+        ctx.fillRect(0, 0, W, H);
+
+        // Stars
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        for (const s of stars) {
+          s.a += (Math.random() - 0.5) * s.tw;
+          s.a = clamp(s.a, 0.1, 0.7);
+          ctx.fillStyle = `rgba(210, 230, 255, ${s.a * 0.7})`;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // Horizon haze
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        const grd = ctx.createLinearGradient(0, H, 0, H * 0.55);
+        grd.addColorStop(0, "rgba(20, 30, 70, 0.25)");
+        grd.addColorStop(1, "rgba(0, 0, 0, 0)");
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, H * 0.55, W, H * 0.45);
+        ctx.restore();
+      }
+
+      function loop(now) {
+        const dt = Math.min(32, now - last);
+        last = now;
+
+        // Background with trails
+        drawBackground();
+
+        // Ambient fireworks if user is idle
+        autoTimer += dt;
+        if (!pointerDown && !finaleRunning && autoTimer > 1400 && Math.random() < 0.35) {
+          autoTimer = 0;
+          launchRocket(rand(W * 0.12, W * 0.88), rand(H * 0.18, H * 0.5), {
+            power: rand(0.95, 1.15),
+            spread: rand(0.85, 1.15),
+            sparkRate: randi(1, 3)
+          });
+        }
+
+        // Update rockets
+        for (let i = rockets.length - 1; i >= 0; i--) {
+          const alive = rockets[i].update();
+          rockets[i].draw(ctx);
+          if (!alive) rockets.splice(i, 1);
+        }
+
+        // Update embers
+        for (let i = embers.length - 1; i >= 0; i--) {
+          const alive = embers[i].update();
+          embers[i].draw(ctx);
+          if (!alive) embers.splice(i, 1);
+        }
+
+        // Update particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const alive = particles[i].update();
+          particles[i].draw(ctx);
+          if (!alive) particles.splice(i, 1);
+        }
+
+        // Soft cap to avoid runaway load
+        if (particles.length > 9000) particles.splice(0, particles.length - 9000);
+
+        requestAnimationFrame(loop);
+      }
+
+      // Initial clear
+      ctx.fillStyle = "#02030b";
+      ctx.fillRect(0, 0, W, H);
+      requestAnimationFrame(loop);
+
+      // Quick start fireworks
+      setTimeout(() => {
+        for (let i = 0; i < 6; i++) {
+          setTimeout(() => launchRocket(rand(W * 0.2, W * 0.8)), i * 160);
+        }
+      }, 250);
+    })();
+  </script>
+</body>
+</html>

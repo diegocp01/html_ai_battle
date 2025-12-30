@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYE 2026 Fireworks Display</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020202;
+            font-family: 'Arial', sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none; /* Let clicks pass through to canvas for general fireworks */
+            z-index: 10;
+        }
+
+        button {
+            pointer-events: auto;
+            background: linear-gradient(135deg, #ff00cc, #3333ff);
+            border: none;
+            border-radius: 50px;
+            padding: 15px 40px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 0, 204, 0.5);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255, 0, 204, 0.8);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .instruction {
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="instruction">Click anywhere to launch fireworks</div>
+        <button id="finaleBtn">Grand Finale</button>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // State lists
+        let fireworks = [];
+        let particles = [];
+        let textParticles = []; // Special particles for the text
+
+        // Configuration
+        const GRAVITY = 0.04;
+        const DRAG = 0.96; // Air resistance
+        
+        // Resize handling
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --------------------------------------------------------
+        // UTILITIES
+        // --------------------------------------------------------
+        function random(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        // Generate coordinates for the text "HELLO 2026"
+        function getTextCoordinates(text) {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d');
+            offCanvas.width = width;
+            offCanvas.height = height;
+
+            // Responsive font size
+            const fontSize = Math.min(width / 6, 150); 
+            offCtx.font = `900 ${fontSize}px Arial`;
+            offCtx.fillStyle = 'white';
+            offCtx.textAlign = 'center';
+            offCtx.textBaseline = 'middle';
+            offCtx.fillText(text, width / 2, height / 3); // Draw text in upper-middle
+
+            const imageData = offCtx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            const coords = [];
+            const gap = 5; // Skip pixels to reduce particle count (performance)
+
+            for (let y = 0; y < height; y += gap) {
+                for (let x = 0; x < width; x += gap) {
+                    const index = (y * width + x) * 4;
+                    // If pixel is not transparent
+                    if (data[index + 3] > 128) {
+                        coords.push({ x: x, y: y });
+                    }
+                }
+            }
+            return coords;
+        }
+
+        // --------------------------------------------------------
+        // CLASSES
+        // --------------------------------------------------------
+
+        class Firework {
+            constructor(tx, ty, isTextPayload = false, textCoords = null) {
+                this.x = width / 2;
+                this.y = height;
+                this.tx = tx;
+                this.ty = ty;
+                this.isTextPayload = isTextPayload;
+                this.textCoords = textCoords;
+                
+                // Calculate velocity to reach target
+                const dist = Math.sqrt((this.tx - this.x) ** 2 + (this.ty - this.y) ** 2);
+                const speed = isTextPayload ? 18 : random(10, 15);
+                const angle = Math.atan2(this.ty - this.y, this.tx - this.x);
+                
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                this.hue = random(0, 360);
+                this.brightness = random(50, 70);
+                this.alpha = 1;
+                this.dead = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Apply gravity slightly to curve the shot
+                this.vy += GRAVITY;
+
+                // Check distance to target (explode when close or falling)
+                const dist = Math.sqrt((this.tx - this.x) ** 2 + (this.ty - this.y) ** 2);
+                
+                if (dist < 20 || this.vy >= 0) {
+                    this.dead = true;
+                    this.explode();
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${this.hue}, 100%, 50%)`;
+                ctx.fill();
+            }
+
+            explode() {
+                if (this.isTextPayload && this.textCoords) {
+                    // Create text formation particles
+                    createMotherExplosion(this.x, this.y, this.textCoords);
+                } else {
+                    // Standard Explosion
+                    const particleCount = random(80, 150);
+                    for (let i = 0; i < particleCount; i++) {
+                        particles.push(new Particle(this.x, this.y, this.hue));
+                    }
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, hue) {
+                this.x = x;
+                this.y = y;
+                this.hue = hue + random(-20, 20);
+                
+                const angle = random(0, Math.PI * 2);
+                const speed = random(1, 8);
+                
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                this.friction = DRAG;
+                this.gravity = GRAVITY;
+                this.alpha = 1;
+                this.decay = random(0.01, 0.03);
+            }
+
+            update() {
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${this.hue}, 100%, 60%)`;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class TextParticle {
+            constructor(startX, startY, targetX, targetY) {
+                this.x = startX;
+                this.y = startY;
+                this.tx = targetX;
+                this.ty = targetY;
+                
+                // Explosion velocity initially
+                const angle = random(0, Math.PI * 2);
+                const speed = random(5, 15); // Fast explosion
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                this.hue = random(180, 240); // Cyan/Blue theme for 2026
+                this.alpha = 1;
+                this.friction = 0.92;
+                
+                // When true, particle snaps to text position
+                this.forming = false;
+                this.done = false;
+            }
+
+            update() {
+                // Phase 1: Explode outward
+                if (!this.forming) {
+                    this.vx *= this.friction;
+                    this.vy *= this.friction;
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // Once slowed down, switch to magnetic pull towards text
+                    if (Math.abs(this.vx) < 0.5 && Math.abs(this.vy) < 0.5) {
+                        this.forming = true;
+                    }
+                } 
+                // Phase 2: Move to text position
+                else {
+                    const dx = this.tx - this.x;
+                    const dy = this.ty - this.y;
+                    
+                    this.x += dx * 0.15; // Ease to position
+                    this.y += dy * 0.15;
+
+                    // Twinkle effect
+                    if (Math.random() < 0.05) {
+                        this.hue = random(180, 360);
+                    }
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                // Glowing effect
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = `hsl(${this.hue}, 100%, 50%)`;
+                ctx.fillStyle = `hsla(${this.hue}, 100%, 70%, ${this.alpha})`;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        // --------------------------------------------------------
+        // LOGIC
+        // --------------------------------------------------------
+
+        function createMotherExplosion(x, y, coords) {
+            // Only take a subset of coords if too many (performance cap)
+            const maxParticles = 2500;
+            let step = Math.ceil(coords.length / maxParticles);
+            
+            for (let i = 0; i < coords.length; i += step) {
+                textParticles.push(new TextParticle(x, y, coords[i].x, coords[i].y));
+            }
+        }
+
+        // Main Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Motion trails: clear canvas with opacity
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Update Fireworks
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                fireworks[i].update();
+                fireworks[i].draw();
+                if (fireworks[i].dead) {
+                    fireworks.splice(i, 1);
+                }
+            }
+
+            // Update Regular Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Update Text Particles
+            for (let i = textParticles.length - 1; i >= 0; i--) {
+                textParticles[i].update();
+                textParticles[i].draw();
+            }
+        }
+
+        // Input Handling
+        canvas.addEventListener('mousedown', (e) => {
+            const fw = new Firework(e.clientX, e.clientY);
+            fireworks.push(fw);
+        });
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const fw = new Firework(touch.clientX, touch.clientY);
+            fireworks.push(fw);
+        });
+
+        // Grand Finale Logic
+        document.getElementById('finaleBtn').addEventListener('click', () => {
+            // 1. Launch a barrage of random fireworks
+            let count = 0;
+            const barrage = setInterval(() => {
+                const fw = new Firework(random(width * 0.1, width * 0.9), random(height * 0.1, height * 0.5));
+                fireworks.push(fw);
+                count++;
+                if (count > 15) clearInterval(barrage);
+            }, 100);
+
+            // 2. Launch the "Mother Rocket" after 1.5 seconds
+            setTimeout(() => {
+                const coords = getTextCoordinates("HELLO 2026");
+                // Launch to center of where text should be
+                const mother = new Firework(width / 2, height / 3, true, coords);
+                fireworks.push(mother);
+            }, 1500);
+        });
+
+        // Start
+        animate();
+
+    </script>
+</body>
+</html>
