@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Tearable Cloth</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #ccc;
+            user-select: none; /* Prevent text selection while dragging */
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: none; /* Let mouse clicks pass through to canvas */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .highlight {
+            color: #4db8ff;
+            font-weight: bold;
+        }
+        
+        .cut-mode {
+            color: #ff4d4d;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>Verlet Cloth Simulation</h1>
+        <p><span class="highlight">Left Click + Drag</span> to pull the cloth.</p>
+        <p><span class="cut-mode">Right Click (or Shift) + Drag</span> to cut.</p>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // --- Configuration ---
+        const config = {
+            gravity: 0.5,
+            friction: 0.99,
+            bounce: 0.9,
+            physics_accuracy: 3, // Iterations for constraint solving (higher is stiffer)
+            mouse_interaction_radius: 20,
+            cut_radius: 10,
+            spacing: 16 // Distance between points
+        };
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const points = [];
+        const constraints = [];
+
+        // --- Input State ---
+        const mouse = {
+            x: 0,
+            y: 0,
+            px: 0, // previous x
+            py: 0, // previous y
+            down: false,
+            button: 0 // 0: left, 2: right
+        };
+
+        let draggedPoint = null;
+
+        // --- Classes ---
+
+        class Point {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.oldx = x;
+                this.oldy = y;
+                this.pinned = false;
+            }
+
+            update() {
+                if (this.pinned) return;
+
+                // Verlet Integration
+                const vx = (this.x - this.oldx) * config.friction;
+                const vy = (this.y - this.oldy) * config.friction;
+
+                this.oldx = this.x;
+                this.oldy = this.y;
+
+                this.x += vx;
+                this.y += vy;
+                this.y += config.gravity;
+
+                // Canvas Bounds
+                if (this.x > width) { this.x = width; this.oldx = this.x + vx * config.bounce; }
+                else if (this.x < 0) { this.x = 0; this.oldx = this.x + vx * config.bounce; }
+
+                if (this.y > height) { this.y = height; this.oldy = this.y + vy * config.bounce; }
+                else if (this.y < 0) { this.y = 0; this.oldy = this.y + vy * config.bounce; }
+            }
+
+            draw() {
+                // Points are invisible, we draw constraints
+            }
+        }
+
+        class Constraint {
+            constructor(p1, p2) {
+                this.p1 = p1;
+                this.p2 = p2;
+                this.length = config.spacing;
+            }
+
+            resolve() {
+                const dx = this.p1.x - this.p2.x;
+                const dy = this.p1.y - this.p2.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 0.01) return; // Prevent division by zero
+
+                const diff = (this.length - dist) / dist;
+                
+                // Correction vector
+                const cx = dx * diff * 0.5;
+                const cy = dy * diff * 0.5;
+
+                if (!this.p1.pinned) {
+                    this.p1.x += cx;
+                    this.p1.y += cy;
+                }
+                if (!this.p2.pinned) {
+                    this.p2.x -= cx;
+                    this.p2.y -= cy;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.p1.x, this.p1.y);
+                ctx.lineTo(this.p2.x, this.p2.y);
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+            }
+        }
+
+        // --- Initialization ---
+
+        function initCloth() {
+            points.length = 0;
+            constraints.length = 0;
+
+            const cols = Math.floor(width / config.spacing) - 10;
+            const rows = Math.floor(height / config.spacing) - 10;
+            
+            // Limit grid size for performance if screen is huge
+            const startX = (width - Math.min(cols * config.spacing, 600)) / 2; 
+            const startY = 50;
+
+            const gridCols = Math.min(cols, 40); // Max columns
+            const gridRows = Math.min(rows, 25); // Max rows
+
+            // Create Points
+            for (let y = 0; y < gridRows; y++) {
+                for (let x = 0; x < gridCols; x++) {
+                    const p = new Point(startX + x * config.spacing, startY + y * config.spacing);
+                    
+                    // Pin the top row
+                    if (y === 0) p.pinned = true;
+                    
+                    // Randomly unpin some top points for a "ragged" curtain look? 
+                    // Let's keep it clean: 
+                    if (y === 0 && x % 5 === 0) p.pinned = true; // Pin every 5th point for style
+                    else if (y === 0) p.pinned = false; // Actually, let's just pin the whole top row properly
+                    if (y === 0) p.pinned = true;
+
+                    points.push(p);
+                }
+            }
+
+            // Create Constraints
+            for (let y = 0; y < gridRows; y++) {
+                for (let x = 0; x < gridCols; x++) {
+                    const i = y * gridCols + x;
+                    
+                    // Connect to right neighbor
+                    if (x < gridCols - 1) {
+                        constraints.push(new Constraint(points[i], points[i+1]));
+                    }
+                    
+                    // Connect to bottom neighbor
+                    if (y < gridRows - 1) {
+                        constraints.push(new Constraint(points[i], points[i + gridCols]));
+                    }
+                }
+            }
+        }
+
+        // --- Main Loop ---
+
+        function update() {
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Update Points
+            points.forEach(p => p.update());
+
+            // 2. Dragging Logic
+            if (mouse.down) {
+                // If dragging a point (Left Click)
+                if (mouse.button === 0 && !mouse.shift && draggedPoint) {
+                    draggedPoint.oldx = draggedPoint.x - (mouse.x - mouse.px);
+                    draggedPoint.oldy = draggedPoint.y - (mouse.y - mouse.py);
+                    draggedPoint.x = mouse.x;
+                    draggedPoint.y = mouse.y;
+                }
+                
+                // If Cutting (Right Click or Shift+Left)
+                if (mouse.button === 2 || (mouse.button === 0 && mouse.shift)) {
+                    cutCloth();
+                    drawKnife();
+                }
+            }
+
+            // 3. Resolve Constraints (Multiple passes for stiffness)
+            for (let i = 0; i < config.physics_accuracy; i++) {
+                constraints.forEach(c => c.resolve());
+            }
+
+            // 4. Draw Constraints
+            ctx.lineWidth = 1;
+            constraints.forEach(c => c.draw());
+
+            requestAnimationFrame(update);
+        }
+
+        // --- Interaction Logic ---
+
+        function cutCloth() {
+            // Remove constraints that intersect with the mouse
+            // Simple method: check distance to constraints
+            // Optimized method: we iterate backwards so we can splice safely
+            for (let i = constraints.length - 1; i >= 0; i--) {
+                const c = constraints[i];
+                // Check distance from mouse to the midpoint of the stick
+                const midX = (c.p1.x + c.p2.x) / 2;
+                const midY = (c.p1.y + c.p2.y) / 2;
+                
+                const dist = Math.sqrt(
+                    (midX - mouse.x) ** 2 + (midY - mouse.y) ** 2
+                );
+
+                if (dist < config.cut_radius) {
+                    constraints.splice(i, 1);
+                }
+            }
+        }
+
+        function findNearestPoint(x, y) {
+            let nearest = null;
+            let minDist = config.mouse_interaction_radius;
+
+            points.forEach(p => {
+                const dist = Math.sqrt((p.x - x) ** 2 + (p.y - y) ** 2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = p;
+                }
+            });
+            return nearest;
+        }
+
+        function drawKnife() {
+            ctx.beginPath();
+            ctx.arc(mouse.x, mouse.y, config.cut_radius, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ff4d4d';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // --- Event Listeners ---
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initCloth();
+        });
+
+        // Prevent context menu on right click
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        canvas.addEventListener('mousedown', e => {
+            mouse.down = true;
+            mouse.button = e.button;
+            mouse.shift = e.shiftKey;
+            mouse.px = mouse.x; // reset previous position logic on click
+            mouse.py = mouse.y;
+            
+            // If left click, try to grab a point
+            if (mouse.button === 0 && !mouse.shift) {
+                draggedPoint = findNearestPoint(e.clientX, e.clientY);
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            mouse.px = mouse.x;
+            mouse.py = mouse.y;
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            mouse.shift = e.shiftKey;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            mouse.down = false;
+            draggedPoint = null;
+        });
+
+        // --- Start ---
+        initCloth();
+        update();
+
+    </script>
+</body>
+</html>

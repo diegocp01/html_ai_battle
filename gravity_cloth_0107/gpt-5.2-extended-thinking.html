@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tearable Cloth (Single File)</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0b0f14; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+    .hud {
+      position: fixed; left: 12px; top: 12px; z-index: 10;
+      font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      color: rgba(255,255,255,0.9);
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 10px 12px;
+      user-select: none;
+      backdrop-filter: blur(6px);
+      max-width: 360px;
+    }
+    .hud b { color: #fff; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.14);
+      margin-left: 6px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .hint { opacity: 0.85; margin-top: 6px; }
+    .row { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .btn {
+      appearance: none; border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.92);
+      padding: 6px 10px; border-radius: 10px; cursor: pointer;
+      font: inherit;
+    }
+    .btn:hover { background: rgba(255,255,255,0.12); }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div class="hud" id="hud">
+    <div><b>Tearable Cloth</b><span class="pill" id="modePill">DRAG</span></div>
+    <div class="hint">
+      <b>Drag:</b> Left click / touch and move<br>
+      <b>Tear:</b> Right click + drag, or hold <b>Shift</b> and drag<br>
+      <b>Reset:</b> Press <b>R</b>
+    </div>
+    <div class="row">
+      <button class="btn" id="resetBtn">Reset</button>
+      <button class="btn" id="pinBtn">Toggle Pin Corners</button>
+    </div>
+    <div class="hint" id="stats"></div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const modePill = document.getElementById('modePill');
+  const statsEl = document.getElementById('stats');
+  const resetBtn = document.getElementById('resetBtn');
+  const pinBtn = document.getElementById('pinBtn');
+
+  // Prevent context menu so right-drag can tear
+  window.addEventListener('contextmenu', (e) => e.preventDefault(), { passive: false });
+
+  // --- Simulation parameters ---
+  const sim = {
+    gravity: 980,         // px/s^2
+    damping: 0.995,       // Verlet velocity damping
+    constraintIters: 7,   // more = stiffer cloth
+    thickness: 1.25,      // constraint render thickness
+    tearRadius: 14,       // pixels around the slicing path
+    grabRadius: 18,       // pick nearest point radius
+    substeps: 1,          // keep 1 for speed; increase for stability if needed
+    pointMass: 1,
+    floorFriction: 0.85,
+    bounce: 0.1
+  };
+
+  // --- DPI resize ---
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+    W = Math.floor(window.innerWidth);
+    H = Math.floor(window.innerHeight);
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+
+  // --- Cloth data ---
+  /** Point: Verlet particle */
+  class Point {
+    constructor(x, y, pinned=false) {
+      this.x = x; this.y = y;
+      this.px = x; this.py = y;
+      this.ax = 0; this.ay = 0;
+      this.pinned = pinned;
+      this.pinX = x; this.pinY = y;
+    }
+    addForce(fx, fy) { this.ax += fx; this.ay += fy; }
+    integrate(dt) {
+      if (this.pinned) {
+        this.x = this.pinX; this.y = this.pinY;
+        this.px = this.pinX; this.py = this.pinY;
+        this.ax = 0; this.ay = 0;
+        return;
+      }
+      const vx = (this.x - this.px) * sim.damping;
+      const vy = (this.y - this.py) * sim.damping;
+
+      const nx = this.x + vx + this.ax * dt * dt;
+      const ny = this.y + vy + this.ay * dt * dt;
+
+      this.px = this.x; this.py = this.y;
+      this.x = nx; this.y = ny;
+
+      this.ax = 0; this.ay = 0;
+    }
+    constrainToBounds() {
+      const r = 0.0;
+      if (this.x < r) { this.x = r; this.px = this.x + (this.x - this.px) * sim.bounce; }
+      if (this.x > W - r) { this.x = W - r; this.px = this.x + (this.x - this.px) * sim.bounce; }
+      if (this.y < r) { this.y = r; this.py = this.y + (this.y - this.py) * sim.bounce; }
+      if (this.y > H - r) {
+        this.y = H - r;
+        // floor friction
+        const vx = this.x - this.px;
+        this.px = this.x - vx * sim.floorFriction;
+        const vy = this.y - this.py;
+        this.py = this.y - vy * sim.bounce;
+      }
+    }
+  }
+
+  /** Constraint: distance joint between two points */
+  class Constraint {
+    constructor(a, b, rest) {
+      this.a = a; this.b = b; this.rest = rest;
+      this.broken = false;
+    }
+    satisfy() {
+      if (this.broken) return;
+
+      const ax = points[this.a].x, ay = points[this.a].y;
+      const bx = points[this.b].x, by = points[this.b].y;
+
+      let dx = bx - ax, dy = by - ay;
+      const dist = Math.hypot(dx, dy) || 1e-6;
+      const diff = (dist - this.rest) / dist;
+
+      const pA = points[this.a];
+      const pB = points[this.b];
+
+      // equal mass, but respect pinned points
+      const invA = pA.pinned ? 0 : 1;
+      const invB = pB.pinned ? 0 : 1;
+      const sum = invA + invB || 1;
+
+      const corrX = dx * diff;
+      const corrY = dy * diff;
+
+      if (!pA.pinned) { pA.x += corrX * (invA / sum) * 0.5; pA.y += corrY * (invA / sum) * 0.5; }
+      if (!pB.pinned) { pB.x -= corrX * (invB / sum) * 0.5; pB.y -= corrY * (invB / sum) * 0.5; }
+    }
+    midpoint() {
+      const pA = points[this.a], pB = points[this.b];
+      return { x: (pA.x + pB.x) * 0.5, y: (pA.y + pB.y) * 0.5 };
+    }
+  }
+
+  let points = [];
+  let constraints = [];
+  let cols = 0, rows = 0;
+  let spacing = 12;
+  let pinCornersOnly = false;
+
+  function buildCloth() {
+    points = [];
+    constraints = [];
+
+    // Size cloth based on window
+    const clothW = Math.min(860, Math.max(520, W * 0.78));
+    const clothH = Math.min(520, Math.max(280, H * 0.55));
+    spacing = Math.max(10, Math.min(18, Math.floor(Math.min(clothW / 55, clothH / 35) * 14)));
+
+    cols = Math.floor(clothW / spacing);
+    rows = Math.floor(clothH / spacing);
+
+    const startX = (W - cols * spacing) * 0.5;
+    const startY = Math.max(18, H * 0.08);
+
+    // Points
+    for (let y = 0; y <= rows; y++) {
+      for (let x = 0; x <= cols; x++) {
+        const px = startX + x * spacing;
+        const py = startY + y * spacing;
+        const pinned = (y === 0); // top row pinned by default
+        points.push(new Point(px, py, pinned));
+      }
+    }
+
+    // Constraints (structural: horizontal + vertical)
+    const idx = (x, y) => y * (cols + 1) + x;
+
+    for (let y = 0; y <= rows; y++) {
+      for (let x = 0; x <= cols; x++) {
+        if (x < cols) {
+          const a = idx(x, y), b = idx(x + 1, y);
+          constraints.push(new Constraint(a, b, spacing));
+        }
+        if (y < rows) {
+          const a = idx(x, y), b = idx(x, y + 1);
+          constraints.push(new Constraint(a, b, spacing));
+        }
+
+        // Optional: shear constraints for nicer behavior (comment out if you want simpler)
+        if (x < cols && y < rows) {
+          const a = idx(x, y), b = idx(x + 1, y + 1);
+          constraints.push(new Constraint(a, b, Math.hypot(spacing, spacing)));
+          const c = idx(x + 1, y), d = idx(x, y + 1);
+          constraints.push(new Constraint(c, d, Math.hypot(spacing, spacing)));
+        }
+      }
+    }
+
+    applyPinMode();
+  }
+
+  function applyPinMode() {
+    // Reset pins: either whole top row or just corners
+    for (let i = 0; i < points.length; i++) {
+      points[i].pinned = false;
+    }
+    const topY = 0;
+    if (!pinCornersOnly) {
+      for (let x = 0; x <= cols; x++) {
+        const p = points[topY * (cols + 1) + x];
+        p.pinned = true;
+        p.pinX = p.x; p.pinY = p.y;
+      }
+    } else {
+      const left = points[topY * (cols + 1) + 0];
+      const right = points[topY * (cols + 1) + cols];
+      left.pinned = true; right.pinned = true;
+      left.pinX = left.x; left.pinY = left.y;
+      right.pinX = right.x; right.pinY = right.y;
+    }
+  }
+
+  // --- Interaction ---
+  const mouse = {
+    x: 0, y: 0,
+    px: 0, py: 0,
+    down: false,
+    rightDown: false,
+    shift: false,
+    grabbed: -1
+  };
+
+  function setModePill() {
+    const tearing = mouse.rightDown || (mouse.down && mouse.shift);
+    modePill.textContent = tearing ? 'TEAR' : (mouse.down ? 'DRAG' : 'DRAG');
+    modePill.style.background = tearing ? 'rgba(255, 90, 90, 0.18)' : 'rgba(255,255,255,0.10)';
+    modePill.style.borderColor = tearing ? 'rgba(255, 90, 90, 0.28)' : 'rgba(255,255,255,0.14)';
+  }
+
+  function pointerPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left),
+      y: (e.clientY - rect.top),
+    };
+  }
+
+  function nearestPoint(x, y, radius) {
+    let best = -1;
+    let bestD2 = radius * radius;
+    for (let i = 0; i < points.length; i++) {
+      const dx = points[i].x - x;
+      const dy = points[i].y - y;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < bestD2) { bestD2 = d2; best = i; }
+    }
+    return best;
+  }
+
+  // Distance from point to segment
+  function pointSegmentDist(px, py, ax, ay, bx, by) {
+    const abx = bx - ax, aby = by - ay;
+    const apx = px - ax, apy = py - ay;
+    const ab2 = abx*abx + aby*aby || 1e-9;
+    let t = (apx*abx + apy*aby) / ab2;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + abx * t;
+    const cy = ay + aby * t;
+    return Math.hypot(px - cx, py - cy);
+  }
+
+  // Slice constraints near the mouse movement segment
+  function sliceConstraints(x0, y0, x1, y1, radius) {
+    const r = radius;
+    for (let i = 0; i < constraints.length; i++) {
+      const c = constraints[i];
+      if (c.broken) continue;
+      const a = points[c.a], b = points[c.b];
+
+      // If the constraint segment is close to the slicing segment, break it.
+      // Approx: check distance from constraint midpoint to slicing segment,
+      // plus also endpoints to be a bit more forgiving.
+      const mx = (a.x + b.x) * 0.5;
+      const my = (a.y + b.y) * 0.5;
+
+      const dMid = pointSegmentDist(mx, my, x0, y0, x1, y1);
+      if (dMid <= r) { c.broken = true; continue; }
+
+      const dA = pointSegmentDist(a.x, a.y, x0, y0, x1, y1);
+      const dB = pointSegmentDist(b.x, b.y, x0, y0, x1, y1);
+      if (Math.min(dA, dB) <= r * 0.85) c.broken = true;
+    }
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    const p = pointerPos(e);
+    mouse.x = mouse.px = p.x;
+    mouse.y = mouse.py = p.y;
+    mouse.shift = e.shiftKey;
+    mouse.down = (e.button === 0);
+    mouse.rightDown = (e.button === 2);
+
+    // If left-click and not tearing (Shift not held), grab a point
+    const tearing = mouse.rightDown || (mouse.down && mouse.shift);
+    if (!tearing && mouse.down) {
+      mouse.grabbed = nearestPoint(mouse.x, mouse.y, sim.grabRadius);
+    } else {
+      mouse.grabbed = -1;
+    }
+
+    setModePill();
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('pointermove', (e) => {
+    const p = pointerPos(e);
+    mouse.px = mouse.x; mouse.py = mouse.y;
+    mouse.x = p.x; mouse.y = p.y;
+    mouse.shift = e.shiftKey;
+
+    const tearing = mouse.rightDown || (mouse.down && mouse.shift);
+
+    if (tearing) {
+      // slice along mouse path
+      sliceConstraints(mouse.px, mouse.py, mouse.x, mouse.y, sim.tearRadius);
+      mouse.grabbed = -1;
+    } else if (mouse.down && mouse.grabbed !== -1) {
+      // hard set grabbed point (feels responsive)
+      const gp = points[mouse.grabbed];
+      gp.x = mouse.x; gp.y = mouse.y;
+      // also pull previous position so it doesn't "snap back" with huge velocity
+      gp.px = mouse.x; gp.py = mouse.y;
+    }
+
+    setModePill();
+  });
+
+  canvas.addEventListener('pointerup', (e) => {
+    mouse.down = false;
+    mouse.rightDown = false;
+    mouse.grabbed = -1;
+    setModePill();
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Shift') mouse.shift = true;
+    if (e.key === 'r' || e.key === 'R') { buildCloth(); }
+    setModePill();
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'Shift') mouse.shift = false;
+    setModePill();
+  });
+
+  resetBtn.addEventListener('click', () => buildCloth());
+  pinBtn.addEventListener('click', () => {
+    pinCornersOnly = !pinCornersOnly;
+    applyPinMode();
+  });
+
+  // --- Rendering helpers ---
+  function clear() {
+    ctx.fillStyle = '#0b0f14';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function draw() {
+    clear();
+
+    // Subtle background vignette
+    const g = ctx.createRadialGradient(W*0.5, H*0.35, 40, W*0.5, H*0.5, Math.max(W,H)*0.75);
+    g.addColorStop(0, 'rgba(80,120,255,0.08)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw constraints
+    ctx.lineWidth = sim.thickness;
+    ctx.lineCap = 'round';
+
+    // Two-pass: faint then bright for depth
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    for (const c of constraints) {
+      if (c.broken) continue;
+      const a = points[c.a], b = points[c.b];
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(180, 210, 255, 0.22)';
+    ctx.beginPath();
+    for (const c of constraints) {
+      if (c.broken) continue;
+      const a = points[c.a], b = points[c.b];
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
+
+    // Draw pinned points
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (!p.pinned) continue;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.2, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // Cursor indicator
+    const tearing = mouse.rightDown || (mouse.down && mouse.shift);
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, tearing ? sim.tearRadius : sim.grabRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = tearing ? 'rgba(255,90,90,0.35)' : 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // --- Simulation loop ---
+  let lastT = performance.now();
+  function step(t) {
+    const dt = Math.min(0.033, (t - lastT) / 1000);
+    lastT = t;
+
+    // Forces and integration
+    for (let s = 0; s < sim.substeps; s++) {
+      const subDt = dt / sim.substeps;
+
+      for (const p of points) {
+        p.addForce(0, sim.gravity);
+        p.integrate(subDt);
+        p.constrainToBounds();
+      }
+
+      // Satisfy constraints
+      for (let k = 0; k < sim.constraintIters; k++) {
+        for (const c of constraints) c.satisfy();
+        for (const p of points) p.constrainToBounds();
+      }
+    }
+
+    // Stats
+    let broken = 0;
+    for (const c of constraints) if (c.broken) broken++;
+    statsEl.textContent =
+      `Points: ${points.length}   Constraints: ${constraints.length - broken}/${constraints.length}   ` +
+      `Grid: ${cols+1}×${rows+1}`;
+
+    draw();
+    requestAnimationFrame(step);
+  }
+
+  // Init
+  resize();
+  buildCloth();
+  setModePill();
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>

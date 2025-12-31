@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tearable Cloth Simulation</title>
+<style>
+  body { margin: 0; background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  canvas { background: #fff; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+</style>
+</head>
+<body>
+<canvas id="c" width="900" height="700"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const width = canvas.width;
+const height = canvas.height;
+
+const cols = 45;
+const rows = 35;
+const spacing = 14;
+const startX = (width - (cols - 1) * spacing) / 2;
+const startY = 60;
+
+const gravity = 0.25;
+const damping = 0.98;
+const iterations = 40;
+const grabRadius = 40;
+const cutThickness = 10; // not used directly, but intersection detects slice
+
+class Point {
+  constructor(x, y) {
+    this.x = this.oldx = x;
+    this.y = this.oldy = y;
+    this.pinned = false;
+  }
+}
+
+class Constraint {
+  constructor(p1, p2, length) {
+    this.p1 = p1;
+    this.p2 = p2;
+    this.length = length || Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  }
+}
+
+// Create points
+const points = [];
+for (let i = 0; i < rows; i++) {
+  points[i] = [];
+  for (let j = 0; j < cols; j++) {
+    points[i][j] = new Point(startX + j * spacing, startY + i * spacing);
+  }
+}
+
+// Pin top-left and top-right corners
+points[0][0].pinned = true;
+points[0][cols - 1].pinned = true;
+
+// Create constraints (horizontal, vertical, both diagonals)
+const constraints = [];
+for (let i = 0; i < rows; i++) {
+  for (let j = 0; j < cols; j++) {
+    if (j < cols - 1) constraints.push(new Constraint(points[i][j], points[i][j + 1]));
+    if (i < rows - 1) constraints.push(new Constraint(points[i][j], points[i + 1][j]));
+    if (i < rows - 1 && j < cols - 1) {
+      constraints.push(new Constraint(points[i][j], points[i + 1][j + 1], spacing * Math.sqrt(2)));
+      constraints.push(new Constraint(points[i][j + 1], points[i + 1][j], spacing * Math.sqrt(2)));
+    }
+  }
+}
+
+// Mouse state
+const mouse = { x: 0, y: 0 };
+let grabbedPoint = null;
+let offsetX = 0, offsetY = 0;
+let isCutting = false;
+let lastCutX = 0, lastCutY = 0;
+let shiftHeld = false;
+
+// Line segment intersection
+function doIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
+  function orient(px, py, qx, qy, rx, ry) {
+    const val = (qy - py) * (rx - qx) - (qx - px) * (ry - qy);
+    if (val === 0) return 0;
+    return val > 0 ? 1 : 2;
+  }
+  const o1 = orient(ax, ay, bx, by, cx, cy);
+  const o2 = orient(ax, ay, bx, by, dx, dy);
+  const o3 = orient(cx, cy, dx, dy, ax, ay);
+  const o4 = orient(cx, cy, dx, dy, bx, by);
+  return o1 !== o2 && o3 !== o4;
+}
+
+// Events
+window.addEventListener('keydown', e => { if (e.key === 'Shift') shiftHeld = true; });
+window.addEventListener('keyup', e => { if (e.key === 'Shift') shiftHeld = false; });
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+
+  if (grabbedPoint) {
+    grabbedPoint.x = mouse.x + offsetX;
+    grabbedPoint.y = mouse.y + offsetY;
+    grabbedPoint.oldx = grabbedPoint.x;
+    grabbedPoint.oldy = grabbedPoint.y;
+  }
+
+  if (isCutting) {
+    if (Math.hypot(mouse.x - lastCutX, mouse.y - lastCutY) > 2) { // avoid tiny moves
+      for (let i = constraints.length - 1; i >= 0; i--) {
+        const c = constraints[i];
+        if (doIntersect(lastCutX, lastCutY, mouse.x, mouse.y, c.p1.x, c.p1.y, c.p2.x, c.p2.y)) {
+          constraints.splice(i, 1);
+        }
+      }
+      lastCutX = mouse.x;
+      lastCutY = mouse.y;
+    }
+  }
+});
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+
+  if (e.button === 2) { // right click
+    e.preventDefault();
+    isCutting = true;
+    lastCutX = mouse.x;
+    lastCutY = mouse.y;
+  } else if (e.button === 0) { // left click
+    if (shiftHeld) {
+      isCutting = true;
+      lastCutX = mouse.x;
+      lastCutY = mouse.y;
+    } else {
+      // Grab nearest point
+      let closest = null;
+      let minDist = grabRadius;
+      for (let row of points) {
+        for (let p of row) {
+          const d = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+          if (d < minDist) {
+            minDist = d;
+            closest = p;
+          }
+        }
+      }
+      if (closest) {
+        grabbedPoint = closest;
+        offsetX = closest.x - mouse.x;
+        offsetY = closest.y - mouse.y;
+        closest.oldx = closest.x;
+        closest.oldy = closest.y;
+      }
+    }
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  grabbedPoint = null;
+  isCutting = false;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  grabbedPoint = null;
+  isCutting = false;
+});
+
+canvas.oncontextmenu = e => e.preventDefault();
+
+// Physics update
+function update() {
+  // Apply gravity and damping
+  for (let row of points) {
+    for (let p of row) {
+      if (!p.pinned) {
+        const vx = (p.x - p.oldx) * damping;
+        const vy = (p.y - p.oldy) * damping;
+        p.oldx = p.x;
+        p.oldy = p.y;
+        p.x += vx;
+        p.y += vy + gravity;
+      }
+    }
+  }
+
+  // Satisfy constraints
+  for (let it = 0; it < iterations; it++) {
+    for (let c of constraints) {
+      const dx = c.p2.x - c.p1.x;
+      const dy = c.p2.y - c.p1.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > c.length) {
+        const diff = (dist - c.length) / dist;
+        const ox = dx * diff * 0.5;
+        const oy = dy * diff * 0.5;
+        if (!c.p1.pinned) {
+          c.p1.x += ox;
+          c.p1.y += oy;
+        }
+        if (!c.p2.pinned) {
+          c.p2.x -= ox;
+          c.p2.y -= oy;
+        }
+      }
+    }
+  }
+}
+
+// Render
+function render() {
+  ctx.clearRect(0, 0, width, height);
+
+  // Draw constraints
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  for (let c of constraints) {
+    ctx.beginPath();
+    ctx.moveTo(c.p1.x, c.p1.y);
+    ctx.lineTo(c.p2.x, c.p2.y);
+    ctx.stroke();
+  }
+
+  // Draw points
+  for (let row of points) {
+    for (let p of row) {
+      ctx.fillStyle = p.pinned ? '#d44' : '#000';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.pinned ? 5 : 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Draw cutting line (visual feedback)
+  if (isCutting) {
+    ctx.strokeStyle = '#f00';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.moveTo(lastCutX, lastCutY);
+    ctx.lineTo(mouse.x, mouse.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// Main loop
+function loop() {
+  update();
+  render();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

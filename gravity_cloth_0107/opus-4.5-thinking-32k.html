@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tearable Cloth Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            overflow: hidden;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        canvas {
+            display: block;
+            cursor: grab;
+        }
+        
+        canvas:active {
+            cursor: grabbing;
+        }
+        
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 280px;
+            z-index: 100;
+        }
+        
+        .controls h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #88ccff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .controls p {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0.9;
+        }
+        
+        .controls .emoji {
+            font-size: 16px;
+        }
+        
+        .controls hr {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 15px 0;
+        }
+        
+        .slider-group {
+            margin: 12px 0;
+        }
+        
+        .slider-group label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        
+        .slider-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #88ccff;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 10px 20px;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+            margin-top: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #88ccff;
+        }
+        
+        .stats {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 13px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .cutting-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 68, 68, 0.9);
+            padding: 10px 25px;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        
+        .cutting-indicator.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div class="controls">
+        <h2>🧵 Tearable Cloth</h2>
+        <p><span class="emoji">🖱️</span> Left-click + drag to pull</p>
+        <p><span class="emoji">✂️</span> Right-click or Shift to cut</p>
+        <p><span class="emoji">🔄</span> Press R to reset</p>
+        
+        <hr>
+        
+        <div class="slider-group">
+            <label>Gravity <span id="gravityVal">0.5</span></label>
+            <input type="range" id="gravity" min="0" max="2" step="0.1" value="0.5">
+        </div>
+        
+        <div class="slider-group">
+            <label>Wind <span id="windVal">0</span></label>
+            <input type="range" id="wind" min="-1" max="1" step="0.1" value="0">
+        </div>
+        
+        <div class="slider-group">
+            <label>Tear Resistance <span id="tearVal">2.5</span></label>
+            <input type="range" id="tear" min="1.5" max="5" step="0.1" value="2.5">
+        </div>
+        
+        <div class="checkbox-group">
+            <input type="checkbox" id="showPoints">
+            <label for="showPoints">Show Points</label>
+        </div>
+        
+        <div class="checkbox-group">
+            <input type="checkbox" id="colorMode" checked>
+            <label for="colorMode">Strain Colors</label>
+        </div>
+        
+        <button class="btn" onclick="resetCloth()">Reset Cloth</button>
+    </div>
+    
+    <div class="stats">
+        <div>Points: <span id="pointCount">0</span></div>
+        <div>Constraints: <span id="constraintCount">0</span></div>
+        <div>FPS: <span id="fps">0</span></div>
+    </div>
+    
+    <div class="cutting-indicator" id="cuttingIndicator">✂️ CUTTING MODE</div>
+
+    <script>
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            clothWidth: 70,
+            clothHeight: 40,
+            spacing: 10,
+            gravity: 0.5,
+            wind: 0,
+            friction: 0.98,
+            bounce: 0.3,
+            tearDistance: 2.5,
+            constraintIterations: 5,
+            renderPoints: false,
+            strainColors: true,
+            pointRadius: 3,
+            mouseInfluence: 40,
+            cutRadius: 12
+        };
+
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            resetCloth();
+        });
+
+        // ============================================
+        // POINT CLASS (Particle)
+        // ============================================
+        class Point {
+            constructor(x, y, pinned = false) {
+                this.x = x;
+                this.y = y;
+                this.prevX = x;
+                this.prevY = y;
+                this.pinned = pinned;
+                this.mass = 1;
+            }
+
+            update(deltaTime) {
+                if (this.pinned) return;
+
+                // Verlet integration
+                const velocityX = (this.x - this.prevX) * CONFIG.friction;
+                const velocityY = (this.y - this.prevY) * CONFIG.friction;
+
+                this.prevX = this.x;
+                this.prevY = this.y;
+
+                // Apply forces
+                this.x += velocityX + CONFIG.wind * Math.random();
+                this.y += velocityY + CONFIG.gravity;
+
+                // Boundary constraints
+                this.constrainToBounds();
+            }
+
+            constrainToBounds() {
+                const velocityX = (this.x - this.prevX) * CONFIG.bounce;
+                const velocityY = (this.y - this.prevY) * CONFIG.bounce;
+
+                if (this.x < 0) {
+                    this.x = 0;
+                    this.prevX = this.x + velocityX;
+                } else if (this.x > canvas.width) {
+                    this.x = canvas.width;
+                    this.prevX = this.x + velocityX;
+                }
+
+                if (this.y < 0) {
+                    this.y = 0;
+                    this.prevY = this.y + velocityY;
+                } else if (this.y > canvas.height) {
+                    this.y = canvas.height;
+                    this.prevY = this.y + velocityY;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, CONFIG.pointRadius, 0, Math.PI * 2);
+                ctx.fillStyle = this.pinned ? '#ff6b6b' : '#4ecdc4';
+                ctx.fill();
+            }
+        }
+
+        // ============================================
+        // CONSTRAINT CLASS (Spring)
+        // ============================================
+        class Constraint {
+            constructor(pointA, pointB) {
+                this.pointA = pointA;
+                this.pointB = pointB;
+                this.restLength = this.getDistance();
+                this.active = true;
+                this.stiffness = 1;
+            }
+
+            getDistance() {
+                const dx = this.pointB.x - this.pointA.x;
+                const dy = this.pointB.y - this.pointA.y;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            solve() {
+                if (!this.active) return;
+
+                const dx = this.pointB.x - this.pointA.x;
+                const dy = this.pointB.y - this.pointA.y;
+                const currentDistance = Math.sqrt(dx * dx + dy * dy);
+
+                // Check for tearing
+                if (currentDistance > this.restLength * CONFIG.tearDistance) {
+                    this.active = false;
+                    return;
+                }
+
+                // Satisfy constraint
+                const difference = (this.restLength - currentDistance) / currentDistance;
+                const translateX = dx * 0.5 * difference * this.stiffness;
+                const translateY = dy * 0.5 * difference * this.stiffness;
+
+                if (!this.pointA.pinned) {
+                    this.pointA.x -= translateX;
+                    this.pointA.y -= translateY;
+                }
+                if (!this.pointB.pinned) {
+                    this.pointB.x += translateX;
+                    this.pointB.y += translateY;
+                }
+            }
+
+            draw() {
+                if (!this.active) return;
+
+                const strain = this.getDistance() / this.restLength;
+                let color;
+                let lineWidth = 1;
+
+                if (CONFIG.strainColors) {
+                    if (strain > 2.0) {
+                        color = '#ff0000';
+                        lineWidth = 2;
+                    } else if (strain > 1.5) {
+                        color = '#ff4444';
+                        lineWidth = 1.5;
+                    } else if (strain > 1.2) {
+                        color = '#ffaa44';
+                    } else if (strain > 1.0) {
+                        color = '#88ddff';
+                    } else {
+                        color = '#66bbff';
+                    }
+                } else {
+                    // Gradient based on position
+                    const avgY = (this.pointA.y + this.pointB.y) / 2;
+                    const t = avgY / canvas.height;
+                    const r = Math.floor(100 + t * 100);
+                    const g = Math.floor(150 + t * 50);
+                    const b = Math.floor(255 - t * 50);
+                    color = `rgb(${r}, ${g}, ${b})`;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(this.pointA.x, this.pointA.y);
+                ctx.lineTo(this.pointB.x, this.pointB.y);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lineWidth;
+                ctx.stroke();
+            }
+        }
+
+        // ============================================
+        // CLOTH CLASS
+        // ============================================
+        class Cloth {
+            constructor() {
+                this.points = [];
+                this.constraints = [];
+                this.initialize();
+            }
+
+            initialize() {
+                const startX = (canvas.width - (CONFIG.clothWidth - 1) * CONFIG.spacing) / 2;
+                const startY = 40;
+
+                // Create points grid
+                for (let y = 0; y < CONFIG.clothHeight; y++) {
+                    for (let x = 0; x < CONFIG.clothWidth; x++) {
+                        // Pin every few points on top row
+                        const pinned = y === 0 && x % 4 === 0;
+                        const point = new Point(
+                            startX + x * CONFIG.spacing,
+                            startY + y * CONFIG.spacing,
+                            pinned
+                        );
+                        this.points.push(point);
+                    }
+                }
+
+                // Create constraints (connections)
+                for (let y = 0; y < CONFIG.clothHeight; y++) {
+                    for (let x = 0; x < CONFIG.clothWidth; x++) {
+                        const index = y * CONFIG.clothWidth + x;
+
+                        // Horizontal constraint
+                        if (x < CONFIG.clothWidth - 1) {
+                            this.constraints.push(new Constraint(
+                                this.points[index],
+                                this.points[index + 1]
+                            ));
+                        }
+
+                        // Vertical constraint
+                        if (y < CONFIG.clothHeight - 1) {
+                            this.constraints.push(new Constraint(
+                                this.points[index],
+                                this.points[index + CONFIG.clothWidth]
+                            ));
+                        }
+                    }
+                }
+            }
+
+            update() {
+                // Update all points
+                for (const point of this.points) {
+                    point.update();
+                }
+
+                // Solve constraints multiple times for stability
+                for (let i = 0; i < CONFIG.constraintIterations; i++) {
+                    for (const constraint of this.constraints) {
+                        constraint.solve();
+                    }
+                }
+            }
+
+            draw() {
+                // Draw constraints (lines)
+                for (const constraint of this.constraints) {
+                    constraint.draw();
+                }
+
+                // Draw points if enabled
+                if (CONFIG.renderPoints) {
+                    for (const point of this.points) {
+                        point.draw();
+                    }
+                }
+            }
+
+            cut(x, y, prevX, prevY) {
+                for (const constraint of this.constraints) {
+                    if (!constraint.active) continue;
+
+                    // Line segment intersection or proximity check
+                    if (this.lineIntersectsConstraint(x, y, prevX, prevY, constraint)) {
+                        constraint.active = false;
+                    }
+                }
+            }
+
+            lineIntersectsConstraint(x1, y1, x2, y2, constraint) {
+                // Check if cutting line intersects or is close to constraint
+                const dist = this.lineToLineDistance(
+                    x1, y1, x2, y2,
+                    constraint.pointA.x, constraint.pointA.y,
+                    constraint.pointB.x, constraint.pointB.y
+                );
+                return dist < CONFIG.cutRadius;
+            }
+
+            lineToLineDistance(x1, y1, x2, y2, x3, y3, x4, y4) {
+                // Simplified: check midpoint of cutting line to constraint
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
+                return this.pointToSegmentDistance(midX, midY, x3, y3, x4, y4);
+            }
+
+            pointToSegmentDistance(px, py, x1, y1, x2, y2) {
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const lengthSquared = dx * dx + dy * dy;
+                
+                if (lengthSquared === 0) {
+                    return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+                }
+
+                let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
+                t = Math.max(0, Math.min(1, t));
+
+                const nearestX = x1 + t * dx;
+                const nearestY = y1 + t * dy;
+
+                return Math.sqrt((px - nearestX) ** 2 + (py - nearestY) ** 2);
+            }
+
+            getActiveConstraintCount() {
+                return this.constraints.filter(c => c.active).length;
+            }
+        }
+
+        // ============================================
+        // MOUSE HANDLING
+        // ============================================
+        const mouse = {
+            x: 0,
+            y: 0,
+            prevX: 0,
+            prevY: 0,
+            isDown: false,
+            isCutting: false,
+            dragPoint: null
+        };
+
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            mouse.isDown = true;
+            mouse.isCutting = e.button === 2 || e.shiftKey;
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            mouse.prevX = mouse.x;
+            mouse.prevY = mouse.y;
+
+            updateCuttingIndicator();
+
+            if (!mouse.isCutting) {
+                findDragPoint();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            mouse.prevX = mouse.x;
+            mouse.prevY = mouse.y;
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+
+            if (mouse.isDown) {
+                if (mouse.isCutting || e.shiftKey) {
+                    mouse.isCutting = true;
+                    updateCuttingIndicator();
+                    cloth.cut(mouse.x, mouse.y, mouse.prevX, mouse.prevY);
+                } else if (mouse.dragPoint) {
+                    applyDragForce();
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            mouse.isDown = false;
+            mouse.isCutting = false;
+            mouse.dragPoint = null;
+            updateCuttingIndicator();
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            mouse.isDown = false;
+            mouse.dragPoint = null;
+            updateCuttingIndicator();
+        });
+
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            mouse.isDown = true;
+            mouse.isCutting = e.touches.length > 1;
+            mouse.x = touch.clientX;
+            mouse.y = touch.clientY;
+            mouse.prevX = mouse.x;
+            mouse.prevY = mouse.y;
+
+            updateCuttingIndicator();
+
+            if (!mouse.isCutting) {
+                findDragPoint();
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            mouse.prevX = mouse.x;
+            mouse.prevY = mouse.y;
+            mouse.x = touch.clientX;
+            mouse.y = touch.clientY;
+
+            if (e.touches.length > 1) {
+                mouse.isCutting = true;
+                updateCuttingIndicator();
+            }
+
+            if (mouse.isDown) {
+                if (mouse.isCutting) {
+                    cloth.cut(mouse.x, mouse.y, mouse.prevX, mouse.prevY);
+                } else if (mouse.dragPoint) {
+                    applyDragForce();
+                }
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            mouse.isDown = false;
+            mouse.isCutting = false;
+            mouse.dragPoint = null;
+            updateCuttingIndicator();
+        });
+
+        function findDragPoint() {
+            let closestPoint = null;
+            let minDistance = CONFIG.mouseInfluence;
+
+            for (const point of cloth.points) {
+                if (point.pinned) continue;
+                
+                const dx = point.x - mouse.x;
+                const dy = point.y - mouse.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPoint = point;
+                }
+            }
+
+            mouse.dragPoint = closestPoint;
+        }
+
+        function applyDragForce() {
+            if (!mouse.dragPoint) return;
+
+            mouse.dragPoint.prevX = mouse.dragPoint.x;
+            mouse.dragPoint.prevY = mouse.dragPoint.y;
+            mouse.dragPoint.x = mouse.x;
+            mouse.dragPoint.y = mouse.y;
+        }
+
+        function updateCuttingIndicator() {
+            const indicator = document.getElementById('cuttingIndicator');
+            if (mouse.isCutting && mouse.isDown) {
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
+        }
+
+        // ============================================
+        // UI CONTROLS
+        // ============================================
+        document.getElementById('gravity').addEventListener('input', (e) => {
+            CONFIG.gravity = parseFloat(e.target.value);
+            document.getElementById('gravityVal').textContent = CONFIG.gravity.toFixed(1);
+        });
+
+        document.getElementById('wind').addEventListener('input', (e) => {
+            CONFIG.wind = parseFloat(e.target.value);
+            document.getElementById('windVal').textContent = CONFIG.wind.toFixed(1);
+        });
+
+        document.getElementById('tear').addEventListener('input', (e) => {
+            CONFIG.tearDistance = parseFloat(e.target.value);
+            document.getElementById('tearVal').textContent = CONFIG.tearDistance.toFixed(1);
+        });
+
+        document.getElementById('showPoints').addEventListener('change', (e) => {
+            CONFIG.renderPoints = e.target.checked;
+        });
+
+        document.getElementById('colorMode').addEventListener('change', (e) => {
+            CONFIG.strainColors = e.target.checked;
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'r') {
+                resetCloth();
+            }
+            if (e.key === 'Shift') {
+                mouse.isCutting = true;
+                updateCuttingIndicator();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'Shift' && !mouse.isDown) {
+                mouse.isCutting = false;
+                updateCuttingIndicator();
+            }
+        });
+
+        // ============================================
+        // SIMULATION
+        // ============================================
+        let cloth = new Cloth();
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fps = 0;
+
+        function resetCloth() {
+            cloth = new Cloth();
+        }
+
+        function updateStats() {
+            document.getElementById('pointCount').textContent = cloth.points.length;
+            document.getElementById('constraintCount').textContent = cloth.getActiveConstraintCount();
+            document.getElementById('fps').textContent = fps;
+        }
+
+        function animate(currentTime) {
+            // Calculate FPS
+            frameCount++;
+            if (currentTime - lastTime >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                lastTime = currentTime;
+                updateStats();
+            }
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw cloth
+            cloth.update();
+            cloth.draw();
+
+            // Draw mouse cursor effect when dragging
+            if (mouse.isDown && !mouse.isCutting) {
+                ctx.beginPath();
+                ctx.arc(mouse.x, mouse.y, CONFIG.mouseInfluence, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(136, 204, 255, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Draw cutting cursor
+            if (mouse.isCutting && mouse.isDown) {
+                ctx.beginPath();
+                ctx.arc(mouse.x, mouse.y, CONFIG.cutRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 68, 68, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Cutting trail
+                ctx.beginPath();
+                ctx.moveTo(mouse.prevX, mouse.prevY);
+                ctx.lineTo(mouse.x, mouse.y);
+                ctx.strokeStyle = 'rgba(255, 68, 68, 0.5)';
+                ctx.lineWidth = CONFIG.cutRadius * 2;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Start animation
+        animate(performance.now());
+        updateStats();
+    </script>
+</body>
+</html>

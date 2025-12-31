@@ -40,6 +40,8 @@ X (Twitter) posts showcasing the experiments:
 
 **Rocket Launch:** https://x.com/diegocabezas01/status/2004908584656617578?s=20
 
+**New Year's Eve:** https://x.com/diegocabezas01/status/2006340874104353078?s=20
+
 
 ---
 
