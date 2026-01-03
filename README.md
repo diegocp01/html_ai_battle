@@ -42,6 +42,8 @@ X (Twitter) posts showcasing the experiments:
 
 **New Year's Eve:** https://x.com/diegocabezas01/status/2006340874104353078?s=20
 
+**Dog Fetch:** https://x.com/diegocabezas01/status/2007439963172831693?s=20
+
 
 ---
 
