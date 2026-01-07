@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pirate Ship Sailing Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        let time = 0;
+
+        function drawWave(amp, freq, speed, alpha, phaseOffset = 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            const baseY = canvas.height * 0.65;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height);
+            ctx.lineTo(0, baseY + amp * Math.sin(phaseOffset));
+            for (let x = 0; x <= canvas.width; x += 4) {
+                const y = baseY + amp * Math.sin(x * freq + time * speed + phaseOffset);
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawCloud(baseX, y, speed) {
+            let x = (baseX + time * speed) % (canvas.width + 400) - 200;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.beginPath();
+            ctx.arc(x, y, 30, 0, Math.PI * 2);
+            ctx.arc(x + 35, y, 40, 0, Math.PI * 2);
+            ctx.arc(x + 70, y, 30, 0, Math.PI * 2);
+            ctx.arc(x + 35, y - 20, 35, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawSun() {
+            const x = canvas.width * 0.8;
+            const y = canvas.height * 0.15;
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(x, y, 60, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#FFAA00';
+            ctx.lineWidth = 8;
+            for (let i = 0; i < 12; i++) {
+                const angle = i * Math.PI / 6;
+                ctx.beginPath();
+                ctx.moveTo(x + Math.cos(angle) * 70, y + Math.sin(angle) * 70);
+                ctx.lineTo(x + Math.cos(angle) * 100, y + Math.sin(angle) * 100);
+                ctx.stroke();
+            }
+        }
+
+        function drawPirateShip(x, y) {
+            // Hull
+            ctx.fillStyle = '#654321';
+            ctx.beginPath();
+            ctx.moveTo(x - 80, y + 10);
+            ctx.quadraticCurveTo(x - 100, y + 30, x - 80, y + 50);
+            ctx.lineTo(x + 80, y + 50);
+            ctx.quadraticCurveTo(x + 100, y + 30, x + 80, y + 10);
+            ctx.closePath();
+            ctx.fill();
+
+            // Deck
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(x - 70, y, 140, 15);
+
+            // Mast
+            ctx.fillStyle = '#4B2F1A';
+            ctx.fillRect(x - 8, y - 160, 16, 170);
+
+            // Main sail
+            ctx.fillStyle = '#F8F8F8';
+            ctx.beginPath();
+            ctx.moveTo(x, y - 150);
+            ctx.lineTo(x - 70, y - 70);
+            ctx.lineTo(x, y - 50);
+            ctx.lineTo(x + 70, y - 70);
+            ctx.closePath();
+            ctx.fill();
+
+            // Top sail
+            ctx.beginPath();
+            ctx.moveTo(x, y - 160);
+            ctx.lineTo(x - 40, y - 120);
+            ctx.lineTo(x, y - 110);
+            ctx.lineTo(x + 40, y - 120);
+            ctx.closePath();
+            ctx.fill();
+
+            // Pirate flag
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(x - 35, y - 190, 70, 45);
+
+            // Skull
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(x, y - 167, 15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(x - 7, y - 170, 5, 0, Math.PI * 2);
+            ctx.arc(x + 7, y - 170, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Crossbones
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(x - 18, y - 160);
+            ctx.lineTo(x + 18, y - 175);
+            ctx.moveTo(x + 18, y - 160);
+            ctx.lineTo(x - 18, y - 175);
+            ctx.stroke();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Sky
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.6);
+            skyGrad.addColorStop(0, '#87CEEB');
+            skyGrad.addColorStop(1, '#B0E0E6');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height * 0.6);
+
+            // Ocean base
+            const oceanGrad = ctx.createLinearGradient(0, canvas.height * 0.6, 0, canvas.height);
+            oceanGrad.addColorStop(0, '#4682B4');
+            oceanGrad.addColorStop(1, '#191970');
+            ctx.fillStyle = oceanGrad;
+            ctx.fillRect(0, canvas.height * 0.6, canvas.width, canvas.height * 0.4);
+
+            // Waves (back to front)
+            drawWave(50, 0.008, -0.02, 0.15, 0);
+            drawWave(35, 0.012, -0.04, 0.25, Math.PI / 2);
+            drawWave(20, 0.018, -0.06, 0.35, Math.PI);
+
+            // Clouds
+            drawCloud(100, 100, 0.1);
+            drawCloud(500, 150, 0.15);
+            drawCloud(900, 80, 0.08);
+
+            // Sun
+            drawSun();
+
+            // Ship
+            const shipSpeed = 0.8;
+            let shipX = (time * shipSpeed) % (canvas.width + 400) - 200;
+            const waveInfluence = 30 * Math.sin(shipX * 0.012 + time * -0.04);
+            let shipY = canvas.height * 0.65 + waveInfluence - 20;
+            const rockAngle = Math.sin(time * 0.08 + shipX * 0.01) * 8; // degrees
+
+            ctx.save();
+            ctx.translate(shipX, shipY);
+            ctx.rotate(rockAngle * Math.PI / 180);
+            drawPirateShip(0, 0);
+            ctx.restore();
+
+            time += 1;
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

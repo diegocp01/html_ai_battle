@@ -1,0 +1,974 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pirate Ship Ocean Sail (Single File)</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #05070c;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      user-select: none;
+    }
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    .hud {
+      position: fixed;
+      left: 14px;
+      top: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.35);
+      color: rgba(255,255,255,0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      line-height: 1.25;
+      font-size: 13px;
+      max-width: min(460px, calc(100vw - 28px));
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    .hud b { font-weight: 700; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+    .pill {
+      border: 1px solid rgba(255,255,255,0.18);
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      white-space: nowrap;
+    }
+    .bar {
+      width: 120px; height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      overflow: hidden;
+      position: relative;
+    }
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 50%;
+      background: rgba(255,255,255,0.75);
+      border-radius: 999px;
+    }
+    .hint {
+      opacity: 0.9;
+      margin-top: 8px;
+    }
+    .corner {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.28);
+      color: rgba(255,255,255,0.86);
+      font-size: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .corner kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+    }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud" id="hud">
+  <div><b>Pirate Ship Ocean Sail</b></div>
+  <div class="hint">
+    Steer, trim sails, and ride procedural swells. Toggle storm for lightning and rougher seas.
+  </div>
+  <div class="row" style="margin-top:10px;">
+    <span class="pill">Speed <span class="bar"><i id="barSpeed"></i></span></span>
+    <span class="pill">Sail <span class="bar"><i id="barSail"></i></span></span>
+    <span class="pill">Storm <b id="stormLabel">OFF</b></span>
+  </div>
+  <div class="hint" style="margin-top:10px;">
+    <b>Controls:</b> A/D steer, W/S sails, T storm, R reset, Space boost (short), Mouse drag to steer
+  </div>
+</div>
+
+<div class="corner">
+  Tip: Hold <kbd>Space</kbd> to catch gusts. Press <kbd>T</kbd> for storm.
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d", { alpha: false });
+
+  const barSpeed = document.getElementById("barSpeed");
+  const barSail  = document.getElementById("barSail");
+  const stormLabel = document.getElementById("stormLabel");
+
+  // ---------- Utilities ----------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smoothstep = (t) => t * t * (3 - 2 * t);
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  // Tiny hash noise (stable-ish)
+  function hash2(x, y) {
+    let n = (x * 374761393 + y * 668265263) | 0;
+    n = (n ^ (n >>> 13)) | 0;
+    n = (n * 1274126177) | 0;
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+  }
+
+  // Sum-of-sines wave field, "worldX/worldZ" are in arbitrary units
+  function waveHeight(wx, wz, t, seaState) {
+    // seaState in [0..1]
+    const a0 = lerp(0.55, 1.05, seaState);
+    const a1 = lerp(0.30, 0.75, seaState);
+    const a2 = lerp(0.18, 0.52, seaState);
+    const a3 = lerp(0.10, 0.35, seaState);
+
+    // Different directions and wavelengths
+    const h =
+      Math.sin(wx * 0.85 + wz * 0.70 + t * 1.10) * a0 +
+      Math.sin(wx * 1.35 - wz * 0.55 + t * 1.45) * a1 +
+      Math.sin(wx * 0.40 + wz * 1.10 + t * 0.95) * a2 +
+      Math.sin(wx * 2.10 + wz * 0.25 + t * 1.85) * a3;
+
+    // Add a little choppiness
+    const chop = Math.sin(wx * 3.7 + wz * 2.2 + t * 2.4) * lerp(0.05, 0.16, seaState);
+    return h + chop;
+  }
+
+  function waveNormal(wx, wz, t, seaState) {
+    // Finite difference gradients for roll/pitch cues
+    const e = 0.08;
+    const h  = waveHeight(wx, wz, t, seaState);
+    const hx = waveHeight(wx + e, wz, t, seaState);
+    const hz = waveHeight(wx, wz + e, t, seaState);
+    return { h, dx: (hx - h) / e, dz: (hz - h) / e };
+  }
+
+  // ---------- State ----------
+  const state = {
+    t: 0,
+    dt: 0,
+    w: 0,
+    h: 0,
+    dpr: 1,
+
+    // Ship
+    shipX: 0,        // world lateral
+    shipZ: 0,        // world forward (camera follows, so mostly 0)
+    heading: 0,      // radians
+    yawVel: 0,
+    speed: 0.85,     // base forward speed
+    sail: 0.75,      // 0..1
+    boost: 0,        // 0..1 short gust
+    storm: false,
+    seaState: 0.22,  // calm baseline, storm increases it
+
+    // Wind
+    windAngle: -0.35,    // radians, direction relative to +Z
+    windSpeed: 1.00,     // magnitude
+    gustTimer: 0,
+
+    // Input
+    left: false,
+    right: false,
+    up: false,
+    down: false,
+    space: false,
+    dragging: false,
+    dragX: 0,
+    dragPrevX: 0,
+
+    // Spray particles
+    spray: [],
+    lightning: { active: false, timer: 0, flash: 0, next: 2.5 },
+    clouds: []
+  };
+
+  function resize() {
+    state.dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    state.w = Math.floor(window.innerWidth * state.dpr);
+    state.h = Math.floor(window.innerHeight * state.dpr);
+    canvas.width = state.w;
+    canvas.height = state.h;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(1, 1);
+  }
+  window.addEventListener("resize", resize);
+
+  // ---------- Input ----------
+  window.addEventListener("keydown", (e) => {
+    const k = e.key.toLowerCase();
+    if (k === "a" || e.key === "ArrowLeft") state.left = true;
+    if (k === "d" || e.key === "ArrowRight") state.right = true;
+    if (k === "w" || e.key === "ArrowUp") state.up = true;
+    if (k === "s" || e.key === "ArrowDown") state.down = true;
+    if (e.code === "Space") state.space = true;
+
+    if (k === "t") state.storm = !state.storm;
+    if (k === "r") hardReset();
+
+    // Prevent page scrolling with arrows/space
+    if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space"].includes(e.code)) e.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener("keyup", (e) => {
+    const k = e.key.toLowerCase();
+    if (k === "a" || e.key === "ArrowLeft") state.left = false;
+    if (k === "d" || e.key === "ArrowRight") state.right = false;
+    if (k === "w" || e.key === "ArrowUp") state.up = false;
+    if (k === "s" || e.key === "ArrowDown") state.down = false;
+    if (e.code === "Space") state.space = false;
+  });
+
+  canvas.addEventListener("pointerdown", (e) => {
+    state.dragging = true;
+    state.dragX = e.clientX;
+    state.dragPrevX = e.clientX;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!state.dragging) return;
+    state.dragPrevX = state.dragX;
+    state.dragX = e.clientX;
+  });
+  canvas.addEventListener("pointerup", () => state.dragging = false);
+  canvas.addEventListener("pointercancel", () => state.dragging = false);
+
+  function hardReset() {
+    state.heading = 0;
+    state.yawVel = 0;
+    state.shipX = 0;
+    state.sail = 0.75;
+    state.speed = 0.85;
+    state.boost = 0;
+    state.seaState = 0.22;
+    state.storm = false;
+    state.spray.length = 0;
+  }
+
+  // ---------- Atmosphere ----------
+  function initClouds() {
+    state.clouds = [];
+    for (let i = 0; i < 24; i++) {
+      state.clouds.push({
+        x: rand(-0.2, 1.2),
+        y: rand(0.02, 0.28),
+        s: rand(0.4, 1.2),
+        a: rand(0.12, 0.28),
+        vx: rand(-0.012, 0.012),
+      });
+    }
+  }
+
+  // ---------- Ocean Rendering ----------
+  function drawSky(horizonY, t) {
+    const W = state.w, H = state.h;
+
+    // Day-night-ish tint drift
+    const day = 0.5 + 0.5 * Math.sin(t * 0.03);
+    const stormTint = state.storm ? 0.35 : 0.0;
+
+    const top = `rgb(${Math.floor(10 + 35*day - 10*stormTint)},
+                     ${Math.floor(25 + 55*day - 18*stormTint)},
+                     ${Math.floor(55 + 90*day - 30*stormTint)})`;
+    const mid = `rgb(${Math.floor(10 + 22*day - 12*stormTint)},
+                     ${Math.floor(18 + 35*day - 18*stormTint)},
+                     ${Math.floor(38 + 62*day - 22*stormTint)})`;
+    const near = `rgb(${Math.floor(8 + 10*day - 10*stormTint)},
+                      ${Math.floor(10 + 14*day - 12*stormTint)},
+                      ${Math.floor(18 + 20*day - 12*stormTint)})`;
+
+    const g = ctx.createLinearGradient(0, 0, 0, horizonY);
+    g.addColorStop(0, top);
+    g.addColorStop(0.7, mid);
+    g.addColorStop(1, near);
+
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, horizonY);
+
+    // Sun/moon glow near horizon
+    const cx = W * (0.62 + 0.10 * Math.sin(t * 0.02));
+    const cy = horizonY * (0.55 + 0.12 * Math.sin(t * 0.017));
+    ctx.save();
+    ctx.globalAlpha = state.storm ? 0.10 : 0.22;
+    const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.24);
+    rg.addColorStop(0, "rgba(255,255,255,0.65)");
+    rg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.arc(cx, cy, W * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Clouds (simple soft blobs)
+    ctx.save();
+    for (const c of state.clouds) {
+      const x = (c.x + (t * c.vx)) % 1.4 - 0.2;
+      const y = c.y;
+      const px = x * W;
+      const py = y * horizonY;
+      const r = W * 0.06 * c.s;
+
+      ctx.globalAlpha = (state.storm ? 0.22 : 0.32) * c.a;
+      const cg = ctx.createRadialGradient(px, py, 0, px, py, r);
+      cg.addColorStop(0, "rgba(255,255,255,0.55)");
+      cg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Lightning flash overlay
+    if (state.lightning.flash > 0.001) {
+      ctx.save();
+      ctx.globalAlpha = state.lightning.flash;
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, W, horizonY);
+      ctx.restore();
+    }
+  }
+
+  function drawOcean(horizonY, t) {
+    const W = state.w, H = state.h;
+
+    // Base ocean gradient
+    const stormAmt = state.storm ? 1 : 0;
+    const g = ctx.createLinearGradient(0, horizonY, 0, H);
+    g.addColorStop(0, `rgb(${Math.floor(10 - 2*stormAmt)}, ${Math.floor(24 - 4*stormAmt)}, ${Math.floor(34 - 6*stormAmt)})`);
+    g.addColorStop(1, `rgb(${Math.floor(4 - 1*stormAmt)}, ${Math.floor(12 - 2*stormAmt)}, ${Math.floor(18 - 3*stormAmt)})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, horizonY, W, H - horizonY);
+
+    // Perspective strips
+    const strips = 130;
+    const samples = 72;
+
+    // Camera and "world" scaling
+    const baseScale = 240 * state.dpr;     // controls wave frequency vs screen
+    const depthMax = 38;                  // how far the grid extends in world units
+    const scroll = t * (state.speed + state.boost) * 2.2;
+
+    for (let i = 0; i < strips; i++) {
+      const zN = i / (strips - 1);              // 0..1
+      const z = zN * depthMax;
+
+      // Perspective curve: more density near horizon
+      const p = Math.pow(zN, 1.85);
+      const y = horizonY + p * (H - horizonY);
+
+      // Strip thickness varies
+      const nextZ = (i + 1) / (strips - 1);
+      const nextP = Math.pow(nextZ, 1.85);
+      const y2 = horizonY + nextP * (H - horizonY);
+
+      // Scaling: far strips are flatter and narrower waves
+      const scaleAtZ = lerp(0.22, 1.85, p); // more effect near camera
+      const amp = (1 - zN) * (1 - zN) * 18 * state.dpr * lerp(0.9, 1.7, state.seaState);
+
+      // Water color modulation
+      const shade = clamp(0.55 + 0.45 * (1 - zN), 0, 1);
+      const foamChance = (state.storm ? 0.07 : 0.035) * (1 - zN) * (1 - zN);
+
+      ctx.beginPath();
+
+      for (let s = 0; s <= samples; s++) {
+        const xN = s / samples;
+        const x = xN * W;
+
+        // Map screen X to world X (narrower toward horizon)
+        const centered = (x - W * 0.5);
+        const wx = (centered / baseScale) / scaleAtZ + state.shipX;
+        const wz = z + scroll;
+
+        // Heading slightly affects wave sampling to add motion feel
+        const h = waveHeight(
+          wx * Math.cos(state.heading) - wz * Math.sin(state.heading),
+          wx * Math.sin(state.heading) + wz * Math.cos(state.heading),
+          t,
+          state.seaState
+        );
+
+        const yy = y + h * amp;
+
+        if (s === 0) ctx.moveTo(x, yy);
+        else ctx.lineTo(x, yy);
+      }
+
+      // Close strip polygon
+      ctx.lineTo(W, y2 + 50 * state.dpr);
+      ctx.lineTo(0, y2 + 50 * state.dpr);
+      ctx.closePath();
+
+      // Fill strip
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = `rgba(10, 40, 55, ${0.10 + 0.32 * shade})`;
+      ctx.fill();
+      ctx.restore();
+
+      // Foam highlights
+      if (Math.random() < foamChance) {
+        ctx.save();
+        ctx.globalAlpha = 0.11 + 0.10 * (1 - zN);
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.lineWidth = (1 + 1.5 * (1 - zN)) * state.dpr;
+
+        const s0 = Math.floor(rand(0, samples * 0.7));
+        const s1 = Math.floor(s0 + rand(8, 22));
+        ctx.beginPath();
+        for (let s = s0; s <= s1; s++) {
+          const xN = s / samples;
+          const x = xN * W;
+          const centered = (x - W * 0.5);
+          const wx = (centered / baseScale) / scaleAtZ + state.shipX;
+          const wz = z + scroll;
+
+          const h = waveHeight(
+            wx * Math.cos(state.heading) - wz * Math.sin(state.heading),
+            wx * Math.sin(state.heading) + wz * Math.cos(state.heading),
+            t,
+            state.seaState
+          );
+          const yy = y + h * amp;
+          if (s === s0) ctx.moveTo(x, yy);
+          else ctx.lineTo(x, yy);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // Horizon haze
+    ctx.save();
+    ctx.globalAlpha = state.storm ? 0.16 : 0.10;
+    const hg = ctx.createLinearGradient(0, horizonY - 10 * state.dpr, 0, horizonY + 120 * state.dpr);
+    hg.addColorStop(0, "rgba(255,255,255,0.35)");
+    hg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = hg;
+    ctx.fillRect(0, horizonY - 10 * state.dpr, W, 140 * state.dpr);
+    ctx.restore();
+  }
+
+  // ---------- Ship Rendering ----------
+  function drawShip(t) {
+    const W = state.w, H = state.h;
+
+    const horizonY = H * 0.36;
+    const shipYBase = lerp(horizonY + 140 * state.dpr, horizonY + 220 * state.dpr, 0.45);
+
+    // Sample waves at ship contact points
+    const scroll = t * (state.speed + state.boost) * 2.2;
+    const sea = state.seaState;
+
+    const baseScale = 240 * state.dpr;
+    const z = 0.7; // near camera in world units
+    const zN = z / 38;
+    const p = Math.pow(zN, 1.85);
+    const scaleAtZ = lerp(0.22, 1.85, p);
+    const amp = (1 - zN) * (1 - zN) * 18 * state.dpr * lerp(0.9, 1.7, sea);
+
+    const shipXScreen = W * 0.5;
+    const wx0 = state.shipX;
+    const wz0 = z + scroll;
+
+    // Width samples for roll
+    const hullHalf = 0.75;
+    const front = 0.75;
+
+    const nC = waveNormal(wx0, wz0, t, sea);
+    const nL = waveNormal(wx0 - hullHalf, wz0, t, sea);
+    const nR = waveNormal(wx0 + hullHalf, wz0, t, sea);
+    const nF = waveNormal(wx0, wz0 + front, t, sea);
+    const nB = waveNormal(wx0, wz0 - front, t, sea);
+
+    const waveC = nC.h * amp;
+    const waveL = nL.h * amp;
+    const waveR = nR.h * amp;
+
+    // Roll is from left-right wave difference
+    const roll = clamp((waveR - waveL) * 0.0065, -0.25, 0.25);
+
+    // Pitch from front-back
+    const pitch = clamp((nF.h - nB.h) * 0.08, -0.18, 0.18);
+
+    // Bobbing is center wave plus subtle speed effect
+    const bob = waveC;
+
+    const shipY = shipYBase + bob;
+
+    // Ship scale based on "camera zoom"
+    const shipScale = 1.05 * state.dpr;
+
+    // Draw spray particles first (behind hull)
+    drawSpray();
+
+    // Draw ship in local space then transform
+    ctx.save();
+    ctx.translate(shipXScreen, shipY);
+    ctx.rotate(roll + state.heading * 0.25);
+    ctx.scale(shipScale, shipScale);
+
+    // Shadow on water
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.ellipse(0, 46 * state.dpr, 110 * state.dpr, 26 * state.dpr, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Hull
+    const hullW = 210 * state.dpr;
+    const hullH = 70 * state.dpr;
+
+    ctx.save();
+    ctx.translate(0, 10 * state.dpr);
+
+    // Wood gradient
+    const hg = ctx.createLinearGradient(-hullW * 0.6, -hullH, hullW * 0.6, hullH);
+    hg.addColorStop(0, "rgb(65, 36, 20)");
+    hg.addColorStop(1, "rgb(35, 18, 10)");
+    ctx.fillStyle = hg;
+
+    ctx.beginPath();
+    ctx.moveTo(-hullW * 0.52, -hullH * 0.05);
+    ctx.quadraticCurveTo(-hullW * 0.15, -hullH * 0.65, hullW * 0.25, -hullH * 0.45);
+    ctx.quadraticCurveTo(hullW * 0.62, -hullH * 0.22, hullW * 0.52, hullH * 0.12);
+    ctx.quadraticCurveTo(hullW * 0.15, hullH * 0.62, -hullW * 0.45, hullH * 0.42);
+    ctx.quadraticCurveTo(-hullW * 0.68, hullH * 0.22, -hullW * 0.52, -hullH * 0.05);
+    ctx.closePath();
+    ctx.fill();
+
+    // Hull trim
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.lineWidth = 2.2 * state.dpr;
+    ctx.stroke();
+
+    // Planks
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.lineWidth = 1.2 * state.dpr;
+    for (let i = 0; i < 6; i++) {
+      const yy = lerp(-hullH * 0.25, hullH * 0.30, i / 5);
+      ctx.beginPath();
+      ctx.moveTo(-hullW * 0.45, yy);
+      ctx.quadraticCurveTo(0, yy + 6 * state.dpr, hullW * 0.44, yy - 2 * state.dpr);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Portholes
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    for (let i = 0; i < 4; i++) {
+      const xx = lerp(-hullW * 0.18, hullW * 0.22, i / 3);
+      const yy = lerp(-hullH * 0.02, hullH * 0.18, i / 3);
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.beginPath();
+      ctx.arc(xx, yy, 6.5 * state.dpr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 1.2 * state.dpr;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Deck
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = "rgb(85, 50, 28)";
+    ctx.beginPath();
+    ctx.ellipse(-15 * state.dpr, -hullH * 0.22, hullW * 0.26, hullH * 0.14, -0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore(); // hull group
+
+    // Mast
+    ctx.save();
+    ctx.translate(-10 * state.dpr, -78 * state.dpr);
+    ctx.rotate(pitch * 0.35);
+
+    const mastH = 165 * state.dpr;
+    ctx.fillStyle = "rgb(60, 35, 18)";
+    ctx.fillRect(-6 * state.dpr, 0, 12 * state.dpr, mastH);
+
+    // Crossbar
+    ctx.fillStyle = "rgb(52, 30, 16)";
+    ctx.fillRect(-72 * state.dpr, 42 * state.dpr, 144 * state.dpr, 10 * state.dpr);
+
+    // Rigging lines
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = "rgba(0,0,0,0.65)";
+    ctx.lineWidth = 1.4 * state.dpr;
+    ctx.beginPath();
+    ctx.moveTo(-70 * state.dpr, 46 * state.dpr);
+    ctx.lineTo(-130 * state.dpr, 122 * state.dpr);
+    ctx.moveTo(70 * state.dpr, 46 * state.dpr);
+    ctx.lineTo(130 * state.dpr, 118 * state.dpr);
+    ctx.stroke();
+    ctx.restore();
+
+    // Flags and sails
+    const wind = getWindVec();
+    const windRel = wind.x * Math.cos(state.heading) + wind.z * Math.sin(state.heading); // rough
+    const sailBillow = (0.45 + 0.55 * state.sail) * (0.7 + 0.3 * clamp(windRel, 0, 1));
+    const flap = Math.sin(t * (3.8 + 2.2 * (state.storm ? 1 : 0)) + 1.7) * (state.storm ? 0.18 : 0.10);
+
+    // Main sail (procedural cloth curve)
+    const sailW = 120 * state.dpr;
+    const sailH = 110 * state.dpr;
+    const sailLean = flap + (state.heading * -0.10);
+
+    ctx.save();
+    ctx.translate(0, 58 * state.dpr);
+    ctx.rotate(sailLean * 0.25);
+
+    ctx.fillStyle = "rgba(240, 235, 220, 0.95)";
+    ctx.strokeStyle = "rgba(0,0,0,0.20)";
+    ctx.lineWidth = 1.8 * state.dpr;
+
+    ctx.beginPath();
+    ctx.moveTo(-sailW * 0.45, 0);
+    ctx.quadraticCurveTo(-sailW * 0.10, sailH * 0.05 + sailH * 0.18 * sailBillow, 0, sailH * 0.08);
+    ctx.quadraticCurveTo(sailW * 0.25, sailH * 0.14 - sailH * 0.10 * sailBillow, sailW * 0.45, 0);
+    ctx.lineTo(sailW * 0.35, sailH);
+    ctx.quadraticCurveTo(0, sailH * (0.95 + 0.18 * sailBillow), -sailW * 0.35, sailH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Sail seams
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 1.1 * state.dpr;
+    for (let i = 1; i <= 4; i++) {
+      const yy = (sailH * i) / 5;
+      ctx.beginPath();
+      ctx.moveTo(-sailW * 0.33, yy);
+      ctx.quadraticCurveTo(0, yy + 6 * state.dpr * sailBillow, sailW * 0.33, yy);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.restore();
+
+    // Jolly Roger flag
+    ctx.save();
+    ctx.translate(0, -16 * state.dpr);
+    ctx.rotate(-0.18 + flap * 0.35);
+    ctx.fillStyle = "rgba(0,0,0,0.92)";
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1.2 * state.dpr;
+
+    const fw = 62 * state.dpr, fh = 36 * state.dpr;
+    ctx.beginPath();
+    ctx.moveTo(6 * state.dpr, 0);
+    ctx.quadraticCurveTo(20 * state.dpr, 8 * state.dpr, 28 * state.dpr, 0);
+    ctx.quadraticCurveTo(40 * state.dpr, -10 * state.dpr, fw, 2 * state.dpr);
+    ctx.quadraticCurveTo(42 * state.dpr, 18 * state.dpr, 24 * state.dpr, 24 * state.dpr);
+    ctx.quadraticCurveTo(16 * state.dpr, 28 * state.dpr, 6 * state.dpr, fh);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Tiny skull
+    ctx.save();
+    ctx.translate(28 * state.dpr, 14 * state.dpr);
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 6.2 * state.dpr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.75)";
+    ctx.beginPath();
+    ctx.arc(-2.2 * state.dpr, -1.0 * state.dpr, 1.5 * state.dpr, 0, Math.PI * 2);
+    ctx.arc( 2.2 * state.dpr, -1.0 * state.dpr, 1.5 * state.dpr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+
+    ctx.restore(); // mast
+
+    // Cannon smoke (subtle, storm reduces visibility)
+    if (Math.random() < 0.06 && !state.storm) {
+      spawnSpray(0, 12 * state.dpr, -0.12, -0.2, 1, true);
+    }
+
+    ctx.restore(); // ship transform
+  }
+
+  // ---------- Spray Particles ----------
+  function spawnSpray(x, y, vx, vy, life, smoke=false) {
+    state.spray.push({
+      x, y, vx, vy,
+      life,
+      t: 0,
+      smoke
+    });
+  }
+
+  function updateSpray(dt) {
+    // Spawn bow spray based on speed and sea
+    const p = clamp((state.speed + state.boost) * (0.35 + state.seaState), 0, 1);
+    const rate = lerp(2, 12, p) * dt;
+    const count = Math.floor(rate);
+    for (let i = 0; i < count; i++) {
+      const x = rand(-70, 70) * state.dpr;
+      const y = rand(34, 60) * state.dpr;
+      const vx = rand(-0.8, 0.8) * state.dpr;
+      const vy = rand(-2.8, -1.2) * state.dpr * (0.7 + 0.7 * p);
+      spawnSpray(x, y, vx, vy, rand(0.55, 1.0), false);
+    }
+
+    // Update
+    for (let i = state.spray.length - 1; i >= 0; i--) {
+      const s = state.spray[i];
+      s.t += dt;
+      s.x += s.vx;
+      s.y += s.vy;
+      s.vy += (s.smoke ? 0.02 : 0.10) * state.dpr; // gravity
+      s.vx *= 0.995;
+      s.vy *= 0.995;
+
+      if (s.t > s.life) state.spray.splice(i, 1);
+    }
+  }
+
+  function drawSpray() {
+    if (!state.spray.length) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    for (const s of state.spray) {
+      const a = 1 - (s.t / s.life);
+      ctx.globalAlpha = (s.smoke ? 0.25 : 0.45) * a * (state.storm ? 0.8 : 1.0);
+      ctx.fillStyle = s.smoke ? "rgba(255,255,255,0.6)" : "rgba(180,220,255,0.65)";
+      const r = (s.smoke ? 12 : 6) * state.dpr * (0.35 + 0.65 * a);
+      ctx.beginPath();
+      ctx.arc(state.w * 0.5 + s.x, (state.h * 0.36 + 190 * state.dpr) + s.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ---------- Wind and Storm ----------
+  function getWindVec() {
+    // Wind angle defined relative to +Z axis (forward)
+    return {
+      x: Math.sin(state.windAngle) * state.windSpeed,
+      z: Math.cos(state.windAngle) * state.windSpeed
+    };
+  }
+
+  function updateStorm(dt) {
+    // Smooth sea state
+    const targetSea = state.storm ? 0.92 : 0.22;
+    state.seaState = lerp(state.seaState, targetSea, 1 - Math.pow(0.001, dt));
+
+    // Gusts
+    state.gustTimer -= dt;
+    if (state.gustTimer <= 0) {
+      state.gustTimer = rand(1.2, state.storm ? 3.0 : 5.0);
+      const da = rand(-0.22, 0.22) * (state.storm ? 1.8 : 1.0);
+      state.windAngle += da;
+      state.windSpeed = lerp(state.windSpeed, rand(0.8, state.storm ? 1.6 : 1.25), 0.35);
+    }
+    state.windSpeed = clamp(state.windSpeed, 0.6, state.storm ? 1.9 : 1.4);
+
+    // Lightning logic
+    if (!state.storm) {
+      state.lightning.active = false;
+      state.lightning.flash = lerp(state.lightning.flash, 0, 1 - Math.pow(0.001, dt));
+      state.lightning.next = rand(2.0, 5.0);
+      return;
+    }
+
+    state.lightning.next -= dt;
+    if (state.lightning.next <= 0) {
+      state.lightning.active = true;
+      state.lightning.timer = rand(0.12, 0.22);
+      state.lightning.next = rand(1.4, 4.0);
+      state.lightning.flash = 0.75;
+    }
+
+    if (state.lightning.active) {
+      state.lightning.timer -= dt;
+      state.lightning.flash *= Math.pow(0.001, dt * 3.0);
+      if (state.lightning.timer <= 0) state.lightning.active = false;
+    } else {
+      state.lightning.flash = lerp(state.lightning.flash, 0, 1 - Math.pow(0.001, dt));
+    }
+  }
+
+  function drawLightning(t) {
+    if (!state.storm || state.lightning.flash < 0.03) return;
+
+    const W = state.w, H = state.h;
+    const horizonY = H * 0.36;
+
+    ctx.save();
+    ctx.globalAlpha = 0.55 * state.lightning.flash;
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = 2.2 * state.dpr;
+    ctx.shadowColor = "rgba(255,255,255,0.8)";
+    ctx.shadowBlur = 14 * state.dpr;
+
+    // Random-ish bolt path
+    const startX = W * rand(0.25, 0.78);
+    const startY = horizonY * rand(0.10, 0.35);
+    const endY = horizonY + rand(40, 170) * state.dpr;
+
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+
+    let x = startX;
+    let y = startY;
+    const steps = 12;
+    for (let i = 0; i < steps; i++) {
+      const p = (i + 1) / steps;
+      y = lerp(startY, endY, p);
+      x += rand(-28, 28) * state.dpr * (0.4 + 0.6 * (1 - p));
+      ctx.lineTo(x, y);
+      if (Math.random() < 0.15) {
+        // little branch
+        ctx.lineTo(x + rand(-35, 35) * state.dpr, y + rand(10, 35) * state.dpr);
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- Simulation Update ----------
+  function update(dt) {
+    // Sail trim
+    if (state.up) state.sail = clamp(state.sail + dt * 0.55, 0, 1);
+    if (state.down) state.sail = clamp(state.sail - dt * 0.55, 0, 1);
+
+    // Steering input
+    let steer = 0;
+    if (state.left) steer -= 1;
+    if (state.right) steer += 1;
+
+    // Mouse drag steering
+    if (state.dragging) {
+      const dx = (state.dragX - state.dragPrevX);
+      steer += clamp(dx / 40, -1.2, 1.2);
+    }
+
+    // Heading dynamics
+    const steerPower = 1.45;
+    state.yawVel += steer * steerPower * dt;
+    state.yawVel *= Math.pow(0.001, dt * 1.1);
+
+    // Damping and subtle wander
+    state.heading += state.yawVel * dt;
+    state.heading *= Math.pow(0.001, dt * 0.02);
+
+    // Boost (short gust capture)
+    const boostTarget = state.space ? 1 : 0;
+    state.boost = lerp(state.boost, boostTarget, 1 - Math.pow(0.001, dt * 3.0));
+
+    // Speed depends on sail and wind alignment
+    const wind = getWindVec();
+    const forward = { x: Math.sin(state.heading), z: Math.cos(state.heading) };
+    const windDot = clamp(wind.x * forward.x + wind.z * forward.z, -1, 1);
+    const windPush = clamp(0.35 + 0.65 * (0.5 + 0.5 * windDot), 0.15, 1);
+
+    const stormPenalty = state.storm ? 0.88 : 1.0;
+    const targetSpeed = (0.55 + 1.25 * state.sail * windPush) * stormPenalty + 0.45 * state.boost;
+    state.speed = lerp(state.speed, targetSpeed, 1 - Math.pow(0.001, dt * 1.8));
+    state.speed = clamp(state.speed, 0.25, state.storm ? 1.75 : 1.55);
+
+    // Side drift (very mild)
+    const drift = Math.sin(state.heading) * 0.12 * state.speed;
+    state.shipX += drift * dt;
+
+    // Keep shipX bounded (camera center stays, just affects wave sampling)
+    state.shipX = clamp(state.shipX, -2.2, 2.2);
+
+    updateStorm(dt);
+    updateSpray(dt);
+  }
+
+  // ---------- HUD ----------
+  function updateHUD() {
+    const sp = clamp(state.speed / (state.storm ? 1.75 : 1.55), 0, 1);
+    barSpeed.style.width = `${Math.floor(sp * 100)}%`;
+    barSail.style.width = `${Math.floor(state.sail * 100)}%`;
+    stormLabel.textContent = state.storm ? "ON" : "OFF";
+  }
+
+  // ---------- Main Render ----------
+  function render() {
+    const W = state.w, H = state.h;
+    const horizonY = H * 0.36;
+
+    // Background
+    drawSky(horizonY, state.t);
+    drawOcean(horizonY, state.t);
+
+    // Lightning bolt (foreground)
+    drawLightning(state.t);
+
+    // Ship
+    drawShip(state.t);
+
+    // Subtle vignette
+    ctx.save();
+    const vg = ctx.createRadialGradient(W * 0.5, H * 0.62, 0, W * 0.5, H * 0.62, Math.max(W, H) * 0.62);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,0,0,0.35)");
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  // ---------- Loop ----------
+  let last = performance.now();
+  function tick(now) {
+    const dt = clamp((now - last) / 1000, 0, 0.033);
+    last = now;
+
+    state.t += dt;
+    state.dt = dt;
+
+    update(dt);
+    updateHUD();
+
+    // Clear
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.fillRect(0, 0, state.w, state.h);
+
+    render();
+
+    requestAnimationFrame(tick);
+  }
+
+  // ---------- Init ----------
+  resize();
+  initClouds();
+  hardReset();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

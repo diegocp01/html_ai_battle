@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pirate Ship Sailing Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: linear-gradient(to bottom, #1a1a2e 0%, #16213e 20%, #0f3460 40%, #e94560 50%, #ff6b6b 55%, #feca57 60%, #48dbfb 70%, #0abde3 100%);
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .scene {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sun */
+        .sun {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, #fff9c4 0%, #ffeb3b 50%, #ff9800 100%);
+            border-radius: 50%;
+            top: 15%;
+            right: 15%;
+            box-shadow: 0 0 60px #ffeb3b, 0 0 100px #ff9800, 0 0 150px #ff5722;
+            animation: sunPulse 4s ease-in-out infinite;
+        }
+
+        @keyframes sunPulse {
+            0%, 100% { box-shadow: 0 0 60px #ffeb3b, 0 0 100px #ff9800, 0 0 150px #ff5722; }
+            50% { box-shadow: 0 0 80px #ffeb3b, 0 0 120px #ff9800, 0 0 180px #ff5722; }
+        }
+
+        /* Clouds */
+        .cloud {
+            position: absolute;
+            background: #fff;
+            border-radius: 50px;
+            opacity: 0.9;
+            filter: blur(2px);
+        }
+
+        .cloud::before, .cloud::after {
+            content: '';
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        /* Ocean */
+        .ocean {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 55%;
+            background: linear-gradient(to bottom, #006994 0%, #004466 30%, #003355 60%, #002244 100%);
+        }
+
+        /* Wave layers */
+        .wave {
+            position: absolute;
+            width: 200%;
+            height: 100px;
+            background-repeat: repeat-x;
+            left: 0;
+        }
+
+        .wave1 {
+            top: -30px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100"><path fill="%23006994" d="M0,50 C360,100 720,0 1080,50 C1260,75 1350,25 1440,50 L1440,100 L0,100 Z"/></svg>');
+            background-size: 720px 100px;
+            animation: wave 8s linear infinite;
+            opacity: 0.8;
+        }
+
+        .wave2 {
+            top: -20px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100"><path fill="%23007aa5" d="M0,30 C240,80 480,0 720,50 C960,100 1200,20 1440,60 L1440,100 L0,100 Z"/></svg>');
+            background-size: 600px 100px;
+            animation: wave 6s linear infinite reverse;
+            opacity: 0.6;
+        }
+
+        .wave3 {
+            top: -10px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100"><path fill="%230088b5" d="M0,60 C180,20 360,80 540,40 C720,0 900,60 1080,30 C1260,0 1350,50 1440,40 L1440,100 L0,100 Z"/></svg>');
+            background-size: 540px 100px;
+            animation: wave 10s linear infinite;
+            opacity: 0.4;
+        }
+
+        @keyframes wave {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* Ship Container */
+        .ship-container {
+            position: absolute;
+            left: 50%;
+            top: 40%;
+            transform: translateX(-50%);
+            animation: shipFloat 4s ease-in-out infinite, shipMove 30s linear infinite;
+        }
+
+        @keyframes shipFloat {
+            0%, 100% { transform: translateX(-50%) rotate(-3deg) translateY(0); }
+            25% { transform: translateX(-50%) rotate(-1deg) translateY(-15px); }
+            50% { transform: translateX(-50%) rotate(3deg) translateY(-5px); }
+            75% { transform: translateX(-50%) rotate(1deg) translateY(-20px); }
+        }
+
+        @keyframes shipMove {
+            0% { left: -10%; }
+            100% { left: 110%; }
+        }
+
+        /* Ship Hull */
+        .hull {
+            position: relative;
+            width: 300px;
+            height: 80px;
+            background: linear-gradient(to bottom, #8B4513 0%, #654321 50%, #3d2914 100%);
+            border-radius: 0 0 50% 50%;
+            clip-path: polygon(5% 0%, 95% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%);
+        }
+
+        .hull::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10%;
+            right: 10%;
+            height: 8px;
+            background: #5d3a1a;
+            border-radius: 2px;
+        }
+
+        .hull-stripe {
+            position: absolute;
+            width: 100%;
+            height: 10px;
+            background: repeating-linear-gradient(90deg, #654321 0px, #654321 30px, #8B4513 30px, #8B4513 60px);
+            top: 25px;
+        }
+
+        /* Cannons */
+        .cannon-row {
+            position: absolute;
+            top: 35px;
+            left: 15%;
+            right: 15%;
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .cannon {
+            width: 12px;
+            height: 8px;
+            background: #2c2c2c;
+            border-radius: 2px;
+        }
+
+        /* Bow decoration */
+        .bow {
+            position: absolute;
+            left: -30px;
+            top: -10px;
+            width: 50px;
+            height: 40px;
+            background: #654321;
+            clip-path: polygon(100% 50%, 0% 0%, 20% 50%, 0% 100%);
+        }
+
+        .bowsprit {
+            position: absolute;
+            left: -80px;
+            top: 5px;
+            width: 90px;
+            height: 8px;
+            background: linear-gradient(to right, #d4a574, #8B4513);
+            transform: rotate(-15deg);
+            transform-origin: right center;
+            border-radius: 2px;
+        }
+
+        /* Stern */
+        .stern {
+            position: absolute;
+            right: -20px;
+            top: -30px;
+            width: 60px;
+            height: 70px;
+            background: linear-gradient(to right, #654321, #8B4513);
+            border-radius: 5px 15px 5px 5px;
+        }
+
+        .stern-windows {
+            position: absolute;
+            right: -10px;
+            top: -15px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .stern-window {
+            width: 10px;
+            height: 12px;
+            background: #ffd700;
+            border-radius: 5px 5px 0 0;
+            box-shadow: 0 0 5px #ffd700;
+        }
+
+        /* Masts */
+        .mast {
+            position: absolute;
+            background: linear-gradient(to right, #8B4513, #a0522d, #8B4513);
+            border-radius: 5px;
+        }
+
+        .main-mast {
+            width: 15px;
+            height: 250px;
+            left: 50%;
+            top: -250px;
+            transform: translateX(-50%);
+        }
+
+        .fore-mast {
+            width: 12px;
+            height: 200px;
+            left: 25%;
+            top: -200px;
+            transform: translateX(-50%);
+        }
+
+        .mizzen-mast {
+            width: 10px;
+            height: 180px;
+            right: 15%;
+            top: -180px;
+        }
+
+        /* Crow's Nest */
+        .crows-nest {
+            position: absolute;
+            left: 50%;
+            top: -220px;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 20px;
+            background: #654321;
+            border-radius: 5px;
+            border: 3px solid #8B4513;
+        }
+
+        /* Sails */
+        .sail {
+            position: absolute;
+            background: linear-gradient(to bottom, #f5f5dc 0%, #e8e8d0 50%, #d4d4c0 100%);
+            border-radius: 0 30% 0 30%;
+            transform-origin: top center;
+            box-shadow: inset -10px 0 20px rgba(0,0,0,0.1);
+        }
+
+        .main-sail {
+            width: 100px;
+            height: 120px;
+            left: calc(50% - 50px);
+            top: -200px;
+            animation: sailBillow 3s ease-in-out infinite;
+        }
+
+        .main-sail-top {
+            width: 80px;
+            height: 80px;
+            left: calc(50% - 40px);
+            top: -240px;
+            animation: sailBillow 3.5s ease-in-out infinite 0.5s;
+        }
+
+        .fore-sail {
+            width: 70px;
+            height: 90px;
+            left: calc(25% - 35px);
+            top: -170px;
+            animation: sailBillow 2.8s ease-in-out infinite 0.3s;
+        }
+
+        .fore-sail-top {
+            width: 55px;
+            height: 60px;
+            left: calc(25% - 27px);
+            top: -195px;
+            animation: sailBillow 3.2s ease-in-out infinite 0.7s;
+        }
+
+        .mizzen-sail {
+            width: 60px;
+            height: 80px;
+            right: calc(15% - 20px);
+            top: -150px;
+            animation: sailBillow 3s ease-in-out infinite 0.2s;
+        }
+
+        @keyframes sailBillow {
+            0%, 100% { 
+                border-radius: 0 30% 0 30%; 
+                transform: scaleX(1) skewY(0deg);
+            }
+            50% { 
+                border-radius: 0 40% 0 40%; 
+                transform: scaleX(1.05) skewY(-2deg);
+            }
+        }
+
+        /* Sail ropes/lines */
+        .yard {
+            position: absolute;
+            height: 6px;
+            background: linear-gradient(to right, #654321, #8B4513, #654321);
+            border-radius: 3px;
+        }
+
+        .main-yard {
+            width: 120px;
+            left: calc(50% - 60px);
+            top: -200px;
+        }
+
+        .main-yard-top {
+            width: 100px;
+            left: calc(50% - 50px);
+            top: -242px;
+        }
+
+        .fore-yard {
+            width: 90px;
+            left: calc(25% - 45px);
+            top: -170px;
+        }
+
+        .mizzen-yard {
+            width: 80px;
+            right: calc(15% - 30px);
+            top: -150px;
+        }
+
+        /* Pirate Flag */
+        .flag-pole {
+            position: absolute;
+            width: 4px;
+            height: 40px;
+            background: #8B4513;
+            left: calc(50% - 2px);
+            top: -288px;
+        }
+
+        .pirate-flag {
+            position: absolute;
+            width: 60px;
+            height: 40px;
+            background: #1a1a1a;
+            left: calc(50% + 2px);
+            top: -285px;
+            animation: flagWave 1s ease-in-out infinite;
+            transform-origin: left center;
+        }
+
+        .pirate-flag::before {
+            content: '☠';
+            position: absolute;
+            font-size: 28px;
+            color: white;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes flagWave {
+            0%, 100% { transform: skewY(-2deg) scaleX(1); }
+            50% { transform: skewY(2deg) scaleX(0.95); }
+        }
+
+        /* Wake effect */
+        .wake {
+            position: absolute;
+            bottom: -30px;
+            left: -50px;
+            width: 400px;
+            height: 40px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), rgba(255,255,255,0.5), rgba(255,255,255,0.3), transparent);
+            border-radius: 50%;
+            animation: wakeMove 2s ease-in-out infinite;
+        }
+
+        @keyframes wakeMove {
+            0%, 100% { transform: scaleX(1) translateY(0); opacity: 0.5; }
+            50% { transform: scaleX(1.1) translateY(5px); opacity: 0.7; }
+        }
+
+        /* Spray particles */
+        .spray-container {
+            position: absolute;
+            left: -60px;
+            top: 20px;
+            width: 50px;
+            height: 50px;
+        }
+
+        .spray {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 50%;
+            animation: spray 1.5s ease-out infinite;
+        }
+
+        @keyframes spray {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(-30px, -40px) scale(0); opacity: 0; }
+        }
+
+        /* Birds */
+        .bird {
+            position: absolute;
+            font-size: 20px;
+            color: #333;
+            animation: birdFly 20s linear infinite;
+        }
+
+        @keyframes birdFly {
+            0% { transform: translateX(-100px) translateY(0); }
+            25% { transform: translateX(25vw) translateY(-20px); }
+            50% { transform: translateX(50vw) translateY(10px); }
+            75% { transform: translateX(75vw) translateY(-15px); }
+            100% { transform: translateX(calc(100vw + 100px)) translateY(0); }
+        }
+
+        /* Info panel */
+        .info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+        }
+
+        .info h2 {
+            margin-bottom: 10px;
+            font-size: 18px;
+            color: #ffd700;
+        }
+
+        .compass {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background: rgba(139, 69, 19, 0.9);
+            border-radius: 50%;
+            border: 4px solid #654321;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .compass-needle {
+            font-size: 40px;
+            animation: compassSway 4s ease-in-out infinite;
+        }
+
+        @keyframes compassSway {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+
+        /* Stars (visible in darker part of sky) */
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s ease-in-out infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="scene">
+        <!-- Stars -->
+        <div id="stars"></div>
+        
+        <!-- Sun -->
+        <div class="sun"></div>
+        
+        <!-- Clouds -->
+        <div id="clouds"></div>
+        
+        <!-- Birds -->
+        <div id="birds"></div>
+        
+        <!-- Ocean -->
+        <div class="ocean">
+            <div class="wave wave1"></div>
+            <div class="wave wave2"></div>
+            <div class="wave wave3"></div>
+        </div>
+        
+        <!-- Ship -->
+        <div class="ship-container">
+            <!-- Wake -->
+            <div class="wake"></div>
+            
+            <!-- Spray -->
+            <div class="spray-container" id="spray-container"></div>
+            
+            <!-- Hull -->
+            <div class="hull">
+                <div class="hull-stripe"></div>
+                <div class="cannon-row">
+                    <div class="cannon"></div>
+                    <div class="cannon"></div>
+                    <div class="cannon"></div>
+                    <div class="cannon"></div>
+                    <div class="cannon"></div>
+                </div>
+                <div class="bow"></div>
+                <div class="bowsprit"></div>
+                <div class="stern"></div>
+                <div class="stern-windows">
+                    <div class="stern-window"></div>
+                    <div class="stern-window"></div>
+                    <div class="stern-window"></div>
+                </div>
+            </div>
+            
+            <!-- Masts -->
+            <div class="mast main-mast"></div>
+            <div class="mast fore-mast"></div>
+            <div class="mast mizzen-mast"></div>
+            
+            <!-- Crow's Nest -->
+            <div class="crows-nest"></div>
+            
+            <!-- Yards -->
+            <div class="yard main-yard"></div>
+            <div class="yard main-yard-top"></div>
+            <div class="yard fore-yard"></div>
+            <div class="yard mizzen-yard"></div>
+            
+            <!-- Sails -->
+            <div class="sail main-sail"></div>
+            <div class="sail main-sail-top"></div>
+            <div class="sail fore-sail"></div>
+            <div class="sail fore-sail-top"></div>
+            <div class="sail mizzen-sail"></div>
+            
+            <!-- Pirate Flag -->
+            <div class="flag-pole"></div>
+            <div class="pirate-flag"></div>
+        </div>
+        
+        <!-- Info Panel -->
+        <div class="info">
+            <h2>⚓ The Black Pearl</h2>
+            <p>🧭 Heading: East-Northeast</p>
+            <p>💨 Wind: 12 knots</p>
+            <p>🌊 Seas: Moderate</p>
+        </div>
+        
+        <!-- Compass -->
+        <div class="compass">
+            <div class="compass-needle">🧭</div>
+        </div>
+    </div>
+
+    <script>
+        // Create stars
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 50; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 30 + '%';
+                star.style.width = (Math.random() * 3 + 1) + 'px';
+                star.style.height = star.style.width;
+                star.style.animationDelay = Math.random() * 2 + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // Create clouds
+        function createClouds() {
+            const cloudsContainer = document.getElementById('clouds');
+            const cloudCount = 6;
+            
+            for (let i = 0; i < cloudCount; i++) {
+                const cloud = document.createElement('div');
+                cloud.className = 'cloud';
+                
+                const width = Math.random() * 100 + 80;
+                const height = Math.random() * 30 + 25;
+                
+                cloud.style.width = width + 'px';
+                cloud.style.height = height + 'px';
+                cloud.style.top = (Math.random() * 25 + 5) + '%';
+                cloud.style.left = (i * 20 - 10) + '%';
+                
+                cloud.style.setProperty('--before-size', (height * 0.8) + 'px');
+                cloud.style.setProperty('--after-size', (height * 0.6) + 'px');
+                
+                const duration = Math.random() * 40 + 60;
+                cloud.style.animation = `cloudMove ${duration}s linear infinite`;
+                cloud.style.animationDelay = `-${Math.random() * duration}s`;
+                
+                cloudsContainer.appendChild(cloud);
+            }
+            
+            // Add cloud movement keyframes
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes cloudMove {
+                    0% { transform: translateX(-200px); }
+                    100% { transform: translateX(calc(100vw + 200px)); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Create birds
+        function createBirds() {
+            const birdsContainer = document.getElementById('birds');
+            const birdCount = 5;
+            
+            for (let i = 0; i < birdCount; i++) {
+                const bird = document.createElement('div');
+                bird.className = 'bird';
+                bird.innerHTML = '🐦';
+                bird.style.top = (Math.random() * 30 + 10) + '%';
+                bird.style.animationDuration = (Math.random() * 15 + 15) + 's';
+                bird.style.animationDelay = `-${Math.random() * 20}s`;
+                bird.style.fontSize = (Math.random() * 10 + 15) + 'px';
+                birdsContainer.appendChild(bird);
+            }
+        }
+
+        // Create spray particles
+        function createSpray() {
+            const sprayContainer = document.getElementById('spray-container');
+            
+            setInterval(() => {
+                const spray = document.createElement('div');
+                spray.className = 'spray';
+                spray.style.left = Math.random() * 30 + 'px';
+                spray.style.top = Math.random() * 20 + 'px';
+                spray.style.animationDuration = (Math.random() * 0.5 + 1) + 's';
+                sprayContainer.appendChild(spray);
+                
+                setTimeout(() => spray.remove(), 1500);
+            }, 200);
+        }
+
+        // Update info panel with random data
+        function updateInfo() {
+            const headings = ['North', 'North-Northeast', 'Northeast', 'East-Northeast', 'East', 'East-Southeast'];
+            const info = document.querySelector('.info');
+            
+            setInterval(() => {
+                const windSpeed = Math.floor(Math.random() * 5 + 10);
+                const heading = headings[Math.floor(Math.random() * headings.length)];
+                
+                info.innerHTML = `
+                    <h2>⚓ The Black Pearl</h2>
+                    <p>🧭 Heading: ${heading}</p>
+                    <p>💨 Wind: ${windSpeed} knots</p>
+                    <p>🌊 Seas: Moderate</p>
+                `;
+            }, 5000);
+        }
+
+        // Initialize
+        createStars();
+        createClouds();
+        createBirds();
+        createSpray();
+        updateInfo();
+
+        // Add some dynamic wave particles in the ocean
+        const ocean = document.querySelector('.ocean');
+        
+        function createWaveParticle() {
+            const particle = document.createElement('div');
+            particle.style.position = 'absolute';
+            particle.style.width = '4px';
+            particle.style.height = '4px';
+            particle.style.background = 'rgba(255,255,255,0.6)';
+            particle.style.borderRadius = '50%';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.top = Math.random() * 20 + '%';
+            particle.style.animation = 'particleFade 2s ease-out forwards';
+            ocean.appendChild(particle);
+            
+            setTimeout(() => particle.remove(), 2000);
+        }
+
+        // Add particle fade animation
+        const particleStyle = document.createElement('style');
+        particleStyle.textContent = `
+            @keyframes particleFade {
+                0% { opacity: 1; transform: translateY(0); }
+                100% { opacity: 0; transform: translateY(-20px); }
+            }
+        `;
+        document.head.appendChild(particleStyle);
+
+        setInterval(createWaveParticle, 300);
+
+        // Add click interaction for cannon fire
+        document.querySelector('.ship-container').addEventListener('click', (e) => {
+            // Create cannon smoke effect
+            const smoke = document.createElement('div');
+            smoke.style.position = 'absolute';
+            smoke.style.width = '30px';
+            smoke.style.height = '30px';
+            smoke.style.background = 'rgba(255,255,255,0.8)';
+            smoke.style.borderRadius = '50%';
+            smoke.style.left = '50px';
+            smoke.style.top = '30px';
+            smoke.style.animation = 'smokeRise 1s ease-out forwards';
+            smoke.style.filter = 'blur(5px)';
+            document.querySelector('.hull').appendChild(smoke);
+            
+            setTimeout(() => smoke.remove(), 1000);
+        });
+
+        const smokeStyle = document.createElement('style');
+        smokeStyle.textContent = `
+            @keyframes smokeRise {
+                0% { opacity: 1; transform: scale(1) translateY(0); }
+                100% { opacity: 0; transform: scale(3) translateY(-50px); }
+            }
+        `;
+        document.head.appendChild(smokeStyle);
+    </script>
+</body>
+</html>
