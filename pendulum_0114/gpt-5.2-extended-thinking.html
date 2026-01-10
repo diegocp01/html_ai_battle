@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Double Pendulum (Chaotic) with Neon Trail</title>
+  <style>
+    :root {
+      --bg: #05060a;
+      --panel: rgba(20, 22, 34, 0.72);
+      --stroke: rgba(255, 255, 255, 0.22);
+      --text: rgba(255, 255, 255, 0.9);
+      --muted: rgba(255, 255, 255, 0.65);
+      --accent: #6dfcff;
+    }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      overflow: hidden;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--text);
+    }
+    #wrap {
+      position: fixed;
+      inset: 0;
+    }
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #ui {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      width: min(360px, calc(100vw - 28px));
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 12px 12px 10px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+      user-select: none;
+    }
+    #ui h1 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 650;
+      letter-spacing: 0.2px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin: 7px 0;
+    }
+    .row label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .row output {
+      font-size: 12px;
+      color: var(--text);
+      min-width: 56px;
+      text-align: right;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: transform 0.06s ease, background 0.12s ease;
+    }
+    button:hover { background: rgba(255,255,255,0.10); }
+    button:active { transform: translateY(1px); }
+    .hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.35;
+    }
+    #stats {
+      margin-top: 6px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    #stats span { white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <!-- Trail canvas: we fade it slightly each frame to create a decaying neon path -->
+    <canvas id="trail"></canvas>
+    <!-- Foreground canvas: pendulum arms + bobs -->
+    <canvas id="fg"></canvas>
+
+    <div id="ui">
+      <h1>Double Pendulum (real equations, chaotic) + neon trail</h1>
+
+      <div class="row">
+        <label for="g">Gravity (g)</label>
+        <output id="gOut"></output>
+      </div>
+      <input id="g" type="range" min="1" max="30" step="0.1" value="9.81">
+
+      <div class="row">
+        <label for="damp">Damping</label>
+        <output id="dampOut"></output>
+      </div>
+      <input id="damp" type="range" min="0" max="0.08" step="0.0005" value="0.0025">
+
+      <div class="row">
+        <label for="fade">Trail fade (higher = shorter trail)</label>
+        <output id="fadeOut"></output>
+      </div>
+      <input id="fade" type="range" min="0.01" max="0.20" step="0.005" value="0.06">
+
+      <div class="btns">
+        <button id="toggle">Pause</button>
+        <button id="reset">Reset</button>
+        <button id="nudge">Nudge (tiny change)</button>
+        <button id="clear">Clear trail</button>
+      </div>
+
+      <div id="stats">
+        <span id="fps">FPS: --</span>
+        <span id="energy">Energy: --</span>
+      </div>
+
+      <div class="hint">
+        Tip: Double pendulums are extremely sensitive to initial conditions. Click “Nudge” a few times
+        to see the path diverge quickly.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // Canvas setup (2 layers)
+    // =========================
+    const trailCanvas = document.getElementById("trail");
+    const fgCanvas = document.getElementById("fg");
+    const tctx = trailCanvas.getContext("2d", { alpha: true });
+    const fctx = fgCanvas.getContext("2d", { alpha: true });
+
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      for (const c of [trailCanvas, fgCanvas]) {
+        c.width = Math.floor(innerWidth * dpr);
+        c.height = Math.floor(innerHeight * dpr);
+        c.style.width = innerWidth + "px";
+        c.style.height = innerHeight + "px";
+      }
+      tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Clearing the trail on resize avoids stretched artifacts
+      tctx.clearRect(0, 0, innerWidth, innerHeight);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // =========================
+    // Double pendulum physics
+    // Using standard equations of motion (nonlinear, chaotic)
+    // Integration: fixed-step RK4 for stability
+    // =========================
+    const params = {
+      m1: 1.0,
+      m2: 1.0,
+      L1: 180,
+      L2: 180,
+      g: 9.81,
+      damping: 0.0025
+    };
+
+    // State: angles (rad) + angular velocities (rad/s)
+    let state = {
+      t1: Math.PI / 2,
+      w1: 0,
+      t2: Math.PI / 2 + 0.01, // tiny offset drives chaotic divergence
+      w2: 0
+    };
+
+    function derivatives(s) {
+      const { m1, m2, L1, L2, g } = params;
+      const t1 = s.t1, t2 = s.t2, w1 = s.w1, w2 = s.w2;
+
+      const delta = t2 - t1;
+      const sinD = Math.sin(delta);
+      const cosD = Math.cos(delta);
+
+      // These are a common form of the double pendulum equations
+      const den1 = (m1 + m2) * L1 - m2 * L1 * cosD * cosD;
+      const den2 = (L2 / L1) * den1;
+
+      const dt1 = w1;
+      const dt2 = w2;
+
+      const dw1 =
+        (m2 * L1 * w1 * w1 * sinD * cosD +
+         m2 * g * Math.sin(t2) * cosD +
+         m2 * L2 * w2 * w2 * sinD -
+         (m1 + m2) * g * Math.sin(t1)) / den1;
+
+      const dw2 =
+        (-m2 * L2 * w2 * w2 * sinD * cosD +
+         (m1 + m2) * g * Math.sin(t1) * cosD -
+         (m1 + m2) * L1 * w1 * w1 * sinD -
+         (m1 + m2) * g * Math.sin(t2)) / den2;
+
+      // Simple linear damping on angular velocities
+      return {
+        t1: dt1,
+        w1: dw1 - params.damping * w1,
+        t2: dt2,
+        w2: dw2 - params.damping * w2
+      };
+    }
+
+    function addScaled(a, b, k) {
+      return { t1: a.t1 + b.t1 * k, w1: a.w1 + b.w1 * k, t2: a.t2 + b.t2 * k, w2: a.w2 + b.w2 * k };
+    }
+
+    function rk4Step(s, dt) {
+      const k1 = derivatives(s);
+      const k2 = derivatives(addScaled(s, k1, dt / 2));
+      const k3 = derivatives(addScaled(s, k2, dt / 2));
+      const k4 = derivatives(addScaled(s, k3, dt));
+
+      const t1 = s.t1 + (dt / 6) * (k1.t1 + 2 * k2.t1 + 2 * k3.t1 + k4.t1);
+      const w1 = s.w1 + (dt / 6) * (k1.w1 + 2 * k2.w1 + 2 * k3.w1 + k4.w1);
+      const t2 = s.t2 + (dt / 6) * (k1.t2 + 2 * k2.t2 + 2 * k3.t2 + k4.t2);
+      const w2 = s.w2 + (dt / 6) * (k1.w2 + 2 * k2.w2 + 2 * k3.w2 + k4.w2);
+
+      return { t1, w1, t2, w2 };
+    }
+
+    // Rough energy (for sanity checks, not exact with damping)
+    function totalEnergy(s) {
+      const { m1, m2, L1, L2, g } = params;
+      const t1 = s.t1, t2 = s.t2, w1 = s.w1, w2 = s.w2;
+
+      const x1 = L1 * Math.sin(t1), y1 = L1 * Math.cos(t1);
+      const x2 = x1 + L2 * Math.sin(t2), y2 = y1 + L2 * Math.cos(t2);
+
+      const vx1 = L1 * w1 * Math.cos(t1);
+      const vy1 = -L1 * w1 * Math.sin(t1);
+
+      const vx2 = vx1 + L2 * w2 * Math.cos(t2);
+      const vy2 = vy1 - L2 * w2 * Math.sin(t2);
+
+      const T = 0.5 * m1 * (vx1 * vx1 + vy1 * vy1) + 0.5 * m2 * (vx2 * vx2 + vy2 * vy2);
+      const V = -(m1 + m2) * g * y1 - m2 * g * (y2 - y1); // consistent relative reference
+      return T + V;
+    }
+
+    // =========================
+    // Rendering
+    // =========================
+    function pendulumPositions(s) {
+      const origin = {
+        x: innerWidth * 0.5,
+        y: innerHeight * 0.22
+      };
+      const x1 = origin.x + params.L1 * Math.sin(s.t1);
+      const y1 = origin.y + params.L1 * Math.cos(s.t1);
+      const x2 = x1 + params.L2 * Math.sin(s.t2);
+      const y2 = y1 + params.L2 * Math.cos(s.t2);
+      return { origin, x1, y1, x2, y2 };
+    }
+
+    let prevTip = null;
+
+    function drawTrail(tip, fadeAlpha) {
+      // Fade old trail by painting a translucent rect
+      // This creates the "decay over time" effect.
+      tctx.save();
+      tctx.globalCompositeOperation = "source-over";
+      tctx.fillStyle = `rgba(5, 6, 10, ${fadeAlpha})`;
+      tctx.fillRect(0, 0, innerWidth, innerHeight);
+      tctx.restore();
+
+      if (!prevTip) {
+        prevTip = { x: tip.x, y: tip.y };
+        return;
+      }
+
+      // Neon stroke from previous tip to current tip
+      tctx.save();
+      tctx.globalCompositeOperation = "lighter";
+      tctx.lineCap = "round";
+      tctx.lineJoin = "round";
+
+      // Outer glow
+      tctx.strokeStyle = "rgba(109, 252, 255, 0.18)";
+      tctx.lineWidth = 10;
+      tctx.shadowColor = "rgba(109, 252, 255, 0.55)";
+      tctx.shadowBlur = 18;
+      tctx.beginPath();
+      tctx.moveTo(prevTip.x, prevTip.y);
+      tctx.lineTo(tip.x, tip.y);
+      tctx.stroke();
+
+      // Core bright line
+      tctx.shadowBlur = 0;
+      tctx.strokeStyle = "rgba(109, 252, 255, 0.95)";
+      tctx.lineWidth = 2.2;
+      tctx.beginPath();
+      tctx.moveTo(prevTip.x, prevTip.y);
+      tctx.lineTo(tip.x, tip.y);
+      tctx.stroke();
+
+      tctx.restore();
+
+      prevTip.x = tip.x;
+      prevTip.y = tip.y;
+    }
+
+    function drawPendulum(pos) {
+      fctx.clearRect(0, 0, innerWidth, innerHeight);
+
+      // Arms
+      fctx.save();
+      fctx.lineWidth = 2;
+      fctx.strokeStyle = "rgba(255,255,255,0.7)";
+      fctx.beginPath();
+      fctx.moveTo(pos.origin.x, pos.origin.y);
+      fctx.lineTo(pos.x1, pos.y1);
+      fctx.lineTo(pos.x2, pos.y2);
+      fctx.stroke();
+
+      // Pivot
+      fctx.fillStyle = "rgba(255,255,255,0.9)";
+      fctx.beginPath();
+      fctx.arc(pos.origin.x, pos.origin.y, 3.2, 0, Math.PI * 2);
+      fctx.fill();
+
+      // Bob 1
+      fctx.fillStyle = "rgba(255,255,255,0.88)";
+      fctx.beginPath();
+      fctx.arc(pos.x1, pos.y1, 8, 0, Math.PI * 2);
+      fctx.fill();
+
+      // Bob 2 with subtle glow
+      fctx.fillStyle = "rgba(255,255,255,0.9)";
+      fctx.shadowColor = "rgba(109, 252, 255, 0.5)";
+      fctx.shadowBlur = 14;
+      fctx.beginPath();
+      fctx.arc(pos.x2, pos.y2, 9, 0, Math.PI * 2);
+      fctx.fill();
+
+      fctx.restore();
+    }
+
+    // =========================
+    // UI controls
+    // =========================
+    const gEl = document.getElementById("g");
+    const dampEl = document.getElementById("damp");
+    const fadeEl = document.getElementById("fade");
+    const gOut = document.getElementById("gOut");
+    const dampOut = document.getElementById("dampOut");
+    const fadeOut = document.getElementById("fadeOut");
+
+    function syncUI() {
+      params.g = Number(gEl.value);
+      params.damping = Number(dampEl.value);
+      gOut.textContent = params.g.toFixed(2);
+      dampOut.textContent = params.damping.toFixed(4);
+      fadeOut.textContent = Number(fadeEl.value).toFixed(3);
+    }
+    gEl.addEventListener("input", syncUI);
+    dampEl.addEventListener("input", syncUI);
+    fadeEl.addEventListener("input", syncUI);
+    syncUI();
+
+    const toggleBtn = document.getElementById("toggle");
+    const resetBtn = document.getElementById("reset");
+    const nudgeBtn = document.getElementById("nudge");
+    const clearBtn = document.getElementById("clear");
+
+    let running = true;
+
+    toggleBtn.addEventListener("click", () => {
+      running = !running;
+      toggleBtn.textContent = running ? "Pause" : "Play";
+    });
+
+    function resetState() {
+      state = {
+        t1: Math.PI / 2,
+        w1: 0,
+        t2: Math.PI / 2 + 0.01,
+        w2: 0
+      };
+      prevTip = null;
+      tctx.clearRect(0, 0, innerWidth, innerHeight);
+    }
+    resetBtn.addEventListener("click", resetState);
+
+    nudgeBtn.addEventListener("click", () => {
+      // Tiny deterministic nudge to show chaotic divergence
+      state.t2 += 0.0025;
+    });
+
+    clearBtn.addEventListener("click", () => {
+      tctx.clearRect(0, 0, innerWidth, innerHeight);
+      prevTip = null;
+    });
+
+    // =========================
+    // Animation loop
+    // =========================
+    const fpsEl = document.getElementById("fps");
+    const energyEl = document.getElementById("energy");
+
+    let lastTS = performance.now();
+    let fpsSmooth = 60;
+
+    // Fixed physics timestep
+    const fixedDt = 1 / 240; // seconds
+    let accumulator = 0;
+
+    function frame(ts) {
+      const dt = Math.min(0.033, (ts - lastTS) / 1000); // clamp to avoid huge jumps
+      lastTS = ts;
+
+      // FPS
+      const fps = 1 / Math.max(1e-6, dt);
+      fpsSmooth = fpsSmooth * 0.9 + fps * 0.1;
+      fpsEl.textContent = `FPS: ${fpsSmooth.toFixed(0)}`;
+
+      syncUI();
+
+      if (running) {
+        accumulator += dt;
+
+        // If tab was inactive, accumulator might explode. Clamp it.
+        accumulator = Math.min(accumulator, 0.15);
+
+        while (accumulator >= fixedDt) {
+          state = rk4Step(state, fixedDt);
+          accumulator -= fixedDt;
+        }
+      }
+
+      const pos = pendulumPositions(state);
+      drawPendulum(pos);
+
+      // Trail fade value
+      const fadeAlpha = Number(fadeEl.value);
+      drawTrail({ x: pos.x2, y: pos.y2 }, fadeAlpha);
+
+      // Energy readout (mainly to show it's real dynamics, it will decay with damping)
+      const E = totalEnergy(state);
+      energyEl.textContent = `Energy: ${E.toFixed(2)}`;
+
+      requestAnimationFrame(frame);
+    }
+
+    // Start with a clean dark background for trail canvas
+    tctx.fillStyle = "rgb(5, 6, 10)";
+    tctx.fillRect(0, 0, innerWidth, innerHeight);
+
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "model_name": "gpt-5.2-extended-thinking.html",
+      "performance_score": 8.75,
+      "observations": "nice pirate ship design, you even try to do the skull in the black flag, the water and waves tho arent very good, the fact that you made it interactive is actually amazing! and the storm with the thunder is the back is pretty good."
+    },
+    {
+      "model_name": "gemini-3-pro.html",
+      "performance_score": 9.0,
+      "observations": "nice pirate ship! it moves in the water, consistency and very nice sun and clouds, even tho when i click the arrows the ui goes crazy, pretty good overall, the fire from the ship after I click space very very nice"
+    },
+    {
+      "model_name": "grok-4.1-thinking.html",
+      "performance_score": 8.48,
+      "observations": "grok you put a white christmas tree instead of a ship, nice details on the black flag with the skull tho, you pretty much did what i asked and the clouds move, very basic but to the point"
+    },
+    {
+      "model_name": "opus-4.5-thinking-32k.html",
+      "performance_score": 9.0,
+      "observations": "very nice clouds and wind, the ship is well designed, and there is even a compass that moves with the ship, non interactive but you did what asked, very cool pirate ship!! congrats the best skull so far"
+    }
+  ]
+}

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Pendulum — Chaos in Motion</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            background: #0a0a0f;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse at 50% 0%, rgba(0, 255, 255, 0.03) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(255, 0, 128, 0.02) 0%, transparent 40%),
+                radial-gradient(ellipse at 20% 70%, rgba(128, 0, 255, 0.02) 0%, transparent 40%);
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1.2rem, 4vw, 1.8rem);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            color: #0ff;
+            text-shadow: 
+                0 0 10px rgba(0, 255, 255, 0.8),
+                0 0 30px rgba(0, 255, 255, 0.4),
+                0 0 60px rgba(0, 255, 255, 0.2);
+            margin-bottom: 1.5rem;
+            text-align: center;
+            animation: glow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: brightness(1); }
+            to { filter: brightness(1.2); }
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 4px;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 255, 0.1),
+                inset 0 0 60px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(145deg, rgba(10, 10, 20, 0.9), rgba(5, 5, 15, 0.95));
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 0.7rem 1.5rem;
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            background: rgba(0, 255, 255, 0.05);
+            color: #0ff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 2px;
+        }
+
+        button:hover {
+            background: rgba(0, 255, 255, 0.15);
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.3),
+                inset 0 0 15px rgba(0, 255, 255, 0.1);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .stats {
+            margin-top: 1.2rem;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem 2rem;
+            font-size: 0.7rem;
+            color: rgba(0, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .stats span {
+            color: #ff0080;
+            text-shadow: 0 0 8px rgba(255, 0, 128, 0.5);
+        }
+
+        .info {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.3);
+            letter-spacing: 0.1em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Double Pendulum</h1>
+        <div class="canvas-wrapper">
+            <canvas id="canvas" width="700" height="600"></canvas>
+        </div>
+        <div class="controls">
+            <button id="restart">Restart</button>
+            <button id="randomize">Randomize</button>
+            <button id="toggleTrail">Clear Trail</button>
+        </div>
+        <div class="stats">
+            <div>θ₁: <span id="theta1">0.00</span>°</div>
+            <div>θ₂: <span id="theta2">0.00</span>°</div>
+            <div>ω₁: <span id="omega1">0.00</span> rad/s</div>
+            <div>ω₂: <span id="omega2">0.00</span> rad/s</div>
+        </div>
+    </div>
+    <div class="info">Lagrangian mechanics • Runge-Kutta integration • Deterministic chaos</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Physical parameters
+        const g = 9.81;
+        let L1 = 150, L2 = 150;  // Lengths in pixels
+        let m1 = 15, m2 = 15;    // Masses
+
+        // State variables: [θ1, ω1, θ2, ω2]
+        let state = [Math.PI / 2, 0, Math.PI / 2 + 0.1, 0];
+        
+        // Initial state for restart
+        let initialState = [...state];
+
+        // Trail storage
+        const maxTrailLength = 800;
+        let trail = [];
+
+        // Pivot point
+        const pivotX = canvas.width / 2;
+        const pivotY = canvas.height / 2 - 80;
+
+        // Time step for simulation (smaller = more accurate)
+        const dt = 0.02;
+        const stepsPerFrame = 3;
+
+        /**
+         * Compute derivatives using Lagrangian mechanics
+         * These are the exact equations of motion for a double pendulum
+         */
+        function derivatives(s) {
+            const [θ1, ω1, θ2, ω2] = s;
+            const Δθ = θ1 - θ2;
+            
+            const sinΔ = Math.sin(Δθ);
+            const cosΔ = Math.cos(Δθ);
+            
+            // Denominator (appears in both equations)
+            const denom1 = (m1 + m2) * L1 - m2 * L1 * cosΔ * cosΔ;
+            const denom2 = (L2 / L1) * denom1;
+            
+            // Angular acceleration for θ1
+            const num1 = m2 * L1 * ω1 * ω1 * sinΔ * cosΔ
+                       + m2 * g * Math.sin(θ2) * cosΔ
+                       + m2 * L2 * ω2 * ω2 * sinΔ
+                       - (m1 + m2) * g * Math.sin(θ1);
+            
+            const α1 = num1 / denom1;
+            
+            // Angular acceleration for θ2
+            const num2 = -m2 * L2 * ω2 * ω2 * sinΔ * cosΔ
+                       + (m1 + m2) * (g * Math.sin(θ1) * cosΔ - L1 * ω1 * ω1 * sinΔ - g * Math.sin(θ2));
+            
+            const α2 = num2 / denom2;
+            
+            return [ω1, α1, ω2, α2];
+        }
+
+        /**
+         * 4th-order Runge-Kutta integration
+         * Much more accurate than Euler for oscillatory systems
+         */
+        function rk4Step(s, h) {
+            const k1 = derivatives(s);
+            const k2 = derivatives(s.map((v, i) => v + h/2 * k1[i]));
+            const k3 = derivatives(s.map((v, i) => v + h/2 * k2[i]));
+            const k4 = derivatives(s.map((v, i) => v + h * k3[i]));
+            
+            return s.map((v, i) => 
+                v + (h/6) * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i])
+            );
+        }
+
+        /**
+         * Convert angles to Cartesian coordinates
+         */
+        function getPositions() {
+            const [θ1, , θ2] = state;
+            
+            const x1 = pivotX + L1 * Math.sin(θ1);
+            const y1 = pivotY + L1 * Math.cos(θ1);
+            
+            const x2 = x1 + L2 * Math.sin(θ2);
+            const y2 = y1 + L2 * Math.cos(θ2);
+            
+            return { x1, y1, x2, y2 };
+        }
+
+        /**
+         * Draw the neon trail with gradient fade
+         */
+        function drawTrail() {
+            if (trail.length < 2) return;
+            
+            for (let i = 1; i < trail.length; i++) {
+                const alpha = i / trail.length;
+                const prevAlpha = (i - 1) / trail.length;
+                
+                // Gradient from magenta to cyan
+                const hue = 280 + (180 - 280) * alpha; // 280 = magenta, 180 = cyan
+                
+                ctx.beginPath();
+                ctx.moveTo(trail[i-1].x, trail[i-1].y);
+                ctx.lineTo(trail[i].x, trail[i].y);
+                
+                ctx.strokeStyle = `hsla(${hue}, 100%, 60%, ${alpha * 0.9})`;
+                ctx.lineWidth = 1.5 + alpha * 1.5;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                
+                // Glow effect
+                if (alpha > 0.7) {
+                    ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${(alpha - 0.7) * 0.5})`;
+                    ctx.lineWidth = 4 + alpha * 4;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        /**
+         * Draw the pendulum system
+         */
+        function drawPendulum() {
+            const { x1, y1, x2, y2 } = getPositions();
+            
+            // Draw rods
+            ctx.beginPath();
+            ctx.moveTo(pivotX, pivotY);
+            ctx.lineTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw pivot
+            ctx.beginPath();
+            ctx.arc(pivotX, pivotY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#333';
+            ctx.fill();
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw bob 1
+            const gradient1 = ctx.createRadialGradient(x1, y1, 0, x1, y1, 18);
+            gradient1.addColorStop(0, '#fff');
+            gradient1.addColorStop(0.3, '#0ff');
+            gradient1.addColorStop(1, 'rgba(0, 255, 255, 0)');
+            
+            ctx.beginPath();
+            ctx.arc(x1, y1, 12, 0, Math.PI * 2);
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fill();
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Glow for bob 1
+            ctx.beginPath();
+            ctx.arc(x1, y1, 18, 0, Math.PI * 2);
+            ctx.fillStyle = gradient1;
+            ctx.fill();
+            
+            // Draw bob 2
+            const gradient2 = ctx.createRadialGradient(x2, y2, 0, x2, y2, 22);
+            gradient2.addColorStop(0, '#fff');
+            gradient2.addColorStop(0.3, '#ff0080');
+            gradient2.addColorStop(1, 'rgba(255, 0, 128, 0)');
+            
+            ctx.beginPath();
+            ctx.arc(x2, y2, 14, 0, Math.PI * 2);
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fill();
+            ctx.strokeStyle = '#ff0080';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Glow for bob 2
+            ctx.beginPath();
+            ctx.arc(x2, y2, 22, 0, Math.PI * 2);
+            ctx.fillStyle = gradient2;
+            ctx.fill();
+        }
+
+        /**
+         * Update statistics display
+         */
+        function updateStats() {
+            const toDeg = (rad) => ((rad * 180 / Math.PI) % 360).toFixed(1);
+            
+            document.getElementById('theta1').textContent = toDeg(state[0]);
+            document.getElementById('theta2').textContent = toDeg(state[2]);
+            document.getElementById('omega1').textContent = state[1].toFixed(2);
+            document.getElementById('omega2').textContent = state[3].toFixed(2);
+        }
+
+        /**
+         * Main animation loop
+         */
+        function animate() {
+            // Clear canvas with slight fade for afterglow
+            ctx.fillStyle = 'rgba(10, 10, 15, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Full clear every few frames to prevent buildup
+            if (Math.random() < 0.02) {
+                ctx.fillStyle = '#0a0a0f';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            // Physics steps
+            for (let i = 0; i < stepsPerFrame; i++) {
+                state = rk4Step(state, dt);
+            }
+            
+            // Update trail
+            const { x2, y2 } = getPositions();
+            trail.push({ x: x2, y: y2 });
+            if (trail.length > maxTrailLength) {
+                trail.shift();
+            }
+            
+            // Draw
+            drawTrail();
+            drawPendulum();
+            updateStats();
+            
+            requestAnimationFrame(animate);
+        }
+
+        /**
+         * Initialize or restart simulation
+         */
+        function restart() {
+            state = [...initialState];
+            trail = [];
+        }
+
+        /**
+         * Randomize initial conditions
+         */
+        function randomize() {
+            state = [
+                Math.PI * (0.3 + Math.random() * 0.7) * (Math.random() > 0.5 ? 1 : -1),
+                (Math.random() - 0.5) * 2,
+                Math.PI * (0.3 + Math.random() * 0.7) * (Math.random() > 0.5 ? 1 : -1),
+                (Math.random() - 0.5) * 2
+            ];
+            initialState = [...state];
+            trail = [];
+        }
+
+        /**
+         * Clear trail
+         */
+        function clearTrail() {
+            trail = [];
+        }
+
+        // Event listeners
+        document.getElementById('restart').addEventListener('click', restart);
+        document.getElementById('randomize').addEventListener('click', randomize);
+        document.getElementById('toggleTrail').addEventListener('click', clearTrail);
+
+        // Start animation
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        animate();
+    </script>
+</body>
+</html>

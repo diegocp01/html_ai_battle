@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Pendulum Chaos Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            color: #888;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        h1 {
+            font-size: 14px;
+            margin: 0 0 5px 0;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        p {
+            font-size: 12px;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <h1>Double Pendulum</h1>
+        <p>Solver: Lagrangian Mechanics</p>
+        <p>Condition: Chaos</p>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let width, height, cx, cy;
+
+    // Physics Variables
+    const g = 1; // Gravity scaling factor
+    
+    // Pendulum 1
+    let r1 = 150; // Length
+    let m1 = 20;  // Mass
+    let a1 = Math.PI / 2; // Angle (radians)
+    let a1_v = 0; // Angular velocity
+    let a1_a = 0; // Angular acceleration
+
+    // Pendulum 2
+    let r2 = 150; // Length
+    let m2 = 20;  // Mass
+    let a2 = Math.PI / 2; // Angle (radians)
+    let a2_v = 0; // Angular velocity
+    let a2_a = 0; // Angular acceleration
+
+    // Trail buffer
+    const path = [];
+    const MAX_PATH_LENGTH = 250; // How long the tail is
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        cx = width / 2;
+        cy = height / 3; // Anchor point
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    function update() {
+        // --- LAGRANGIAN MECHANICS ---
+        // These formulas dictate the angular acceleration based on current angles and velocities
+        
+        // Numerator parts for Acceleration 1
+        let num1 = -g * (2 * m1 + m2) * Math.sin(a1);
+        let num2 = -m2 * g * Math.sin(a1 - 2 * a2);
+        let num3 = -2 * Math.sin(a1 - a2) * m2;
+        let num4 = a2_v * a2_v * r2 + a1_v * a1_v * r1 * Math.cos(a1 - a2);
+        
+        // Denominator for Acceleration 1
+        let den = r1 * (2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2));
+        
+        a1_a = (num1 + num2 + num3 * num4) / den;
+
+        // Numerator parts for Acceleration 2
+        num1 = 2 * Math.sin(a1 - a2);
+        num2 = (a1_v * a1_v * r1 * (m1 + m2));
+        num3 = g * (m1 + m2) * Math.cos(a1);
+        num4 = a2_v * a2_v * r2 * m2 * Math.cos(a1 - a2);
+        
+        // Denominator for Acceleration 2 (same as 1 but scaled by length 2)
+        den = r2 * (2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2));
+        
+        a2_a = (num1 * (num2 + num3 + num4)) / den;
+
+        // Update Position and Velocity
+        a1_v += a1_a;
+        a2_v += a2_a;
+        a1 += a1_v;
+        a2 += a2_v;
+
+        // Optional: Damping (air resistance) to stop it from spinning forever
+        // a1_v *= 0.999;
+        // a2_v *= 0.999;
+    }
+
+    function draw() {
+        // Clear screen with solid color (no trails here, we draw trails manually)
+        ctx.fillStyle = '#050505';
+        ctx.fillRect(0, 0, width, height);
+
+        // Calculate positions
+        // x1, y1 is the joint between the two arms
+        let x1 = r1 * Math.sin(a1);
+        let y1 = r1 * Math.cos(a1);
+
+        // x2, y2 is the tip of the second arm
+        let x2 = x1 + r2 * Math.sin(a2);
+        let y2 = y1 + r2 * Math.cos(a2);
+
+        // Translate to center
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // --- DRAW TRAIL ---
+        // Add new point
+        path.push({ x: x2, y: y2 });
+        if (path.length > MAX_PATH_LENGTH) {
+            path.shift();
+        }
+
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        // Draw the neon path segments
+        for (let i = 0; i < path.length - 1; i++) {
+            const p1 = path[i];
+            const p2 = path[i+1];
+            
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            
+            // Calculate opacity based on index (newer = brighter)
+            const alpha = i / path.length;
+            
+            // Neon settings
+            ctx.strokeStyle = `rgba(0, 255, 200, ${alpha})`; 
+            ctx.lineWidth = 4 * alpha; 
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = `rgba(0, 255, 200, ${alpha})`;
+            
+            ctx.stroke();
+        }
+        
+        // Reset shadow for the rods
+        ctx.shadowBlur = 0;
+
+        // --- DRAW RODS & BOBS ---
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 2;
+
+        // Rod 1
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+
+        // Rod 2
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // Bob 1
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(x1, y1, 8, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Bob 2 (The emitter)
+        ctx.fillStyle = '#00ffc8';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#00ffc8';
+        ctx.beginPath();
+        ctx.arc(x2, y2, 8, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+
+</script>
+</body>
+</html>
