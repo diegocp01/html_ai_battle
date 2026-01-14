@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Slow-Motion Stick Figure Backflip Simulation</title>
+<style>
+  body { margin: 0; background: #87CEEB; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; font-family: Arial, sans-serif; }
+  canvas { background: #fff; border: 1px solid #ccc; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+  h1 { color: #333; margin-bottom: 10px; }
+  p { max-width: 800px; text-align: center; color: #555; }
+</style>
+</head>
+<body>
+<h1>Slow-Motion Standing Backflip Simulation</h1>
+<p>This animation shows a stick figure with articulated joints (elbows, knees, hips, shoulders) performing a standing backflip. It crouches, jumps, tucks tightly (reducing moment of inertia → faster spin due to conservation of angular momentum), then extends to slow the rotation and stick the landing.</p>
+<canvas id="c" width="800" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let startTime = performance.now();
+
+const duration = 20; // seconds (slow-motion)
+
+function animate() {
+  const time = (performance.now() - startTime) / 1000;
+  let progress = time / duration;
+
+  // Loop the animation
+  if (progress > 1) {
+    startTime = performance.now();
+    progress = 0;
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Ground
+  ctx.fillStyle = '#228B22';
+  ctx.fillRect(0, 520, 800, 80);
+
+  // Parameters
+  let theta = 0; // body rotation (degrees, negative = backward)
+  let jumpHeight = 0; // upward displacement (negative Y)
+  let tuck = 0; // 0 = extended, 1 = fully tucked
+
+  // Phase breakdown
+  if (progress < 0.1) {
+    // Crouch
+    const p = progress / 0.1;
+    tuck = 0;
+    jumpHeight = 40 * p; // slight sink
+  } else if (progress < 0.2) {
+    // Explosive jump + start rotation
+    const p = (progress - 0.1) / 0.1;
+    tuck = 0;
+    jumpHeight = 40 - 440 * p; // rapid rise (peak ~400px up)
+    theta = -25 * p;
+  } else if (progress < 0.9) {
+    // Airborne
+    const airProgress = (progress - 0.2) / 0.7;
+
+    // Parabolic jump height
+    jumpHeight = -400 * Math.sin(airProgress * Math.PI);
+
+    // Tuck timing
+    const tuckStart = 0.15;
+    const tuckPeak = 0.35;
+    const extendStart = 0.65;
+    if (airProgress < tuckStart) tuck = 0;
+    else if (airProgress < tuckPeak) tuck = (airProgress - tuckStart) / (tuckPeak - tuckStart);
+    else if (airProgress < extendStart) tuck = 1;
+    else tuck = 1 - (airProgress - extendStart) / (1 - extendStart);
+
+    // Angular velocity higher when tucked (conservation of angular momentum)
+    // Base rate adjusted so total rotation = exactly 360°
+    const sections = { s1: tuckStart, avg1: 1, s2: tuckPeak - tuckStart, avg2: 2, s3: extendStart - tuckPeak, avg3: 3, s4: 1 - extendStart, avg4: 2 };
+    const totalWeighted = sections.s1*sections.avg1 + sections.s2*sections.avg2 + sections.s3*sections.avg3 + sections.s4*sections.avg4;
+    const baseRate = 360 / totalWeighted;
+
+    let accumulated = 0;
+    if (airProgress <= tuckStart) {
+      accumulated = baseRate * sections.avg1 * airProgress;
+    } else if (airProgress <= tuckPeak) {
+      accumulated = baseRate * sections.avg1 * tuckStart + baseRate * sections.avg2 * (airProgress - tuckStart);
+    } else if (airProgress <= extendStart) {
+      accumulated = baseRate * sections.avg1 * tuckStart + baseRate * sections.avg2 * sections.s2 + baseRate * sections.avg3 * (airProgress - tuckPeak);
+    } else {
+      accumulated = baseRate * sections.avg1 * tuckStart + baseRate * sections.avg2 * sections.s2 + baseRate * sections.avg3 * sections.s3 + baseRate * sections.avg4 * (airProgress - extendStart);
+    }
+    theta = -accumulated - 25; // continue from takeoff lean
+  } else {
+    // Landing absorb
+    const p = (progress - 0.9) / 0.1;
+    jumpHeight = 40 * p; // sink slightly
+    theta = -385; // slight over-rotation absorbed on landing
+    tuck = 0;
+  }
+
+  // Pose adjustments based on tuck
+  const baseLegUpper = 25; // slight outward for crouch/jump feel
+  const baseKnee = 60;
+  const legUpper = baseLegUpper + tuck * 80; // thighs up
+  const kneeBend = baseKnee + tuck * 60; // knees bend inward
+  const armUpper = 15 + tuck * 90; // arms up
+  const elbowBend = tuck * -140; // elbows bend to hug
+
+  const hipsX = 400;
+  const hipsY = 480 + jumpHeight;
+
+  ctx.save();
+  ctx.translate(hipsX, hipsY);
+  ctx.rotate(theta * Math.PI / 180);
+
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 10;
+  ctx.lineCap = 'round';
+
+  // Torso
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -80);
+  ctx.stroke();
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(0, -95, 15, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Arms (left & right)
+  [-1, 1].forEach(side => {
+    ctx.save();
+    ctx.translate(side * 18, -65);
+    ctx.rotate(side * armUpper * Math.PI / 180);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 45);
+    ctx.stroke();
+    ctx.translate(0, 45);
+    ctx.rotate(side * elbowBend * Math.PI / 180);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 45);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // Legs (left & right)
+  [-1, 1].forEach(side => {
+    ctx.save();
+    ctx.translate(side * 18, 0);
+    ctx.rotate(side * legUpper * Math.PI / 180);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 55);
+    ctx.stroke();
+    ctx.translate(0, 55);
+    ctx.rotate(side * kneeBend * Math.PI / 180);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 55);
+    ctx.stroke();
+    // Foot
+    ctx.beginPath();
+    ctx.moveTo(-15, 55);
+    ctx.lineTo(20, 55);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  ctx.restore();
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>

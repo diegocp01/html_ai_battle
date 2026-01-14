@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physics Backflip Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            color: #eee;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #canvas-container {
+            position: relative;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            background: linear-gradient(to bottom, #333 0%, #111 100%);
+            border-bottom: 4px solid #4a4;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #4a4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5c5;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .stats {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button id="btn-jump">Perform Backflip</button>
+        <button id="btn-reset">Reset</button>
+        <div class="speed-control">
+            <label>Speed:</label>
+            <input type="range" id="time-scale" min="0.1" max="1.0" step="0.1" value="0.3">
+            <span id="speed-val">30%</span>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="simCanvas" width="800" height="500"></canvas>
+        <div class="stats" id="stats">
+            State: IDLE<br>
+            Ang Vel: 0.00 rad/s<br>
+            Inertia: 100%<br>
+            Height: 0.00 m
+        </div>
+    </div>
+
+<script>
+/**
+ * PHYSICS ENGINE & KINEMATICS
+ */
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const statsEl = document.getElementById('stats');
+const btnJump = document.getElementById('btn-jump');
+const btnReset = document.getElementById('btn-reset');
+const slider = document.getElementById('time-scale');
+const speedVal = document.getElementById('speed-val');
+
+// Simulation Constants
+const GROUND_Y = 400;
+const GRAVITY = 0.5;
+const JUMP_FORCE = -14;
+const INITIAL_TORQUE = -0.15; // Negative for backflip (counter-clockwise visually usually, but canvas Y is down, so negative rotation)
+
+// Moment of Inertia Multipliers (The core physics concept)
+const INERTIA_EXTENDED = 1.0;
+const INERTIA_TUCKED = 0.35; // Body spins ~2.8x faster when tucked
+
+// State Management
+let timeScale = 0.3;
+let simState = 'idle'; // idle, crouch, jump, tuck, extend, landed
+let animTimer = 0;
+
+// Physics State
+let physics = {
+    x: 400,
+    y: GROUND_Y,
+    vx: 0,
+    vy: 0,
+    angle: 0,           // Global body rotation
+    angVel: 0,          // Angular velocity
+    angularMomentum: 0, // L = I * w (Conserved quantity)
+    currentInertia: INERTIA_EXTENDED
+};
+
+// Limb Target Angles (Relative to Torso)
+// [hip, knee, shoulder, elbow] in degrees
+const POSES = {
+    idle:   { hip: 0,   knee: 0,   shoulder: 10,  elbow: 10,  head: 0 },
+    crouch: { hip: -80, knee: 110, shoulder: -50, elbow: 80,  head: 20 }, // Wind up
+    jump:   { hip: 10,  knee: 0,   shoulder: 170, elbow: 10,  head: -10}, // Extension
+    tuck:   { hip: 130, knee: 130, shoulder: 40,  elbow: 100, head: 30 }, // Tight ball
+    land:   { hip: 20,  knee: 20,  shoulder: 0,   elbow: 0,   head: 0 }   // Absorb impact
+};
+
+// Current Limb State (interpolated)
+let limbs = { ...POSES.idle };
+
+// Skeleton Configuration (lengths)
+const SKEL = {
+    torso: 50,
+    thigh: 35,
+    shin: 35,
+    upperArm: 30,
+    foreArm: 25,
+    headRad: 12,
+    neck: 10
+};
+
+// ---------------------------------------------------------
+// UPDATE LOOP
+// ---------------------------------------------------------
+
+function update() {
+    // 1. Handle Animation State Logic
+    handleStateLogic();
+
+    // 2. Physics Update (Constraint: Ground)
+    if (simState === 'jump' || simState === 'tuck' || simState === 'extend') {
+        physics.vy += GRAVITY * timeScale;
+        physics.x += physics.vx * timeScale;
+        physics.y += physics.vy * timeScale;
+        
+        // Update Rotation based on Angular Momentum
+        // w = L / I
+        physics.angVel = physics.angularMomentum / physics.currentInertia;
+        physics.angle += physics.angVel * timeScale;
+    }
+
+    // Ground Collision
+    if (physics.y >= GROUND_Y && (simState === 'extend' || simState === 'tuck')) {
+        physics.y = GROUND_Y;
+        physics.vy = 0;
+        physics.vx = 0;
+        physics.angVel = 0;
+        physics.angularMomentum = 0;
+        
+        // Stick the landing logic
+        // If angle is roughly 0 (or 2PI), success. Else crash.
+        const normAngle = Math.abs(physics.angle % (Math.PI * 2));
+        // A simple "snap to feet" for visual cleanliness
+        physics.angle = Math.PI * 2; 
+        
+        simState = 'landed';
+        btnJump.disabled = false;
+        
+        // Ease into landing pose
+        lerpLimbs(POSES.land, 0.2);
+    }
+
+    // 3. Interpolate Limbs for smooth animation
+    // Determine target pose based on state
+    let targetPose = POSES.idle;
+    let lerpSpeed = 0.1 * timeScale * 3; // Adjust anim speed by timescale
+
+    if (simState === 'crouch') targetPose = POSES.crouch;
+    else if (simState === 'jump') targetPose = POSES.jump;
+    else if (simState === 'tuck') targetPose = POSES.tuck;
+    else if (simState === 'extend') targetPose = POSES.jump; // Prepare for landing
+    else if (simState === 'landed') targetPose = POSES.land;
+
+    lerpLimbs(targetPose, lerpSpeed);
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function handleStateLogic() {
+    if (simState === 'crouch') {
+        animTimer += timeScale;
+        // Hold crouch briefly then jump
+        if (animTimer > 20) {
+            triggerJump();
+        }
+    }
+    
+    // Auto-Tuck at peak of jump
+    if (simState === 'jump' && physics.vy > -5 && physics.vy < 0) {
+        simState = 'tuck';
+        // PHYSICS MAGIC: Decrease Inertia -> Increases AngVel
+        physics.currentInertia = INERTIA_TUCKED;
+    }
+
+    // Auto-Extend before landing
+    // Look ahead: if we are close to ground and rotated almost 360
+    if (simState === 'tuck' && physics.y > GROUND_Y - 100) {
+        simState = 'extend';
+        // PHYSICS MAGIC: Increase Inertia -> Slows AngVel (Stopping the spin)
+        physics.currentInertia = INERTIA_EXTENDED;
+    }
+}
+
+function triggerCrouch() {
+    if (simState !== 'idle' && simState !== 'landed') return;
+    simState = 'crouch';
+    animTimer = 0;
+    btnJump.disabled = true;
+    
+    // Reset Physics
+    physics.angle = 0;
+    physics.y = GROUND_Y;
+}
+
+function triggerJump() {
+    simState = 'jump';
+    physics.vy = JUMP_FORCE;
+    
+    // Add initial rotational energy (Torque)
+    // We set Angular Momentum, which stays constant until we change Inertia
+    physics.currentInertia = INERTIA_EXTENDED;
+    let initialVel = INITIAL_TORQUE; 
+    physics.angularMomentum = initialVel * physics.currentInertia;
+}
+
+function lerpLimbs(target, alpha) {
+    for (let key in limbs) {
+        limbs[key] = limbs[key] + (target[key] - limbs[key]) * alpha;
+    }
+}
+
+// ---------------------------------------------------------
+// DRAWING (Forward Kinematics)
+// ---------------------------------------------------------
+
+function toRad(deg) { return deg * Math.PI / 180; }
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Ground
+    ctx.fillStyle = '#4a4';
+    ctx.fillRect(0, GROUND_Y, canvas.width, 4);
+
+    ctx.save();
+    
+    // Translate to Center of Mass (Hips/Lower Torso approx)
+    ctx.translate(physics.x, physics.y - 40); // Shift visual up so feet touch ground at y=400
+    ctx.rotate(physics.angle);
+
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // 1. Draw Torso
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -SKEL.torso);
+    ctx.stroke();
+
+    // 2. Draw Head
+    let headX = 0 + Math.sin(toRad(limbs.head)) * SKEL.neck;
+    let headY = -SKEL.torso - Math.cos(toRad(limbs.head)) * SKEL.neck;
+    
+    ctx.beginPath();
+    ctx.arc(headX, headY - SKEL.headRad, SKEL.headRad, 0, Math.PI*2);
+    ctx.fillStyle = '#fff'; // filled head
+    ctx.fill();
+
+    // 3. Legs (Left & Right)
+    drawLeg(1); // Right
+    drawLeg(-1); // Left (slightly offset or darker?)
+
+    // 4. Arms
+    drawArm(1);
+    drawArm(-1);
+
+    ctx.restore();
+
+    // Draw Stats
+    updateUI();
+}
+
+function drawLeg(side) {
+    ctx.save();
+    // Hips
+    ctx.rotate(toRad(limbs.hip));
+    
+    // Thigh
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(0, SKEL.thigh);
+    ctx.stroke();
+    
+    ctx.translate(0, SKEL.thigh);
+    
+    // Knee
+    ctx.rotate(toRad(-limbs.knee)); // Knees bend backward relative to thigh
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(0, SKEL.shin);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawArm(side) {
+    ctx.save();
+    ctx.translate(0, -SKEL.torso + 5); // Shoulder position
+    
+    // Shoulder Rotate
+    ctx.rotate(toRad(limbs.shoulder));
+    
+    // Upper Arm
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(0, SKEL.upperArm);
+    ctx.stroke();
+    
+    ctx.translate(0, SKEL.upperArm);
+    
+    // Elbow
+    ctx.rotate(toRad(limbs.elbow)); // Elbows bend inward
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(0, SKEL.foreArm);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function updateUI() {
+    statsEl.innerHTML = `
+        State: <span style="color:#4f4">${simState.toUpperCase()}</span><br>
+        Ang Vel: ${physics.angVel.toFixed(2)} rad/s<br>
+        Moment of Inertia: ${(physics.currentInertia * 100).toFixed(0)}%<br>
+        Conservation check (L): ${physics.angularMomentum.toFixed(3)}
+    `;
+}
+
+// ---------------------------------------------------------
+// EVENT LISTENERS
+// ---------------------------------------------------------
+
+btnJump.addEventListener('click', triggerCrouch);
+btnReset.addEventListener('click', () => {
+    simState = 'idle';
+    physics.x = 400;
+    physics.y = GROUND_Y;
+    physics.angle = 0;
+    physics.vx = 0;
+    physics.vy = 0;
+    physics.angVel = 0;
+    physics.angularMomentum = 0;
+    limbs = { ...POSES.idle };
+    btnJump.disabled = false;
+    draw();
+});
+
+slider.addEventListener('input', (e) => {
+    timeScale = parseFloat(e.target.value);
+    speedVal.innerText = Math.round(timeScale * 100) + '%';
+});
+
+// Init
+update();
+
+</script>
+</body>
+</html>

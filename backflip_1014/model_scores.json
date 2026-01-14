@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "model_name": "gpt-5.2-extended-thinking.html",
+      "performance_score": 7.4,
+      "observations": "not sure if thats a backflip or a frontflip, the jump looks very weird, but it lands correctly"
+    },
+    {
+      "model_name": "gemini-3-pro.html",
+      "performance_score": 7.2,
+      "observations": "not sure if thats a backflip or a frontflip, it does several spins in the air and it lands incorrectly"
+    },
+    {
+      "model_name": "grok-4.1-thinking.html",
+      "performance_score": 3.85,
+      "observations": "so the person looks like a car then starts floating, makes some weird movements and lands like a car again"
+    },
+    {
+      "model_name": "opus-4.5-thinking-32k.html",
+      "performance_score": 8.13,
+      "observations": "that is actually a frontflip, but besides that pretty good, slow mo, good physics and lands perfectly"
+    }
+  ]
+}
