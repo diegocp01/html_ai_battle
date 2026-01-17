@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "model_name": "gpt-5.2-extended-thinking.html",
+      "performance_score": 9.32,
+      "observations": "amazing!! you can even control the camera, a lot of details, great job, congrats gpt you getting better"
+    },
+    {
+      "model_name": "gemini-3-pro.html",
+      "performance_score": 8.57,
+      "observations": "straight up to the point, it doing what is asked, incredibly simple but good, even tho the airplane looks like a chicken lol"
+    },
+    {
+      "model_name": "grok-4.1-thinking.html",
+      "performance_score": 0.0,
+      "observations": "code doesnt even render"
+    },
+    {
+      "model_name": "opus-4.5-thinking-32k.html",
+      "performance_score": 4.0,
+      "observations": "the airplane is just floating, not landing, bad job, you focused to much on the extra details instead of the main purpose of landing the plane."
+    }
+  ]
+}

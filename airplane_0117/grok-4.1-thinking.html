@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>3D Airplane Landing Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+    </style>
+</head>
+<body>
+<script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/controls/OrbitControls.js';
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(200, 100, -100);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0, 20, 100);
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(100, 200, 100);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+
+    // Ground (grass field)
+    const fieldGeometry = new THREE.PlaneGeometry(600, 1200);
+    const fieldMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
+    const field = new THREE.Mesh(fieldGeometry, fieldMaterial);
+    field.rotation.x = -Math.PI / 2;
+    field.position.y = -0.1;
+    field.receiveShadow = true;
+    scene.add(field);
+
+    // Runway
+    const runwayGeometry = new THREE.PlaneGeometry(70, 900);
+    const runwayMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const runway = new THREE.Mesh(runwayGeometry, runwayMaterial);
+    runway.rotation.x = -Math.PI / 2;
+    runway.receiveShadow = true;
+    scene.add(runway);
+
+    // Runway center dashed lines
+    const dashGeometry = new THREE.BoxGeometry(8, 0.2, 40);
+    const dashMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
+    for (let i = -400; i < 400; i += 80) {
+        const dash = new THREE.Mesh(dashGeometry, dashMaterial);
+        dash.position.z = i;
+        dash.position.y = 0.1;
+        dash.castShadow = true;
+        scene.add(dash);
+    }
+
+    // Airplane group
+    const airplane = new THREE.Group();
+    scene.add(airplane);
+
+    const planeMaterial = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+    const accentMaterial = new THREE.MeshPhongMaterial({ color: 0x0066ff });
+
+    // Fuselage
+    const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 50, 32), planeMaterial);
+    fuselage.rotation.z = Math.PI / 2;
+    fuselage.castShadow = true;
+    airplane.add(fuselage);
+
+    // Nose cone
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(3, 10, 32), planeMaterial);
+    nose.rotation.z = Math.PI / 2;
+    nose.position.z = 30;
+    nose.castShadow = true;
+    airplane.add(nose);
+
+    // Main wings
+    const wings = new THREE.Mesh(new THREE.BoxGeometry(80, 3, 20), accentMaterial);
+    wings.castShadow = true;
+    airplane.add(wings);
+
+    // Vertical tail
+    const vTail = new THREE.Mesh(new THREE.BoxGeometry(3, 20, 12), accentMaterial);
+    vTail.position.set(0, 10, -22);
+    vTail.castShadow = true;
+    airplane.add(vTail);
+
+    // Horizontal stabilizers
+    const hTail = new THREE.Mesh(new THREE.BoxGeometry(30, 3, 12), accentMaterial);
+    hTail.position.set(0, 10, -22);
+    hTail.castShadow = true;
+    airplane.add(hTail);
+
+    // Propeller (spinning)
+    const propeller = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 30, 16), new THREE.MeshPhongMaterial({ color: 0x222222 }));
+    propeller.position.z = 35;
+    propeller.castShadow = true;
+    airplane.add(propeller);
+
+    // Simple landing gear + wheels (visible throughout)
+    const wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x111111 });
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 6, 32), wheelMaterial);
+
+    const leftMainWheel = wheel.clone();
+    leftMainWheel.position.set(-20, -10, 0);
+    leftMainWheel.rotation.z = Math.PI / 2;
+    airplane.add(leftMainWheel);
+
+    const rightMainWheel = wheel.clone();
+    rightMainWheel.position.set(20, -10, 0);
+    rightMainWheel.rotation.z = Math.PI / 2;
+    airplane.add(rightMainWheel);
+
+    const noseWheel = wheel.clone();
+    noseWheel.scale.set(0.7, 0.7, 0.7);
+    noseWheel.position.set(0, -10, 20);
+    noseWheel.rotation.z = Math.PI / 2;
+    airplane.add(noseWheel);
+
+    // Initial airplane position
+    airplane.position.set(0, 150, -700);
+    airplane.rotation.x = -0.15; // slight nose-down for approach
+
+    // Animation variables
+    let forwardSpeed = 7;
+    let verticalSpeed = 1.4;
+    let flared = false;
+    let landed = false;
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+
+        // Spinning propeller
+        propeller.rotation.z += 0.4;
+
+        if (!landed) {
+            airplane.position.z += forwardSpeed;
+            airplane.position.y -= verticalSpeed;
+
+            // Flare near ground
+            if (airplane.position.y < 40 && !flared) {
+                verticalSpeed = 0.4;
+                airplane.rotation.x = 0.2; // nose up
+                flared = true;
+            }
+
+            // Touchdown
+            if (airplane.position.y <= 0) {
+                airplane.position.y = 0;
+                landed = true;
+                airplane.rotation.x = 0.05; // slight nose up after touchdown
+            }
+        } else {
+            // Deceleration after landing
+            if (forwardSpeed > 0) {
+                forwardSpeed -= 0.06;
+                airplane.position.z += forwardSpeed;
+                propeller.rotation.z += forwardSpeed * 0.1; // propeller slows
+            }
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>

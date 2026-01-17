@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Airplane Landing Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(180deg, 
+                #1a1a2e 0%, 
+                #16213e 20%, 
+                #0f3460 40%, 
+                #533483 60%, 
+                #e94560 80%, 
+                #ff6b6b 100%);
+            height: 100vh;
+            perspective: 1000px;
+        }
+
+        .scene {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            perspective: 800px;
+            overflow: hidden;
+        }
+
+        /* Sky */
+        .sky {
+            position: absolute;
+            width: 100%;
+            height: 60%;
+            background: linear-gradient(180deg, 
+                #87ceeb 0%, 
+                #b0e0e6 50%, 
+                #f0f8ff 100%);
+            transition: background 2s;
+        }
+
+        .sky.sunset {
+            background: linear-gradient(180deg, 
+                #1a1a2e 0%, 
+                #e94560 50%, 
+                #ff9a56 100%);
+        }
+
+        /* Sun */
+        .sun {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #fff700 0%, #ff9500 100%);
+            border-radius: 50%;
+            top: 10%;
+            right: 15%;
+            box-shadow: 0 0 60px #ff9500, 0 0 100px #ffcc00;
+        }
+
+        /* Clouds */
+        .clouds {
+            position: absolute;
+            width: 100%;
+            height: 40%;
+            top: 5%;
+        }
+
+        .cloud {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.9;
+            filter: blur(2px);
+        }
+
+        /* Ground */
+        .ground {
+            position: absolute;
+            width: 300%;
+            height: 100%;
+            bottom: 0;
+            left: -100%;
+            background: linear-gradient(180deg, 
+                #228b22 0%, 
+                #32cd32 20%, 
+                #228b22 40%,
+                #006400 100%);
+            transform-origin: bottom center;
+            transform: rotateX(60deg) translateZ(-200px);
+        }
+
+        /* Runway Container */
+        .runway-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            bottom: 0;
+            transform-style: preserve-3d;
+        }
+
+        /* Runway */
+        .runway {
+            position: absolute;
+            width: 120px;
+            height: 2000px;
+            background: #333;
+            left: 50%;
+            bottom: -100px;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotateX(75deg);
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        .runway::before {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 100%;
+            background: repeating-linear-gradient(
+                to bottom,
+                #fff 0px,
+                #fff 30px,
+                transparent 30px,
+                transparent 60px
+            );
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Runway markings */
+        .runway-marking {
+            position: absolute;
+            width: 40px;
+            height: 8px;
+            background: #fff;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Runway lights */
+        .runway-lights {
+            position: absolute;
+            width: 140px;
+            height: 2000px;
+            left: 50%;
+            bottom: -100px;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotateX(75deg);
+            pointer-events: none;
+        }
+
+        .runway-light {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #ffff00;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ffff00, 0 0 20px #ff9900;
+            animation: blink 1s ease-in-out infinite alternate;
+        }
+
+        .runway-light.left {
+            left: 0;
+        }
+
+        .runway-light.right {
+            right: 0;
+        }
+
+        @keyframes blink {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Approach lights */
+        .approach-lights {
+            position: absolute;
+            width: 200px;
+            height: 400px;
+            left: 50%;
+            bottom: -500px;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotateX(75deg);
+        }
+
+        .approach-light {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #ff0000;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #ff0000;
+            animation: approachBlink 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes approachBlink {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        /* Airport buildings */
+        .airport {
+            position: absolute;
+            bottom: 15%;
+            left: 10%;
+            transform-style: preserve-3d;
+        }
+
+        .building {
+            position: absolute;
+            background: linear-gradient(180deg, #666 0%, #444 100%);
+            border: 2px solid #333;
+        }
+
+        .terminal {
+            width: 200px;
+            height: 60px;
+            bottom: 0;
+            left: 0;
+        }
+
+        .tower {
+            width: 30px;
+            height: 120px;
+            bottom: 0;
+            left: 220px;
+            background: linear-gradient(180deg, #888 0%, #555 100%);
+        }
+
+        .tower::before {
+            content: '';
+            position: absolute;
+            width: 50px;
+            height: 25px;
+            background: #87ceeb;
+            border: 3px solid #444;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 5px 5px 0 0;
+        }
+
+        /* Airplane */
+        .airplane-container {
+            position: absolute;
+            transform-style: preserve-3d;
+            transition: transform 0.1s linear;
+        }
+
+        .airplane {
+            position: relative;
+            transform-style: preserve-3d;
+        }
+
+        /* Fuselage */
+        .fuselage {
+            position: absolute;
+            width: 200px;
+            height: 35px;
+            background: linear-gradient(180deg, 
+                #f5f5f5 0%, 
+                #e0e0e0 30%, 
+                #d0d0d0 70%, 
+                #c0c0c0 100%);
+            border-radius: 60% 95% 95% 60% / 50% 50% 50% 50%;
+            left: -100px;
+            top: -17.5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .fuselage::before {
+            content: '';
+            position: absolute;
+            width: 40%;
+            height: 12px;
+            background: linear-gradient(90deg, 
+                #87ceeb 0%, 
+                #add8e6 50%, 
+                #87ceeb 100%);
+            top: 5px;
+            left: 20%;
+            border-radius: 2px;
+        }
+
+        /* Cockpit */
+        .cockpit {
+            position: absolute;
+            width: 45px;
+            height: 25px;
+            background: linear-gradient(180deg, 
+                #1a1a2e 0%, 
+                #2d3436 100%);
+            border-radius: 80% 100% 60% 60% / 100% 100% 40% 40%;
+            right: -30px;
+            top: -12.5px;
+            border: 2px solid #444;
+        }
+
+        .cockpit::after {
+            content: '';
+            position: absolute;
+            width: 60%;
+            height: 40%;
+            background: rgba(135, 206, 235, 0.6);
+            top: 15%;
+            left: 20%;
+            border-radius: 50%;
+        }
+
+        /* Wings */
+        .wing {
+            position: absolute;
+            width: 120px;
+            height: 25px;
+            background: linear-gradient(180deg, 
+                #e8e8e8 0%, 
+                #d0d0d0 50%, 
+                #c8c8c8 100%);
+            top: 0;
+            left: -30px;
+            transform-origin: right center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .wing.left {
+            transform: rotateY(90deg) rotateZ(-5deg) translateZ(-5px);
+            border-radius: 50% 0 0 50%;
+        }
+
+        .wing.right {
+            transform: rotateY(-90deg) rotateZ(5deg) translateZ(-5px);
+            border-radius: 0 50% 50% 0;
+        }
+
+        /* Engines */
+        .engine {
+            position: absolute;
+            width: 35px;
+            height: 15px;
+            background: linear-gradient(180deg, #888 0%, #555 100%);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            top: 8px;
+        }
+
+        .engine.left {
+            left: -100px;
+            transform: rotateY(90deg) translateZ(40px);
+        }
+
+        .engine.right {
+            left: -100px;
+            transform: rotateY(-90deg) translateZ(40px);
+        }
+
+        .engine::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: radial-gradient(circle, #333 0%, #111 100%);
+            border-radius: 50%;
+            right: -2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Tail */
+        .tail-vertical {
+            position: absolute;
+            width: 45px;
+            height: 40px;
+            background: linear-gradient(90deg, 
+                #e0e0e0 0%, 
+                #f5f5f5 50%, 
+                #e0e0e0 100%);
+            left: -130px;
+            top: -50px;
+            clip-path: polygon(100% 100%, 0% 100%, 50% 0%);
+            transform: rotateX(0deg);
+        }
+
+        .tail-horizontal {
+            position: absolute;
+            width: 50px;
+            height: 15px;
+            background: linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 100%);
+            left: -125px;
+        }
+
+        .tail-horizontal.left {
+            transform: rotateY(70deg) translateZ(-10px);
+            border-radius: 50% 0 0 50%;
+        }
+
+        .tail-horizontal.right {
+            transform: rotateY(-70deg) translateZ(-10px);
+            border-radius: 0 50% 50% 0;
+        }
+
+        /* Landing Gear */
+        .landing-gear {
+            position: absolute;
+            transform-style: preserve-3d;
+            transition: transform 0.5s ease-in-out;
+        }
+
+        .gear-leg {
+            position: absolute;
+            width: 4px;
+            height: 25px;
+            background: linear-gradient(90deg, #444 0%, #666 50%, #444 100%);
+        }
+
+        .wheel {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: radial-gradient(circle, #444 0%, #222 70%, #000 100%);
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+
+        .front-gear {
+            left: 50px;
+            top: 20px;
+        }
+
+        .front-gear .gear-leg {
+            left: 0;
+        }
+
+        .front-gear .wheel {
+            top: 20px;
+            left: -5px;
+        }
+
+        .rear-gear {
+            left: -30px;
+            top: 20px;
+        }
+
+        .rear-gear.left {
+            transform: translateX(-20px);
+        }
+
+        .rear-gear.right {
+            transform: translateX(20px);
+        }
+
+        .rear-gear .wheel {
+            top: 20px;
+            left: -5px;
+        }
+
+        /* Smoke effect on landing */
+        .smoke {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(200, 200, 200, 0.6);
+            border-radius: 50%;
+            opacity: 0;
+            filter: blur(5px);
+        }
+
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 1000;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+
+        .btn.reset {
+            background: linear-gradient(180deg, #f44336 0%, #c62828 100%);
+        }
+
+        .btn.view {
+            background: linear-gradient(180deg, #2196F3 0%, #1565C0 100%);
+        }
+
+        /* HUD */
+        .hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #0f0;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            z-index: 1000;
+            border: 1px solid #0f0;
+            min-width: 200px;
+        }
+
+        .hud-item {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .hud-value {
+            color: #0ff;
+            font-weight: bold;
+        }
+
+        /* Status indicator */
+        .status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 18px;
+            z-index: 1000;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .status.warning {
+            border-left-color: #ff9800;
+        }
+
+        .status.danger {
+            border-left-color: #f44336;
+        }
+
+        /* Horizon indicator */
+        .horizon {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: linear-gradient(180deg, 
+                #87ceeb 0%, 
+                #87ceeb 50%, 
+                #8b4513 50%, 
+                #8b4513 100%);
+            border: 3px solid #333;
+            overflow: hidden;
+            z-index: 1000;
+        }
+
+        .horizon-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: #fff;
+            top: 50%;
+            left: 0;
+        }
+
+        .horizon-center {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #ff0;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .horizon-wings {
+            position: absolute;
+            width: 60px;
+            height: 3px;
+            background: #ff0;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Mountains */
+        .mountains {
+            position: absolute;
+            bottom: 40%;
+            width: 100%;
+            height: 20%;
+        }
+
+        .mountain {
+            position: absolute;
+            bottom: 0;
+            width: 0;
+            height: 0;
+            border-left: 100px solid transparent;
+            border-right: 100px solid transparent;
+            border-bottom: 150px solid #4a5568;
+        }
+
+        .mountain::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            left: -30px;
+            width: 0;
+            height: 0;
+            border-left: 30px solid transparent;
+            border-right: 30px solid transparent;
+            border-bottom: 50px solid white;
+        }
+
+        /* Trees */
+        .trees {
+            position: absolute;
+            bottom: 40%;
+            width: 100%;
+        }
+
+        .tree {
+            position: absolute;
+            bottom: 0;
+        }
+
+        .tree-trunk {
+            width: 8px;
+            height: 20px;
+            background: #8b4513;
+            margin: 0 auto;
+        }
+
+        .tree-top {
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-bottom: 30px solid #228b22;
+            margin-left: -11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="scene" id="scene">
+        <!-- Sky -->
+        <div class="sky" id="sky">
+            <div class="sun"></div>
+        </div>
+
+        <!-- Clouds -->
+        <div class="clouds" id="clouds"></div>
+
+        <!-- Mountains -->
+        <div class="mountains" id="mountains"></div>
+
+        <!-- Ground -->
+        <div class="ground"></div>
+
+        <!-- Runway -->
+        <div class="runway-container">
+            <div class="runway" id="runway"></div>
+            <div class="runway-lights" id="runwayLights"></div>
+            <div class="approach-lights" id="approachLights"></div>
+        </div>
+
+        <!-- Airport -->
+        <div class="airport">
+            <div class="building terminal"></div>
+            <div class="building tower"></div>
+        </div>
+
+        <!-- Airplane -->
+        <div class="airplane-container" id="airplane">
+            <div class="airplane">
+                <!-- Fuselage -->
+                <div class="fuselage"></div>
+                <div class="cockpit"></div>
+
+                <!-- Wings -->
+                <div class="wing left"></div>
+                <div class="wing right"></div>
+
+                <!-- Engines -->
+                <div class="engine left"></div>
+                <div class="engine right"></div>
+
+                <!-- Tail -->
+                <div class="tail-vertical"></div>
+                <div class="tail-horizontal left"></div>
+                <div class="tail-horizontal right"></div>
+
+                <!-- Landing Gear -->
+                <div class="landing-gear" id="landingGear">
+                    <div class="front-gear">
+                        <div class="gear-leg"></div>
+                        <div class="wheel"></div>
+                    </div>
+                    <div class="rear-gear left">
+                        <div class="gear-leg"></div>
+                        <div class="wheel"></div>
+                    </div>
+                    <div class="rear-gear right">
+                        <div class="gear-leg"></div>
+                        <div class="wheel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div class="hud">
+        <div class="hud-item">
+            <span>ALTITUDE:</span>
+            <span class="hud-value" id="altitude">3000 ft</span>
+        </div>
+        <div class="hud-item">
+            <span>SPEED:</span>
+            <span class="hud-value" id="speed">180 kts</span>
+        </div>
+        <div class="hud-item">
+            <span>V/S:</span>
+            <span class="hud-value" id="vspeed">-800 fpm</span>
+        </div>
+        <div class="hud-item">
+            <span>DISTANCE:</span>
+            <span class="hud-value" id="distance">5.0 nm</span>
+        </div>
+        <div class="hud-item">
+            <span>GEAR:</span>
+            <span class="hud-value" id="gearStatus">DOWN</span>
+        </div>
+    </div>
+
+    <!-- Artificial Horizon -->
+    <div class="horizon" id="horizon">
+        <div class="horizon-line"></div>
+        <div class="horizon-center"></div>
+        <div class="horizon-wings"></div>
+    </div>
+
+    <!-- Status -->
+    <div class="status" id="status">APPROACH</div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="btn" id="startBtn">▶ START LANDING</button>
+        <button class="btn view" id="viewBtn">🎥 CHANGE VIEW</button>
+        <button class="btn reset" id="resetBtn">↺ RESET</button>
+    </div>
+
+    <script>
+        // Airplane state
+        let state = {
+            x: window.innerWidth / 2,
+            y: 100,
+            z: -2000,
+            pitch: -5,
+            roll: 0,
+            yaw: 0,
+            altitude: 3000,
+            speed: 180,
+            vspeed: -800,
+            distance: 5.0,
+            gearDown: true,
+            phase: 'waiting', // waiting, approach, flare, touchdown, rollout, stopped
+            touchdownTime: 0
+        };
+
+        let animationId = null;
+        let currentView = 0;
+        const views = ['tower', 'chase', 'cockpit', 'side'];
+
+        // DOM elements
+        const airplane = document.getElementById('airplane');
+        const altitudeEl = document.getElementById('altitude');
+        const speedEl = document.getElementById('speed');
+        const vspeedEl = document.getElementById('vspeed');
+        const distanceEl = document.getElementById('distance');
+        const gearStatusEl = document.getElementById('gearStatus');
+        const statusEl = document.getElementById('status');
+        const horizon = document.getElementById('horizon');
+        const startBtn = document.getElementById('startBtn');
+        const viewBtn = document.getElementById('viewBtn');
+        const resetBtn = document.getElementById('resetBtn');
+
+        // Initialize scene
+        function initScene() {
+            createClouds();
+            createMountains();
+            createRunwayMarkings();
+            createRunwayLights();
+            createApproachLights();
+            updateAirplane();
+        }
+
+        function createClouds() {
+            const clouds = document.getElementById('clouds');
+            clouds.innerHTML = '';
+            for (let i = 0; i < 15; i++) {
+                const cloud = document.createElement('div');
+                cloud.className = 'cloud';
+                const size = Math.random() * 80 + 40;
+                cloud.style.width = size + 'px';
+                cloud.style.height = size * 0.6 + 'px';
+                cloud.style.left = Math.random() * 100 + '%';
+                cloud.style.top = Math.random() * 80 + '%';
+                cloud.style.opacity = Math.random() * 0.5 + 0.3;
+                clouds.appendChild(cloud);
+
+                // Add cloud puffs
+                for (let j = 0; j < 3; j++) {
+                    const puff = document.createElement('div');
+                    puff.className = 'cloud';
+                    const puffSize = size * (0.5 + Math.random() * 0.5);
+                    puff.style.width = puffSize + 'px';
+                    puff.style.height = puffSize * 0.6 + 'px';
+                    puff.style.left = (parseFloat(cloud.style.left) + (j - 1) * 3) + '%';
+                    puff.style.top = (parseFloat(cloud.style.top) + Math.random() * 5 - 2.5) + '%';
+                    puff.style.opacity = Math.random() * 0.4 + 0.3;
+                    clouds.appendChild(puff);
+                }
+            }
+        }
+
+        function createMountains() {
+            const mountains = document.getElementById('mountains');
+            mountains.innerHTML = '';
+            const colors = ['#4a5568', '#2d3748', '#1a202c', '#718096'];
+
+            for (let i = 0; i < 8; i++) {
+                const mountain = document.createElement('div');
+                mountain.className = 'mountain';
+                mountain.style.left = (i * 15 - 10) + '%';
+                mountain.style.borderBottomColor = colors[Math.floor(Math.random() * colors.length)];
+                const scale = 0.5 + Math.random() * 1;
+                mountain.style.transform = `scale(${scale})`;
+                mountain.style.zIndex = Math.floor(scale * 10);
+                mountains.appendChild(mountain);
+            }
+        }
+
+        function createRunwayMarkings() {
+            const runway = document.getElementById('runway');
+            // Threshold markings
+            for (let i = 0; i < 8; i++) {
+                const marking = document.createElement('div');
+                marking.className = 'runway-marking';
+                marking.style.bottom = (50 + i * 25) + 'px';
+                marking.style.width = '8px';
+                marking.style.height = '40px';
+                marking.style.left = (20 + (i % 2) * 60) + 'px';
+                marking.style.transform = 'none';
+                runway.appendChild(marking);
+            }
+
+            // Touchdown zone markings
+            for (let i = 0; i < 6; i++) {
+                const marking = document.createElement('div');
+                marking.className = 'runway-marking';
+                marking.style.bottom = (300 + i * 150) + 'px';
+                runway.appendChild(marking);
+            }
+
+            // Aiming point
+            for (let side = 0; side < 2; side++) {
+                const aimPoint = document.createElement('div');
+                aimPoint.className = 'runway-marking';
+                aimPoint.style.width = '15px';
+                aimPoint.style.height = '60px';
+                aimPoint.style.bottom = '500px';
+                aimPoint.style.left = (25 + side * 55) + 'px';
+                aimPoint.style.transform = 'none';
+                runway.appendChild(aimPoint);
+            }
+        }
+
+        function createRunwayLights() {
+            const lights = document.getElementById('runwayLights');
+            lights.innerHTML = '';
+
+            for (let i = 0; i < 25; i++) {
+                const leftLight = document.createElement('div');
+                leftLight.className = 'runway-light left';
+                leftLight.style.bottom = (i * 80) + 'px';
+                leftLight.style.animationDelay = (i * 0.1) + 's';
+                lights.appendChild(leftLight);
+
+                const rightLight = document.createElement('div');
+                rightLight.className = 'runway-light right';
+                rightLight.style.bottom = (i * 80) + 'px';
+                rightLight.style.animationDelay = (i * 0.1) + 's';
+                lights.appendChild(rightLight);
+            }
+        }
+
+        function createApproachLights() {
+            const approach = document.getElementById('approachLights');
+            approach.innerHTML = '';
+
+            // Center row
+            for (let i = 0; i < 10; i++) {
+                const light = document.createElement('div');
+                light.className = 'approach-light';
+                light.style.left = '50%';
+                light.style.transform = 'translateX(-50%)';
+                light.style.bottom = (i * 40) + 'px';
+                light.style.animationDelay = (i * 0.1) + 's';
+                approach.appendChild(light);
+            }
+
+            // Cross bars
+            for (let row = 0; row < 3; row++) {
+                for (let i = -3; i <= 3; i++) {
+                    if (i === 0) continue;
+                    const light = document.createElement('div');
+                    light.className = 'approach-light';
+                    light.style.left = (50 + i * 10) + '%';
+                    light.style.bottom = (row * 120 + 80) + 'px';
+                    light.style.animationDelay = (Math.abs(i) * 0.1) + 's';
+                    approach.appendChild(light);
+                }
+            }
+        }
+
+        function updateAirplane() {
+            // Calculate position based on view
+            let transform = '';
+
+            switch (views[currentView]) {
+                case 'tower':
+                    // View from control tower
+                    const scale = 0.3 + (state.z + 2000) / 3000 * 1.5;
+                    const screenY = 30 + (state.altitude / 3000) * 30;
+                    const screenX = 50 + (state.x - window.innerWidth / 2) / 20;
+                    transform = `
+                        translate(${screenX}%, ${screenY}%)
+                        scale(${Math.max(0.1, scale)})
+                        rotateX(${state.pitch}deg)
+                        rotateZ(${state.roll}deg)
+                    `;
+                    break;
+
+                case 'chase':
+                    // Chase camera behind airplane
+                    transform = `
+                        translate(calc(50vw - 100px), calc(40vh))
+                        scale(1.5)
+                        rotateX(${state.pitch}deg)
+                        rotateZ(${state.roll}deg)
+                        rotateY(${10 + Math.sin(Date.now() / 2000) * 3}deg)
+                    `;
+                    break;
+
+                case 'cockpit':
+                    // First person view - hide airplane
+                    airplane.style.opacity = '0';
+                    return;
+
+                case 'side':
+                    // Side view
+                    const sideScale = 0.5 + (state.z + 2000) / 3000;
+                    transform = `
+                        translate(${50 + (state.z + 2000) / 40}%, ${30 + (state.altitude / 3000) * 35}%)
+                        scale(${sideScale})
+                        rotateY(-90deg)
+                        rotateZ(${-state.pitch}deg)
+                    `;
+                    break;
+            }
+
+            airplane.style.opacity = '1';
+            airplane.style.transform = transform;
+
+            // Update horizon indicator
+            const horizonBg = horizon.querySelector('.horizon-line');
+            if (horizonBg) {
+                horizon.style.transform = `translateX(-50%) rotate(${state.roll}deg)`;
+                const pitchOffset = state.pitch * 2;
+                horizon.style.background = `linear-gradient(180deg, 
+                    #87ceeb 0%, 
+                    #87ceeb ${50 + pitchOffset}%, 
+                    #8b4513 ${50 + pitchOffset}%, 
+                    #8b4513 100%)`;
+            }
+        }
+
+        function updateHUD() {
+            altitudeEl.textContent = Math.max(0, Math.round(state.altitude)) + ' ft';
+            speedEl.textContent = Math.round(state.speed) + ' kts';
+            vspeedEl.textContent = Math.round(state.vspeed) + ' fpm';
+            distanceEl.textContent = Math.max(0, state.distance).toFixed(1) + ' nm';
+            gearStatusEl.textContent = state.gearDown ? 'DOWN ✓' : 'UP';
+            gearStatusEl.style.color = state.gearDown ? '#0f0' : '#ff0';
+
+            // Update status
+            let statusText = '';
+            let statusClass = '';
+
+            switch (state.phase) {
+                case 'waiting':
+                    statusText = 'READY FOR APPROACH';
+                    break;
+                case 'approach':
+                    statusText = 'ON APPROACH';
+                    statusClass = 'warning';
+                    break;
+                case 'flare':
+                    statusText = 'FLARE';
+                    statusClass = 'danger';
+                    break;
+                case 'touchdown':
+                    statusText = '✈ TOUCHDOWN!';
+                    statusClass = 'danger';
+                    break;
+                case 'rollout':
+                    statusText = 'ROLLOUT - BRAKING';
+                    statusClass = 'warning';
+                    break;
+                case 'stopped':
+                    statusText = '✓ LANDING COMPLETE';
+                    break;
+            }
+
+            statusEl.textContent = statusText;
+            statusEl.className = 'status ' + statusClass;
+        }
+
+        function animate() {
+            if (state.phase === 'waiting' || state.phase === 'stopped') {
+                return;
+            }
+
+            const now = Date.now();
+
+            switch (state.phase) {
+                case 'approach':
+                    // Descending approach
+                    state.altitude -= 15;
+                    state.distance -= 0.008;
+                    state.z += 15;
+                    state.speed = Math.max(140, state.speed - 0.1);
+                    state.vspeed = -700 - Math.random() * 100;
+
+                    // Slight movements
+                    state.roll = Math.sin(now / 500) * 2;
+                    state.pitch = -3 + Math.sin(now / 700) * 0.5;
+
+                    // Transition to flare
+                    if (state.altitude <= 100) {
+                        state.phase = 'flare';
+                    }
+                    break;
+
+                case 'flare':
+                    // Flare - raise nose, reduce descent rate
+                    state.altitude -= 3;
+                    state.z += 8;
+                    state.speed = Math.max(130, state.speed - 0.2);
+                    state.vspeed = -200 - Math.random() * 50;
+                    state.pitch = Math.min(5, state.pitch + 0.3);
+                    state.roll *= 0.95;
+
+                    // Touchdown
+                    if (state.altitude <= 0) {
+                        state.altitude = 0;
+                        state.phase = 'touchdown';
+                        state.touchdownTime = now;
+                        createTouchdownEffect();
+                    }
+                    break;
+
+                case 'touchdown':
+                    // Brief touchdown moment
+                    state.pitch = Math.max(-2, state.pitch - 0.5);
+                    state.vspeed = 0;
+
+                    if (now - state.touchdownTime > 500) {
+                        state.phase = 'rollout';
+                    }
+                    break;
+
+                case 'rollout':
+                    // Deceleration on runway
+                    state.speed = Math.max(0, state.speed - 1);
+                    state.z += state.speed / 20;
+                    state.pitch = -2;
+                    state.roll = 0;
+
+                    // Add slight runway vibration
+                    if (state.speed > 20) {
+                        state.y = window.innerHeight * 0.6 + Math.random() * 2;
+                    }
+
+                    if (state.speed <= 0) {
+                        state.phase = 'stopped';
+                        state.speed = 0;
+                    }
+                    break;
+            }
+
+            updateAirplane();
+            updateHUD();
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function createTouchdownEffect() {
+            // Create smoke puffs at wheels
+            const smokeContainer = document.createElement('div');
+            smokeContainer.style.cssText = `
+                position: fixed;
+                bottom: 40%;
+                left: 50%;
+                transform: translateX(-50%);
+                pointer-events: none;
+            `;
+
+            for (let i = 0; i < 10; i++) {
+                const smoke = document.createElement('div');
+                smoke.style.cssText = `
+                    position: absolute;
+                    width: ${20 + Math.random() * 30}px;
+                    height: ${20 + Math.random() * 30}px;
+                    background: rgba(150, 150, 150, 0.6);
+                    border-radius: 50%;
+                    left: ${(Math.random() - 0.5) * 100}px;
+                    bottom: 0;
+                    filter: blur(5px);
+                    animation: smokeRise 1s ease-out forwards;
+                    animation-delay: ${i * 0.05}s;
+                `;
+                smokeContainer.appendChild(smoke);
+            }
+
+            document.body.appendChild(smokeContainer);
+
+            // Add smoke animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes smokeRise {
+                    0% {
+                        opacity: 0.8;
+                        transform: translateY(0) scale(1);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: translateY(-50px) scale(2);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+
+            setTimeout(() => {
+                smokeContainer.remove();
+                style.remove();
+            }, 1500);
+        }
+
+        function startLanding() {
+            if (state.phase !== 'waiting') return;
+
+            state.phase = 'approach';
+            startBtn.textContent = '✈ LANDING...';
+            startBtn.disabled = true;
+            animate();
+        }
+
+        function resetSimulation() {
+            cancelAnimationFrame(animationId);
+
+            state = {
+                x: window.innerWidth / 2,
+                y: 100,
+                z: -2000,
+                pitch: -5,
+                roll: 0,
+                yaw: 0,
+                altitude: 3000,
+                speed: 180,
+                vspeed: -800,
+                distance: 5.0,
+                gearDown: true,
+                phase: 'waiting',
+                touchdownTime: 0
+            };
+
+            startBtn.textContent = '▶ START LANDING';
+            startBtn.disabled = false;
+
+            updateAirplane();
+            updateHUD();
+        }
+
+        function changeView() {
+            currentView = (currentView + 1) % views.length;
+            viewBtn.textContent = `🎥 ${views[currentView].toUpperCase()}`;
+            updateAirplane();
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', startLanding);
+        resetBtn.addEventListener('click', resetSimulation);
+        viewBtn.addEventListener('click', changeView);
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case ' ':
+                    e.preventDefault();
+                    if (state.phase === 'waiting') startLanding();
+                    break;
+                case 'r':
+                case 'R':
+                    resetSimulation();
+                    break;
+                case 'v':
+                case 'V':
+                    changeView();
+                    break;
+            }
+        });
+
+        // Initialize
+        initScene();
+        updateHUD();
+    </script>
+</body>
+</html>

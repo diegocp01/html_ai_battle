@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Airplane Landing Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: #333;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover { background: #555; }
+    </style>
+</head>
+<body>
+
+    <div id="info">3D Airplane Landing Simulation</div>
+    <div id="controls">
+        <button onclick="resetSimulation()">Replay Landing</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // --- 1. SETUP SCENE, CAMERA, RENDERER ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky Blue
+        scene.fog = new THREE.Fog(0x87CEEB, 100, 1000);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 2. LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(100, 200, 50);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- 3. OBJECTS ---
+
+        // A. The Ground & Runway
+        const groundGeometry = new THREE.PlaneGeometry(2000, 2000);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 }); // Grass Green
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const runwayGeometry = new THREE.PlaneGeometry(40, 1000);
+        const runwayMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 }); // Dark Asphalt
+        const runway = new THREE.Mesh(runwayGeometry, runwayMaterial);
+        runway.rotation.x = -Math.PI / 2;
+        runway.position.y = 0.1; // Slightly above grass to prevent z-fighting
+        runway.receiveShadow = true;
+        scene.add(runway);
+
+        // Runway markings (stripes)
+        for(let i = -450; i < 450; i+= 60) {
+            const stripeGeo = new THREE.PlaneGeometry(2, 30);
+            const stripeMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+            const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+            stripe.rotation.x = -Math.PI / 2;
+            stripe.position.set(0, 0.2, i);
+            scene.add(stripe);
+        }
+
+        // B. The Airplane (Procedural Group)
+        const airplane = new THREE.Group();
+
+        // Fuselage
+        const bodyGeo = new THREE.BoxGeometry(4, 4, 20);
+        const bodyMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.castShadow = true;
+        airplane.add(body);
+
+        // Wings
+        const wingGeo = new THREE.BoxGeometry(24, 0.5, 6);
+        const wingMat = new THREE.MeshPhongMaterial({ color: 0xff0000, flatShading: true });
+        const wing = new THREE.Mesh(wingGeo, wingMat);
+        wing.position.set(0, 0, 2);
+        wing.castShadow = true;
+        airplane.add(wing);
+
+        // Tail (Vertical Stabilizer)
+        const tailGeo = new THREE.BoxGeometry(1, 4, 3);
+        const tail = new THREE.Mesh(tailGeo, wingMat);
+        tail.position.set(0, 3, -8);
+        tail.castShadow = true;
+        airplane.add(tail);
+
+        // Tail (Horizontal Stabilizer)
+        const hStabGeo = new THREE.BoxGeometry(8, 0.5, 3);
+        const hStab = new THREE.Mesh(hStabGeo, wingMat);
+        hStab.position.set(0, 1, -8);
+        hStab.castShadow = true;
+        airplane.add(hStab);
+
+        // Propeller
+        const propGeo = new THREE.BoxGeometry(8, 1, 1);
+        const propMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+        const propeller = new THREE.Mesh(propGeo, propMat);
+        propeller.position.set(0, 0, 10.5);
+        airplane.add(propeller);
+
+        scene.add(airplane);
+
+        // --- 4. ANIMATION STATE ---
+        let simulationTime = 0;
+        const speed = 0.5; 
+        
+        // Initial setup
+        function resetSimulation() {
+            simulationTime = 0;
+            airplane.position.set(0, 100, 600); // Start high and far back
+            airplane.rotation.set(0, 0, 0);
+        }
+
+        resetSimulation();
+
+        // --- 5. ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. Move the plane forward
+            if (airplane.position.z > -400) {
+                airplane.position.z -= speed * 2;
+                simulationTime += 1;
+            }
+
+            // 2. Rotate Propeller
+            propeller.rotation.z += 0.5;
+
+            // 3. Landing Logic (Procedural Animation)
+            const currentZ = airplane.position.z;
+
+            if (currentZ > 100) {
+                // PHASE 1: Approach (Descent)
+                // Linear descent from y=100 to y=10
+                const progress = (600 - currentZ) / 500; // 0 to 1
+                airplane.position.y = 100 - (90 * progress);
+                airplane.rotation.x = 0.05; // Slight nose down
+            } 
+            else if (currentZ > 0) {
+                // PHASE 2: Flare (Pull up slightly before touch down)
+                // Move from y=10 to y=2 (wheels touch)
+                const progress = (100 - currentZ) / 100;
+                airplane.position.y = 10 - (8 * progress);
+                // Pitch up smoothly
+                airplane.rotation.x = THREE.MathUtils.lerp(0.05, -0.05, progress);
+            } 
+            else if (currentZ > -400) {
+                // PHASE 3: Roll out (On the ground)
+                airplane.position.y = 2; // Fixed ground height
+                airplane.rotation.x = 0; // Level
+            }
+
+            // 4. Camera Follow
+            // Place camera behind and slightly above the plane
+            camera.position.x = airplane.position.x + 20; 
+            camera.position.y = airplane.position.y + 10;
+            camera.position.z = airplane.position.z + 40;
+            camera.lookAt(airplane.position);
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
