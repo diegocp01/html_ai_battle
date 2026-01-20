@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realistic 3D Snake Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Georgia', serif;
+            overflow: hidden;
+        }
+
+        .game-container {
+            position: relative;
+            padding: 20px;
+            background: linear-gradient(145deg, #2d2d44, #1a1a2e);
+            border-radius: 20px;
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.5),
+                0 0 100px rgba(100, 100, 150, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .frame {
+            position: relative;
+            padding: 15px;
+            background: linear-gradient(145deg, #8B7355, #6B4423);
+            border-radius: 15px;
+            box-shadow: 
+                inset 0 2px 4px rgba(255, 255, 255, 0.2),
+                inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+                0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .frame::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            border: 2px solid rgba(139, 115, 85, 0.5);
+            border-radius: 12px;
+            pointer-events: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            border-radius: 8px;
+            box-shadow: 
+                inset 0 0 50px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 30px;
+            z-index: 10;
+        }
+
+        .score-panel {
+            background: linear-gradient(145deg, rgba(50, 40, 30, 0.95), rgba(30, 25, 20, 0.95));
+            padding: 12px 25px;
+            border-radius: 10px;
+            border: 2px solid #8B7355;
+            box-shadow: 
+                0 5px 15px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .score-panel h3 {
+            color: #c9a959;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .score-panel .value {
+            color: #f4e4bc;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(201, 169, 89, 0.3);
+        }
+
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at center, rgba(20, 20, 35, 0.95) 0%, rgba(10, 10, 20, 0.98) 100%);
+            border-radius: 8px;
+            z-index: 100;
+        }
+
+        .title {
+            font-size: 48px;
+            color: #c9a959;
+            text-shadow: 
+                0 4px 8px rgba(0, 0, 0, 0.5),
+                0 0 40px rgba(201, 169, 89, 0.4);
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: #8a8a9a;
+            margin-bottom: 40px;
+            letter-spacing: 3px;
+        }
+
+        .btn {
+            padding: 15px 50px;
+            font-size: 18px;
+            font-family: 'Georgia', serif;
+            color: #f4e4bc;
+            background: linear-gradient(145deg, #5a4a3a, #3a2a1a);
+            border: 2px solid #8B7355;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 5px 15px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(145deg, #6a5a4a, #4a3a2a);
+            transform: translateY(-2px);
+            box-shadow: 
+                0 8px 25px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .final-score {
+            font-size: 72px;
+            color: #c9a959;
+            text-shadow: 
+                0 4px 8px rgba(0, 0, 0, 0.5),
+                0 0 40px rgba(201, 169, 89, 0.4);
+            margin: 20px 0;
+        }
+
+        .game-over-text {
+            font-size: 36px;
+            color: #aa4444;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .controls-info {
+            margin-top: 30px;
+            color: #6a6a7a;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .snake-preview {
+            width: 200px;
+            height: 60px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="frame">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            
+            <div class="ui-overlay">
+                <div class="score-panel">
+                    <h3>Score</h3>
+                    <div class="value" id="scoreDisplay">0</div>
+                </div>
+                <div class="score-panel">
+                    <h3>Best</h3>
+                    <div class="value" id="highScoreDisplay">0</div>
+                </div>
+            </div>
+
+            <div id="startScreen">
+                <div class="title">SERPENT</div>
+                <div class="subtitle">A REALISTIC SNAKE EXPERIENCE</div>
+                <canvas class="snake-preview" id="previewCanvas"></canvas>
+                <button class="btn" id="startBtn">BEGIN HUNT</button>
+                <div class="controls-info">Use Arrow Keys or WASD to Control</div>
+            </div>
+
+            <div id="gameOverScreen" class="hidden">
+                <div class="game-over-text">GAME OVER</div>
+                <div class="subtitle">YOUR SCORE</div>
+                <div class="final-score" id="finalScore">0</div>
+                <button class="btn" id="restartBtn">HUNT AGAIN</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+
+        // Game settings
+        const GRID_SIZE = 25;
+        const GRID_WIDTH = canvas.width / GRID_SIZE;
+        const GRID_HEIGHT = canvas.height / GRID_SIZE;
+
+        // Game state
+        let snake = [];
+        let direction = { x: 1, y: 0 };
+        let nextDirection = { x: 1, y: 0 };
+        let food = { x: 0, y: 0 };
+        let score = 0;
+        let highScore = localStorage.getItem('snakeHighScore') || 0;
+        let gameLoop = null;
+        let gameSpeed = 120;
+        let particles = [];
+        let ambientParticles = [];
+        let time = 0;
+
+        // Smooth snake positions for animation
+        let smoothSnake = [];
+
+        // Background texture cache
+        let backgroundCanvas = null;
+
+        document.getElementById('highScoreDisplay').textContent = highScore;
+
+        // Create realistic background
+        function createBackground() {
+            backgroundCanvas = document.createElement('canvas');
+            backgroundCanvas.width = canvas.width;
+            backgroundCanvas.height = canvas.height;
+            const bgCtx = backgroundCanvas.getContext('2d');
+
+            // Base earthy gradient
+            const baseGradient = bgCtx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 0,
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.7
+            );
+            baseGradient.addColorStop(0, '#4a5d3a');
+            baseGradient.addColorStop(0.5, '#3d4f2f');
+            baseGradient.addColorStop(1, '#2a3820');
+            bgCtx.fillStyle = baseGradient;
+            bgCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Add grass/ground texture
+            for (let i = 0; i < 8000; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = Math.random() * 3 + 1;
+                const alpha = Math.random() * 0.15 + 0.05;
+                const hue = 80 + Math.random() * 40;
+                const lightness = 20 + Math.random() * 20;
+                
+                bgCtx.fillStyle = `hsla(${hue}, 40%, ${lightness}%, ${alpha})`;
+                bgCtx.beginPath();
+                bgCtx.ellipse(x, y, size, size * 0.5, Math.random() * Math.PI, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+
+            // Add subtle grass blades
+            for (let i = 0; i < 500; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const height = Math.random() * 15 + 5;
+                const curve = (Math.random() - 0.5) * 10;
+                
+                bgCtx.strokeStyle = `hsla(${90 + Math.random() * 30}, 50%, ${25 + Math.random() * 15}%, ${Math.random() * 0.3 + 0.1})`;
+                bgCtx.lineWidth = Math.random() * 2 + 0.5;
+                bgCtx.beginPath();
+                bgCtx.moveTo(x, y);
+                bgCtx.quadraticCurveTo(x + curve, y - height / 2, x + curve * 1.5, y - height);
+                bgCtx.stroke();
+            }
+
+            // Add small stones
+            for (let i = 0; i < 30; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = Math.random() * 8 + 3;
+                
+                const stoneGrad = bgCtx.createRadialGradient(
+                    x - size * 0.3, y - size * 0.3, 0,
+                    x, y, size
+                );
+                stoneGrad.addColorStop(0, 'rgba(120, 110, 100, 0.4)');
+                stoneGrad.addColorStop(0.7, 'rgba(80, 75, 70, 0.3)');
+                stoneGrad.addColorStop(1, 'rgba(50, 45, 40, 0.2)');
+                
+                bgCtx.fillStyle = stoneGrad;
+                bgCtx.beginPath();
+                bgCtx.ellipse(x, y, size, size * 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+
+            // Add lighting overlay
+            const lightGradient = bgCtx.createRadialGradient(
+                canvas.width * 0.3, canvas.height * 0.2, 0,
+                canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.8
+            );
+            lightGradient.addColorStop(0, 'rgba(255, 250, 220, 0.1)');
+            lightGradient.addColorStop(0.5, 'rgba(255, 250, 220, 0.02)');
+            lightGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+            bgCtx.fillStyle = lightGradient;
+            bgCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Vignette effect
+            const vignette = bgCtx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, canvas.height * 0.3,
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.8
+            );
+            vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vignette.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+            bgCtx.fillStyle = vignette;
+            bgCtx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Initialize ambient particles
+        function initAmbientParticles() {
+            ambientParticles = [];
+            for (let i = 0; i < 20; i++) {
+                ambientParticles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 3 + 1,
+                    speedX: (Math.random() - 0.5) * 0.5,
+                    speedY: (Math.random() - 0.5) * 0.3,
+                    alpha: Math.random() * 0.3 + 0.1,
+                    pulse: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        // Draw snake segment with realistic 3D effect
+        function drawSnakeSegment(x, y, index, prevSegment, nextSegment, isHead, isTail) {
+            const centerX = x * GRID_SIZE + GRID_SIZE / 2;
+            const centerY = y * GRID_SIZE + GRID_SIZE / 2;
+            const radius = GRID_SIZE / 2 - 2;
+
+            // Calculate segment angle for body curve
+            let angle = 0;
+            if (prevSegment) {
+                angle = Math.atan2(y - prevSegment.y, x - prevSegment.x);
+            }
+
+            // Draw shadow
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(centerX + 4, centerY + 6, radius * 1.1, radius * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            if (isHead) {
+                drawSnakeHead(centerX, centerY, radius, angle);
+            } else if (isTail) {
+                drawSnakeTail(centerX, centerY, radius * 0.7, angle, prevSegment, { x, y });
+            } else {
+                drawSnakeBody(centerX, centerY, radius, index, angle);
+            }
+        }
+
+        function drawSnakeHead(x, y, radius, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            const headLength = radius * 1.6;
+            const headWidth = radius * 1.1;
+
+            // Main head shape - elongated
+            const headGrad = ctx.createRadialGradient(
+                -headLength * 0.1, -headWidth * 0.3, 0,
+                0, 0, headLength
+            );
+            headGrad.addColorStop(0, '#6B8E4E');
+            headGrad.addColorStop(0.3, '#4A7034');
+            headGrad.addColorStop(0.7, '#3D5C2A');
+            headGrad.addColorStop(1, '#2A4420');
+
+            ctx.fillStyle = headGrad;
+            ctx.beginPath();
+            ctx.ellipse(headLength * 0.2, 0, headLength, headWidth, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Scale pattern on head
+            for (let i = 0; i < 8; i++) {
+                const scaleX = -headLength * 0.3 + i * (headLength * 0.25);
+                const scaleY = (i % 2 === 0 ? -1 : 1) * headWidth * 0.3;
+                const scaleSize = headWidth * 0.35;
+
+                ctx.fillStyle = `rgba(60, 90, 45, ${0.3 - i * 0.03})`;
+                ctx.beginPath();
+                ctx.ellipse(scaleX, scaleY, scaleSize, scaleSize * 0.7, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Top highlight
+            const highlightGrad = ctx.createLinearGradient(0, -headWidth, 0, 0);
+            highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+            highlightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = highlightGrad;
+            ctx.beginPath();
+            ctx.ellipse(headLength * 0.1, -headWidth * 0.2, headLength * 0.8, headWidth * 0.5, 0, Math.PI, Math.PI * 2);
+            ctx.fill();
+
+            // Eyes
+            const eyeOffsetX = headLength * 0.4;
+            const eyeOffsetY = headWidth * 0.45;
+            const eyeRadius = radius * 0.28;
+
+            // Eye sockets (darker area)
+            ctx.fillStyle = 'rgba(20, 30, 15, 0.5)';
+            ctx.beginPath();
+            ctx.ellipse(eyeOffsetX, -eyeOffsetY, eyeRadius * 1.4, eyeRadius * 1.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(eyeOffsetX, eyeOffsetY, eyeRadius * 1.4, eyeRadius * 1.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eyeballs
+            const eyeGrad = ctx.createRadialGradient(
+                eyeOffsetX - eyeRadius * 0.3, -eyeOffsetY - eyeRadius * 0.3, 0,
+                eyeOffsetX, -eyeOffsetY, eyeRadius
+            );
+            eyeGrad.addColorStop(0, '#FFE4B0');
+            eyeGrad.addColorStop(0.5, '#C9A030');
+            eyeGrad.addColorStop(1, '#8B6914');
+
+            ctx.fillStyle = eyeGrad;
+            ctx.beginPath();
+            ctx.arc(eyeOffsetX, -eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(eyeOffsetX, eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pupils (vertical slits)
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.ellipse(eyeOffsetX + eyeRadius * 0.1, -eyeOffsetY, eyeRadius * 0.2, eyeRadius * 0.7, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(eyeOffsetX + eyeRadius * 0.1, eyeOffsetY, eyeRadius * 0.2, eyeRadius * 0.7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye shine
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.beginPath();
+            ctx.arc(eyeOffsetX - eyeRadius * 0.3, -eyeOffsetY - eyeRadius * 0.3, eyeRadius * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(eyeOffsetX - eyeRadius * 0.3, eyeOffsetY - eyeRadius * 0.3, eyeRadius * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nostrils
+            ctx.fillStyle = 'rgba(20, 20, 15, 0.7)';
+            ctx.beginPath();
+            ctx.ellipse(headLength * 0.85, -headWidth * 0.2, 2, 3, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(headLength * 0.85, headWidth * 0.2, 2, 3, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Forked tongue (animated)
+            const tongueExtension = Math.sin(time * 8) * 0.5 + 0.5;
+            if (tongueExtension > 0.3) {
+                const tongueLength = 15 + tongueExtension * 10;
+                ctx.strokeStyle = '#CC4444';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(headLength * 0.9, 0);
+                ctx.lineTo(headLength * 0.9 + tongueLength * 0.7, 0);
+                ctx.stroke();
+
+                // Fork
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(headLength * 0.9 + tongueLength * 0.7, 0);
+                ctx.lineTo(headLength * 0.9 + tongueLength, -4);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(headLength * 0.9 + tongueLength * 0.7, 0);
+                ctx.lineTo(headLength * 0.9 + tongueLength, 4);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        function drawSnakeBody(x, y, radius, index, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Body gradient with 3D effect
+            const bodyGrad = ctx.createRadialGradient(
+                -radius * 0.3, -radius * 0.4, 0,
+                0, 0, radius * 1.2
+            );
+            
+            // Alternating pattern for scales effect
+            const patternOffset = index % 2 === 0 ? 0 : 10;
+            bodyGrad.addColorStop(0, `hsl(${95 + patternOffset}, 45%, 45%)`);
+            bodyGrad.addColorStop(0.4, `hsl(${90 + patternOffset}, 50%, 35%)`);
+            bodyGrad.addColorStop(0.8, `hsl(${85 + patternOffset}, 45%, 28%)`);
+            bodyGrad.addColorStop(1, `hsl(${80 + patternOffset}, 40%, 20%)`);
+
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Scale pattern overlay
+            const scaleCount = 3;
+            for (let row = 0; row < 2; row++) {
+                for (let col = 0; col < scaleCount; col++) {
+                    const scaleAngle = (col / scaleCount) * Math.PI * 2 + (row * Math.PI / scaleCount);
+                    const scaleX = Math.cos(scaleAngle) * radius * 0.4;
+                    const scaleY = Math.sin(scaleAngle) * radius * 0.4;
+                    const scaleSize = radius * 0.4;
+
+                    ctx.fillStyle = `rgba(${50 + index * 2}, ${70 + index * 2}, ${40 + index}, 0.3)`;
+                    ctx.beginPath();
+                    ctx.ellipse(scaleX, scaleY, scaleSize, scaleSize * 0.6, scaleAngle, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Diamond pattern (snake marking)
+            if (index % 3 === 0) {
+                ctx.fillStyle = 'rgba(80, 60, 40, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(0, -radius * 0.6);
+                ctx.lineTo(radius * 0.5, 0);
+                ctx.lineTo(0, radius * 0.6);
+                ctx.lineTo(-radius * 0.5, 0);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Top highlight
+            const highlightGrad = ctx.createLinearGradient(0, -radius, 0, 0);
+            highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+            highlightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = highlightGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.9, Math.PI, Math.PI * 2);
+            ctx.fill();
+
+            // Rim light
+            ctx.strokeStyle = 'rgba(150, 180, 120, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius - 1, Math.PI * 1.2, Math.PI * 1.8);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawSnakeTail(x, y, radius, angle, prevSegment, currentSegment) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            if (prevSegment) {
+                angle = Math.atan2(currentSegment.y - prevSegment.y, currentSegment.x - prevSegment.x);
+            }
+            ctx.rotate(angle);
+
+            // Tapered tail
+            const tailGrad = ctx.createRadialGradient(
+                -radius * 0.3, -radius * 0.3, 0,
+                0, 0, radius * 1.5
+            );
+            tailGrad.addColorStop(0, '#5A7E3E');
+            tailGrad.addColorStop(0.5, '#4A6834');
+            tailGrad.addColorStop(1, '#3A5428');
+
+            ctx.fillStyle = tailGrad;
+            ctx.beginPath();
+            ctx.moveTo(-radius, -radius * 0.8);
+            ctx.quadraticCurveTo(radius * 0.5, -radius * 0.4, radius * 1.5, 0);
+            ctx.quadraticCurveTo(radius * 0.5, radius * 0.4, -radius, radius * 0.8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Tail highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(-radius * 0.5, -radius * 0.5);
+            ctx.quadraticCurveTo(radius * 0.3, -radius * 0.3, radius, 0);
+            ctx.quadraticCurveTo(radius * 0.3, -radius * 0.1, -radius * 0.5, -radius * 0.2);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Draw realistic apple
+        function drawFood() {
+            const centerX = food.x * GRID_SIZE + GRID_SIZE / 2;
+            const centerY = food.y * GRID_SIZE + GRID_SIZE / 2;
+            const radius = GRID_SIZE / 2 - 3;
+
+            // Pulsing animation
+            const pulse = Math.sin(time * 3) * 0.05 + 1;
+            const currentRadius = radius * pulse;
+
+            // Shadow
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.beginPath();
+            ctx.ellipse(centerX + 3, centerY + currentRadius + 3, currentRadius * 0.9, currentRadius * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Main apple body
+            const appleGrad = ctx.createRadialGradient(
+                centerX - currentRadius * 0.3, centerY - currentRadius * 0.4, 0,
+                centerX, centerY, currentRadius * 1.2
+            );
+            appleGrad.addColorStop(0, '#FF6B6B');
+            appleGrad.addColorStop(0.3, '#E63946');
+            appleGrad.addColorStop(0.6, '#C41E3A');
+            appleGrad.addColorStop(0.85, '#8B0000');
+            appleGrad.addColorStop(1, '#5C0000');
+
+            ctx.fillStyle = appleGrad;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, currentRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Apple dimple at top
+            ctx.fillStyle = 'rgba(100, 0, 0, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY - currentRadius * 0.7, currentRadius * 0.3, currentRadius * 0.15, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Highlight reflection
+            const highlightGrad = ctx.createRadialGradient(
+                centerX - currentRadius * 0.35, centerY - currentRadius * 0.35, 0,
+                centerX - currentRadius * 0.35, centerY - currentRadius * 0.35, currentRadius * 0.5
+            );
+            highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
+            highlightGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+            highlightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = highlightGrad;
+            ctx.beginPath();
+            ctx.arc(centerX - currentRadius * 0.35, centerY - currentRadius * 0.35, currentRadius * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Secondary highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(centerX - currentRadius * 0.2, centerY - currentRadius * 0.5, currentRadius * 0.15, currentRadius * 0.1, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Stem
+            ctx.save();
+            ctx.translate(centerX, centerY - currentRadius * 0.75);
+            ctx.rotate(-0.2);
+            
+            const stemGrad = ctx.createLinearGradient(-2, 0, 2, 0);
+            stemGrad.addColorStop(0, '#3D2314');
+            stemGrad.addColorStop(0.5, '#5D4037');
+            stemGrad.addColorStop(1, '#3D2314');
+            
+            ctx.fillStyle = stemGrad;
+            ctx.beginPath();
+            ctx.moveTo(-1.5, 0);
+            ctx.quadraticCurveTo(-2, -currentRadius * 0.4, 0, -currentRadius * 0.5);
+            ctx.quadraticCurveTo(2, -currentRadius * 0.4, 1.5, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            // Leaf
+            ctx.save();
+            ctx.translate(centerX + currentRadius * 0.15, centerY - currentRadius * 0.9);
+            ctx.rotate(0.4);
+            
+            const leafGrad = ctx.createLinearGradient(0, -5, 0, 5);
+            leafGrad.addColorStop(0, '#4CAF50');
+            leafGrad.addColorStop(0.5, '#388E3C');
+            leafGrad.addColorStop(1, '#2E7D32');
+            
+            ctx.fillStyle = leafGrad;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(currentRadius * 0.6, -currentRadius * 0.2, currentRadius * 0.7, 0);
+            ctx.quadraticCurveTo(currentRadius * 0.6, currentRadius * 0.15, 0, 0);
+            ctx.fill();
+
+            // Leaf vein
+            ctx.strokeStyle = 'rgba(30, 70, 30, 0.5)';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(currentRadius * 0.5, 0);
+            ctx.stroke();
+            
+            ctx.restore();
+
+            // Subtle glow
+            ctx.fillStyle = 'rgba(255, 100, 100, 0.1)';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, currentRadius * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Particle system for eating effect
+        function createEatParticles(x, y) {
+            for (let i = 0; i < 15; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 2;
+                particles.push({
+                    x: x * GRID_SIZE + GRID_SIZE / 2,
+                    y: y * GRID_SIZE + GRID_SIZE / 2,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    size: Math.random() * 6 + 3,
+                    color: Math.random() > 0.5 ? '#FF6B6B' : '#4CAF50',
+                    type: 'eat'
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.15; // gravity
+                p.life -= 0.025;
+                p.size *= 0.98;
+
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Update ambient particles
+            for (const p of ambientParticles) {
+                p.x += p.speedX;
+                p.y += p.speedY;
+                p.pulse += 0.02;
+
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+            }
+        }
+
+        function drawParticles() {
+            for (const p of particles) {
+                ctx.save();
+                ctx.globalAlpha = p.life;
+                
+                const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+                grad.addColorStop(0, p.color);
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Draw ambient particles (dust/pollen)
+            for (const p of ambientParticles) {
+                ctx.save();
+                const alpha = p.alpha * (0.5 + Math.sin(p.pulse) * 0.5);
+                ctx.globalAlpha = alpha;
+                
+                const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+                grad.addColorStop(0, 'rgba(255, 255, 200, 0.8)');
+                grad.addColorStop(1, 'rgba(255, 255, 200, 0)');
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Draw connecting body between segments for smoother look
+        function drawSnakeConnections() {
+            if (snake.length < 2) return;
+
+            ctx.save();
+            for (let i = 0; i < snake.length - 1; i++) {
+                const current = snake[i];
+                const next = snake[i + 1];
+                
+                const x1 = current.x * GRID_SIZE + GRID_SIZE / 2;
+                const y1 = current.y * GRID_SIZE + GRID_SIZE / 2;
+                const x2 = next.x * GRID_SIZE + GRID_SIZE / 2;
+                const y2 = next.y * GRID_SIZE + GRID_SIZE / 2;
+                
+                const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+                if (dist > GRID_SIZE * 1.5) continue; // Skip if segments are far apart (wrapping)
+
+                const radius = GRID_SIZE / 2 - 3;
+                const patternOffset = i % 2 === 0 ? 0 : 10;
+                
+                const connectionGrad = ctx.createLinearGradient(x1, y1, x2, y2);
+                connectionGrad.addColorStop(0, `hsl(${90 + patternOffset}, 48%, 35%)`);
+                connectionGrad.addColorStop(1, `hsl(${90 + patternOffset}, 48%, 32%)`);
+                
+                ctx.strokeStyle = connectionGrad;
+                ctx.lineWidth = radius * 1.8;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function spawnFood() {
+            let valid = false;
+            while (!valid) {
+                food.x = Math.floor(Math.random() * GRID_WIDTH);
+                food.y = Math.floor(Math.random() * GRID_HEIGHT);
+                valid = !snake.some(segment => segment.x === food.x && segment.y === food.y);
+            }
+        }
+
+        function initGame() {
+            snake = [
+                { x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) },
+                { x: Math.floor(GRID_WIDTH / 2) - 1, y: Math.floor(GRID_HEIGHT / 2) },
+                { x: Math.floor(GRID_WIDTH / 2) - 2, y: Math.floor(GRID_HEIGHT / 2) }
+            ];
+            direction = { x: 1, y: 0 };
+            nextDirection = { x: 1, y: 0 };
+            score = 0;
+            particles = [];
+            document.getElementById('scoreDisplay').textContent = score;
+            spawnFood();
+            createBackground();
+            initAmbientParticles();
+        }
+
+        function update() {
+            direction = { ...nextDirection };
+
+            const head = { 
+                x: snake[0].x + direction.x, 
+                y: snake[0].y + direction.y 
+            };
+
+            // Wall collision
+            if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT) {
+                gameOver();
+                return;
+            }
+
+            // Self collision
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+
+            snake.unshift(head);
+
+            // Food collision
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                document.getElementById('scoreDisplay').textContent = score;
+                createEatParticles(food.x, food.y);
+                spawnFood();
+                
+                // Speed up slightly
+                if (gameSpeed > 60) {
+                    gameSpeed -= 2;
+                    clearInterval(gameLoop);
+                    gameLoop = setInterval(update, gameSpeed);
+                }
+            } else {
+                snake.pop();
+            }
+        }
+
+        function draw() {
+            time += 0.016;
+            
+            // Clear and draw background
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (backgroundCanvas) {
+                ctx.drawImage(backgroundCanvas, 0, 0);
+            }
+
+            // Update particles
+            updateParticles();
+
+            // Draw food
+            drawFood();
+
+            // Draw snake body connections first
+            drawSnakeConnections();
+
+            // Draw snake segments
+            for (let i = snake.length - 1; i >= 0; i--) {
+                const segment = snake[i];
+                const prevSegment = i > 0 ? snake[i - 1] : null;
+                const nextSegment = i < snake.length - 1 ? snake[i + 1] : null;
+                const isHead = i === 0;
+                const isTail = i === snake.length - 1;
+                
+                drawSnakeSegment(segment.x, segment.y, i, prevSegment, nextSegment, isHead, isTail);
+            }
+
+            // Draw particles on top
+            drawParticles();
+
+            requestAnimationFrame(draw);
+        }
+
+        function gameOver() {
+            clearInterval(gameLoop);
+            gameLoop = null;
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('snakeHighScore', highScore);
+                document.getElementById('highScoreDisplay').textContent = highScore;
+            }
+            
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            initGame();
+            gameSpeed = 120;
+            gameLoop = setInterval(update, gameSpeed);
+        }
+
+        // Preview snake animation
+        function drawPreview() {
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            
+            const segments = 6;
+            const segmentSize = 18;
+            const startX = 30;
+            const centerY = previewCanvas.height / 2;
+            
+            for (let i = segments - 1; i >= 0; i--) {
+                const x = startX + i * (segmentSize + 3);
+                const y = centerY + Math.sin(time * 3 + i * 0.5) * 5;
+                const radius = segmentSize / 2 - (i === segments - 1 ? 3 : 0);
+                
+                // Shadow
+                previewCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                previewCtx.beginPath();
+                previewCtx.ellipse(x + 2, y + 5, radius, radius * 0.4, 0, 0, Math.PI * 2);
+                previewCtx.fill();
+                
+                // Body gradient
+                const grad = previewCtx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, 0, x, y, radius);
+                if (i === 0) {
+                    grad.addColorStop(0, '#6B8E4E');
+                    grad.addColorStop(1, '#2A4420');
+                } else {
+                    const offset = i % 2 === 0 ? 0 : 10;
+                    grad.addColorStop(0, `hsl(${95 + offset}, 45%, 45%)`);
+                    grad.addColorStop(1, `hsl(${80 + offset}, 40%, 20%)`);
+                }
+                
+                previewCtx.fillStyle = grad;
+                previewCtx.beginPath();
+                previewCtx.arc(x, y, radius, 0, Math.PI * 2);
+                previewCtx.fill();
+                
+                // Highlight
+                previewCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                previewCtx.beginPath();
+                previewCtx.arc(x - radius * 0.3, y - radius * 0.3, radius * 0.4, 0, Math.PI * 2);
+                previewCtx.fill();
+                
+                // Eyes on head
+                if (i === 0) {
+                    previewCtx.fillStyle = '#C9A030';
+                    previewCtx.beginPath();
+                    previewCtx.arc(x + 4, y - 5, 3, 0, Math.PI * 2);
+                    previewCtx.fill();
+                    previewCtx.beginPath();
+                    previewCtx.arc(x + 4, y + 5, 3, 0, Math.PI * 2);
+                    previewCtx.fill();
+                    
+                    previewCtx.fillStyle = '#1a1a1a';
+                    previewCtx.beginPath();
+                    previewCtx.ellipse(x + 4.5, y - 5, 1, 2.5, 0, 0, Math.PI * 2);
+                    previewCtx.fill();
+                    previewCtx.beginPath();
+                    previewCtx.ellipse(x + 4.5, y + 5, 1, 2.5, 0, 0, Math.PI * 2);
+                    previewCtx.fill();
+                }
+            }
+            
+            requestAnimationFrame(drawPreview);
+        }
+
+        // Controls
+        document.addEventListener('keydown', (e) => {
+            if (!gameLoop) return;
+            
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    if (direction.y !== 1) nextDirection = { x: 0, y: -1 };
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    if (direction.y !== -1) nextDirection = { x: 0, y: 1 };
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    if (direction.x !== 1) nextDirection = { x: -1, y: 0 };
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    if (direction.x !== -1) nextDirection = { x: 1, y: 0 };
+                    break;
+            }
+        });
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+
+        // Start preview and render loop
+        previewCanvas.width = 200;
+        previewCanvas.height = 60;
+        drawPreview();
+        createBackground();
+        initAmbientParticles();
+        draw();
+    </script>
+</body>
+</html>

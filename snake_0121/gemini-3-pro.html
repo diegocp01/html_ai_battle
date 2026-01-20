@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CGI Snake 3D</title>
+    <style>
+        :root {
+            --bg-color: #0f1012;
+            --accent-color: #4facfe;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% 50%, #1a1c20 0%, #000000 150%);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Container for the game to handle relative positioning of UI */
+        #game-container {
+            position: relative;
+            box-shadow: 0 50px 100px -20px rgba(0,0,0,0.7);
+            border-radius: 12px;
+            padding: 4px;
+            background: linear-gradient(145deg, #1c1c1c, #0a0a0a);
+        }
+
+        canvas {
+            display: block;
+            border-radius: 8px;
+            cursor: none; /* Hide cursor for immersion */
+            background: #111; /* Fallback */
+        }
+
+        /* UI Overlay - Glassmorphism Style */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            border-radius: 8px;
+            z-index: 20;
+            transition: opacity 0.3s ease;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin: 0 0 10px 0;
+            background: linear-gradient(to bottom, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+        }
+
+        p {
+            color: #ccc;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(79, 172, 254, 0.4);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(79, 172, 254, 0.6);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui-layer">
+            <div class="hud-panel">Score: <span id="score">0</span></div>
+            <div class="hud-panel">High Score: <span id="high-score">0</span></div>
+        </div>
+
+        <div id="start-screen">
+            <h1>SNAKE 3D</h1>
+            <p>Use Arrow Keys to Move</p>
+            <button onclick="startGame()">INITIALIZE</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1 style="color: #ff4b4b; -webkit-text-fill-color: #ff4b4b;">CRITICAL FAILURE</h1>
+            <p>Score: <span id="final-score">0</span></p>
+            <button onclick="startGame()">REBOOT SYSTEM</button>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for non-transparent canvas
+        
+        // Game Constants
+        const TILE_SIZE = 30; // Size of rendering grid
+        const GRID_W = Math.floor(canvas.width / TILE_SIZE);
+        const GRID_H = Math.floor(canvas.height / TILE_SIZE);
+        const SPEED = 100; // Milliseconds per frame
+
+        // State Variables
+        let snake = [];
+        let food = {};
+        let direction = 'RIGHT';
+        let nextDirection = 'RIGHT';
+        let score = 0;
+        let highScore = localStorage.getItem('snake3d_highscore') || 0;
+        let gameLoopId;
+        let lastTime = 0;
+        let isGameOver = false;
+
+        // Visual Assets / Pre-calculations
+        // We will generate background textures dynamically
+        let bgPattern;
+        
+        // --- Initialization ---
+
+        document.getElementById('high-score').innerText = highScore;
+
+        function initBackground() {
+            // Create a complex floor tile pattern
+            const pCanvas = document.createElement('canvas');
+            pCanvas.width = TILE_SIZE * 2;
+            pCanvas.height = TILE_SIZE * 2;
+            const pCtx = pCanvas.getContext('2d');
+
+            // Dark metallic floor base
+            pCtx.fillStyle = '#141414';
+            pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
+
+            // Subtle grid lines (inset look)
+            pCtx.strokeStyle = '#222';
+            pCtx.lineWidth = 2;
+            pCtx.beginPath();
+            pCtx.moveTo(0, 0); pCtx.lineTo(pCanvas.width, 0);
+            pCtx.moveTo(0, pCanvas.height/2); pCtx.lineTo(pCanvas.width, pCanvas.height/2);
+            pCtx.moveTo(0, 0); pCtx.lineTo(0, pCanvas.height);
+            pCtx.moveTo(pCanvas.width/2, 0); pCtx.lineTo(pCanvas.width/2, pCanvas.height);
+            pCtx.stroke();
+
+            // Rivet details
+            pCtx.fillStyle = '#0a0a0a';
+            pCtx.beginPath();
+            pCtx.arc(TILE_SIZE, TILE_SIZE, 2, 0, Math.PI*2);
+            pCtx.fill();
+
+            bgPattern = ctx.createPattern(pCanvas, 'repeat');
+        }
+
+        initBackground();
+
+        // --- Core Game Logic ---
+
+        function startGame() {
+            // Reset State
+            snake = [
+                {x: 5, y: 10},
+                {x: 4, y: 10},
+                {x: 3, y: 10}
+            ];
+            direction = 'RIGHT';
+            nextDirection = 'RIGHT';
+            score = 0;
+            isGameOver = false;
+
+            updateScore();
+            spawnFood();
+            
+            // Hide Menus
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+
+            // Start Loop
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function spawnFood() {
+            let valid = false;
+            while (!valid) {
+                food = {
+                    x: Math.floor(Math.random() * GRID_W),
+                    y: Math.floor(Math.random() * GRID_H)
+                };
+                // Ensure food doesn't spawn inside snake
+                valid = !snake.some(segment => segment.x === food.x && segment.y === food.y);
+            }
+        }
+
+        function handleInput(e) {
+            if (isGameOver) return;
+            
+            const key = e.key;
+            // Prevent reversing direction immediately
+            if ((key === 'ArrowUp' || key === 'w') && direction !== 'DOWN') nextDirection = 'UP';
+            else if ((key === 'ArrowDown' || key === 's') && direction !== 'UP') nextDirection = 'DOWN';
+            else if ((key === 'ArrowLeft' || key === 'a') && direction !== 'RIGHT') nextDirection = 'LEFT';
+            else if ((key === 'ArrowRight' || key === 'd') && direction !== 'LEFT') nextDirection = 'RIGHT';
+        }
+
+        document.addEventListener('keydown', handleInput);
+
+        // --- The Game Loop ---
+
+        function gameLoop(currentTime) {
+            if (isGameOver) return;
+
+            window.requestAnimationFrame(gameLoop);
+
+            const deltaTime = currentTime - lastTime;
+            if (deltaTime < SPEED) return;
+
+            lastTime = currentTime;
+            update();
+            draw();
+        }
+
+        function update() {
+            direction = nextDirection;
+
+            // Calculate new head position
+            const head = { ...snake[0] };
+            if (direction === 'UP') head.y--;
+            if (direction === 'DOWN') head.y++;
+            if (direction === 'LEFT') head.x--;
+            if (direction === 'RIGHT') head.x++;
+
+            // Collision Detection: Walls
+            if (head.x < 0 || head.x >= GRID_W || head.y < 0 || head.y >= GRID_H) {
+                gameOver();
+                return;
+            }
+
+            // Collision Detection: Self
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+
+            snake.unshift(head); // Add new head
+
+            // Check Food
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                updateScore();
+                spawnFood();
+            } else {
+                snake.pop(); // Remove tail if not eating
+            }
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('snake3d_highscore', highScore);
+                document.getElementById('high-score').innerText = highScore;
+            }
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function updateScore() {
+            document.getElementById('score').innerText = score;
+        }
+
+        // --- 3D Rendering Engine ---
+
+        function draw() {
+            // 1. Clear & Background
+            ctx.fillStyle = bgPattern;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Draw Floor Shadow (Vignette)
+            const gradient = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 100,
+                canvas.width / 2, canvas.height / 2, 500
+            );
+            gradient.addColorStop(0, 'rgba(0,0,0,0)');
+            gradient.addColorStop(1, 'rgba(0,0,0,0.8)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 3. Draw Food (Apple)
+            drawFood(food.x, food.y);
+
+            // 4. Draw Snake
+            // Draw from tail to head so the head renders on top (z-index simulation)
+            for (let i = snake.length - 1; i >= 0; i--) {
+                const segment = snake[i];
+                const isHead = (i === 0);
+                // Determine connection to next segment for smoother joints
+                const nextSeg = snake[i-1]; 
+                
+                drawSnakeSegment(segment.x, segment.y, isHead, nextSeg, direction);
+            }
+        }
+
+        function drawSphere(cx, cy, radius, colorBase, colorHighlight, colorShadow) {
+            // Drop Shadow (Ambient Occlusion)
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 15;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 5;
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fillStyle = colorBase; // Base fill to set shadow
+            ctx.fill();
+            ctx.restore();
+
+            // 3D Shading Gradient (Simulating light from top-left)
+            const grad = ctx.createRadialGradient(
+                cx - radius * 0.3, cy - radius * 0.3, radius * 0.1, // Highlight origin
+                cx, cy, radius // Outer edge
+            );
+            
+            grad.addColorStop(0, colorHighlight); // Specular highlight
+            grad.addColorStop(0.4, colorBase);    // Midtone
+            grad.addColorStop(1, colorShadow);    // Shadow side
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rim Light (Fresnel effect on bottom right edge)
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function drawSnakeSegment(x, y, isHead, nextSeg, dir) {
+            const cx = x * TILE_SIZE + TILE_SIZE / 2;
+            const cy = y * TILE_SIZE + TILE_SIZE / 2;
+            const radius = (TILE_SIZE / 2) - 2;
+
+            // Snake Material Colors (Scaly Green)
+            const cBase = isHead ? '#2ecc71' : '#27ae60';
+            const cHigh = '#a8f5c3'; // Shiny wet look
+            const cShad = '#145a32';
+
+            drawSphere(cx, cy, radius, cBase, cHigh, cShad);
+
+            // If head, draw Eyes
+            if (isHead) {
+                drawEyes(cx, cy, radius, dir);
+            }
+        }
+
+        function drawEyes(cx, cy, radius, dir) {
+            // Calculate eye offset based on direction
+            let ox = 0, oy = 0;
+            let eyeSpacing = radius * 0.6;
+            
+            if (dir === 'RIGHT') { ox = 1; }
+            if (dir === 'LEFT')  { ox = -1; }
+            if (dir === 'UP')    { oy = -1; eyeSpacing = radius * 0.5; } // Closer together when looking up/down for perspective
+            if (dir === 'DOWN')  { oy = 1; eyeSpacing = radius * 0.5; }
+
+            const eyeOffsetDistance = radius * 0.4;
+            
+            // Draw Two Eyes
+            const eyeSize = radius * 0.35;
+            
+            // Perpendicular offsets
+            let ex1 = cx + (oy * eyeSpacing) + (ox * eyeOffsetDistance);
+            let ey1 = cy + (ox * eyeSpacing) + (oy * eyeOffsetDistance);
+            
+            let ex2 = cx - (oy * eyeSpacing) + (ox * eyeOffsetDistance);
+            let ey2 = cy - (ox * eyeSpacing) + (oy * eyeOffsetDistance);
+
+            // Adjust for side profile (if moving left/right, one eye is slightly hidden or stacked? 
+            // Simplified: Just draw both relative to center)
+            if (dir === 'RIGHT' || dir === 'LEFT') {
+               ex1 = cx + (ox * eyeOffsetDistance); 
+               ey1 = cy - eyeSpacing/1.5;
+               ex2 = cx + (ox * eyeOffsetDistance); 
+               ey2 = cy + eyeSpacing/1.5;
+            } else {
+               ex1 = cx - eyeSpacing; 
+               ey1 = cy + (oy * eyeOffsetDistance);
+               ex2 = cx + eyeSpacing; 
+               ey2 = cy + (oy * eyeOffsetDistance);
+            }
+
+            [ {x: ex1, y: ey1}, {x: ex2, y: ey2} ].forEach(eye => {
+                // Sclera (White part)
+                ctx.fillStyle = '#fff';
+                ctx.shadowColor = 'black';
+                ctx.shadowBlur = 2;
+                ctx.beginPath();
+                ctx.arc(eye.x, eye.y, eyeSize, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0; // Reset
+
+                // Pupil (Black)
+                const pupilSize = eyeSize * 0.5;
+                const pupilX = eye.x + (ox * 2); // Look slightly in direction
+                const pupilY = eye.y + (oy * 2);
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(pupilX, pupilY, pupilSize, 0, Math.PI*2);
+                ctx.fill();
+
+                // Specular highlight on eye (Wetness)
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.beginPath();
+                ctx.arc(pupilX - 1, pupilY - 1, pupilSize * 0.3, 0, Math.PI*2);
+                ctx.fill();
+            });
+        }
+
+        function drawFood(x, y) {
+            const cx = x * TILE_SIZE + TILE_SIZE / 2;
+            const cy = y * TILE_SIZE + TILE_SIZE / 2;
+            const radius = (TILE_SIZE / 2) - 4;
+
+            // Animate scale (Pulsing)
+            const pulse = Math.sin(Date.now() / 200) * 2;
+            
+            // Apple Colors
+            const cBase = '#c0392b';
+            const cHigh = '#ff7675';
+            const cShad = '#641e16';
+
+            drawSphere(cx, cy, radius + pulse, cBase, cHigh, cShad);
+
+            // Draw Leaf/Stem
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - radius);
+            ctx.quadraticCurveTo(cx + 5, cy - radius - 8, cx + 10, cy - radius - 5);
+            ctx.strokeStyle = '#27ae60';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+    </script>
+</body>
+</html>

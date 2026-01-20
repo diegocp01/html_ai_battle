@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "model_name": "gpt-5.2-extended-thinking.html",
+      "performance_score": 8.98,
+      "observations": "nice visuals, even tho the body of the snake are just black squares, the head the tail and the apple are actually looking good, plus nice background."
+    },
+    {
+      "model_name": "gemini-3-pro.html",
+      "performance_score": 7.48,
+      "observations": "The main request was a realistic looking snake and no black background and you didnt do none of those my man. besides that the game is playable and looks good"
+    },
+    {
+      "model_name": "grok-4.1-thinking.html",
+      "performance_score": 9.04,
+      "observations": "You followed what was asked and the game works, the snake is visual and nice background! good job groky grok"
+    },
+    {
+      "model_name": "opus-4.5-thinking-32k.html",
+      "performance_score": 9.3,
+      "observations": "great game, the snake looks more realistic, even the tongue and the eyes, nice background and the game looks good and works!"
+    }
+  ]
+}
