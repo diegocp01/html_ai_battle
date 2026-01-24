@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D DNA Double Helix Visualization</title>
+    <!-- Polyfill for Import Maps -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <style>
+        :root {
+            --primary-color: #00d2ff;
+            --secondary-color: #3a7bd5;
+            --bg-dark: #050510;
+            --panel-bg: rgba(20, 20, 35, 0.75);
+            --text-color: #ffffff;
+            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2rem;
+        }
+
+        header {
+            pointer-events: auto;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 400px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            font-size: 0.9rem;
+            color: #ccc;
+            line-height: 1.4;
+        }
+
+        .controls {
+            pointer-events: auto;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            max-width: 300px;
+            align-self: flex-end;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: opacity 0.3s ease;
+        }
+
+        .control-group {
+            margin-bottom: 1.2rem;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .legend {
+            margin-top: 1rem;
+            display: flex;
+            gap: 10px;
+            font-size: 0.75rem;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-dark);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            transition: opacity 0.5s ease;
+        }
+
+        @media (max-width: 600px) {
+            #ui-layer {
+                padding: 1rem;
+            }
+            .controls {
+                max-width: 100%;
+            }
+            h1 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loader">Initializing 3D Environment...</div>
+
+    <div id="canvas-container"></div>
+
+    <main id="ui-layer">
+        <header>
+            <h1>Human DNA Helix</h1>
+            <p>Interactive 3D visualization of the double helix structure. Drag to rotate, scroll to zoom.</p>
+            <div class="legend">
+                <div class="legend-item"><div class="dot" style="background:#ff4d4d"></div> Adenine</div>
+                <div class="legend-item"><div class="dot" style="background:#ffcc00"></div> Thymine</div>
+                <div class="legend-item"><div class="dot" style="background:#4dff4d"></div> Cytosine</div>
+                <div class="legend-item"><div class="dot" style="background:#4d4dff"></div> Guanine</div>
+            </div>
+        </header>
+
+        <section class="controls">
+            <div class="control-group">
+                <label for="speed-slider">Rotation Speed</label>
+                <input type="range" id="speed-slider" min="0" max="100" value="10">
+            </div>
+
+            <div class="control-group">
+                <div class="btn-group">
+                    <button id="btn-toggle-anim" class="btn-primary">Pause</button>
+                    <button id="btn-reset" class="btn-secondary">Reset View</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- WebGL Check ---
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) {
+            const container = document.getElementById('canvas-container');
+            container.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#ffffff;text-align:center;padding:20px;font-family:sans-serif;"><h2>WebGL is not supported on your device/browser.<br>Please try a different browser or enable hardware acceleration.</h2></div>';
+            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('loader').style.display = 'none';
+            throw new Error("WebGL not supported");
+        }
+
+        // --- Configuration ---
+        const CONFIG = {
+            particleCount: 45,
+            radius: 10,
+            height: 80,
+            turns: 4,
+            bondThickness: 0.8,
+            particleSize: 1.2,
+            colors: {
+                adenine: 0xff4d4d,
+                thymine: 0xffcc00,
+                cytosine: 0x4dff4d,
+                guanine: 0x4d4dff,
+                backbone: 0xffffff
+            }
+        };
+
+        // --- State ---
+        let scene, camera, renderer, controls;
+        let dnaGroup;
+        let isAnimating = true;
+        
+        // DOM Elements
+        const container = document.getElementById('canvas-container');
+        const loader = document.getElementById('loader');
+        const speedSlider = document.getElementById('speed-slider');
+        const btnToggle = document.getElementById('btn-toggle-anim');
+        const btnReset = document.getElementById('btn-reset');
+
+        // --- Initialization ---
+        function init() {
+            // 1. Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050510);
+            scene.fog = new THREE.FogExp2(0x050510, 0.015);
+
+            // 2. Camera Setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 60);
+
+            // 3. Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // 4. Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 2.0;
+
+            // 5. Lighting
+            setupLighting();
+
+            // 6. Create DNA
+            createDNA();
+
+            // 7. Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            setupUIInteractions();
+
+            // Hide loader
+            setTimeout(() => {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
+            }, 500);
+
+            // 8. Start Loop
+            animate();
+        }
+
+        function setupLighting() {
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const blueLight = new THREE.PointLight(0x00d2ff, 0.8, 50);
+            blueLight.position.set(-20, 10, 20);
+            scene.add(blueLight);
+
+            const redLight = new THREE.PointLight(0xff4d4d, 0.8, 50);
+            redLight.position.set(20, -10, 20);
+            scene.add(redLight);
+        }
+
+        // --- DNA Construction Logic (Optimized with InstancedMesh) ---
+        function createDNA() {
+            dnaGroup = new THREE.Group();
+
+            // Geometries
+            const sphereGeo = new THREE.SphereGeometry(CONFIG.particleSize, 32, 32);
+            
+            // Cylinder geometry for rungs and backbone
+            // Translate geometry so pivot is at the base (0,0,0) and extends along Y
+            const cylinderGeo = new THREE.CylinderGeometry(CONFIG.bondThickness, CONFIG.bondThickness, 1, 16);
+            cylinderGeo.translate(0, 0.5, 0); 
+
+            // Hydrogen bond geometry (thinner)
+            const hBondGeo = new THREE.CylinderGeometry(0.15, 0.15, 1, 8);
+            hBondGeo.translate(0, 0.5, 0);
+
+            // Materials
+            const matAdenine = new THREE.MeshStandardMaterial({ color: CONFIG.colors.adenine, roughness: 0.2, metalness: 0.1 });
+            const matThymine = new THREE.MeshStandardMaterial({ color: CONFIG.colors.thymine, roughness: 0.2, metalness: 0.1 });
+            const matCytosine = new THREE.MeshStandardMaterial({ color: CONFIG.colors.cytosine, roughness: 0.2, metalness: 0.1 });
+            const matGuanine = new THREE.MeshStandardMaterial({ color: CONFIG.colors.guanine, roughness: 0.2, metalness: 0.1 });
+            const matBackbone = new THREE.MeshStandardMaterial({ color: CONFIG.colors.backbone, roughness: 0.5, metalness: 0 });
+            const matHBond = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 });
+
+            // InstancedMesh Setup
+            const count = CONFIG.particleCount;
+            const meshA = new THREE.InstancedMesh(sphereGeo, matAdenine, count);
+            const meshT = new THREE.InstancedMesh(sphereGeo, matThymine, count);
+            const meshC = new THREE.InstancedMesh(sphereGeo, matCytosine, count);
+            const meshG = new THREE.InstancedMesh(sphereGeo, matGuanine, count);
+            
+            // Max 3 hydrogen bonds per pair
+            const meshHBond = new THREE.InstancedMesh(hBondGeo, matHBond, count * 3);
+            
+            // Backbone connectors (2 per pair)
+            const meshConnector = new THREE.InstancedMesh(cylinderGeo, matBackbone, count * 2);
+
+            let idxA = 0, idxT = 0, idxC = 0, idxG = 0, idxHBond = 0, idxConn = 0;
+            const dummy = new THREE.Object3D();
+
+            let prevX1, prevY1, prevZ1, prevX2, prevY2, prevZ2;
+
+            for (let i = 0; i < count; i++) {
+                const t = i / (count - 1);
+                const y = (t - 0.5) * CONFIG.height;
+                const angle = t * Math.PI * 2 * CONFIG.turns;
+
+                const x1 = Math.cos(angle) * CONFIG.radius;
+                const z1 = Math.sin(angle) * CONFIG.radius;
+                const x2 = Math.cos(angle + Math.PI) * CONFIG.radius;
+                const z2 = Math.sin(angle + Math.PI) * CONFIG.radius;
+
+                const isAT = Math.random() > 0.5;
+
+                // --- Atoms ---
+                dummy.position.set(x1, y, z1);
+                dummy.scale.set(1, 1, 1);
+                dummy.rotation.set(0, 0, 0);
+                dummy.updateMatrix();
+                if (isAT) meshA.setMatrixAt(idxA++, dummy.matrix);
+                else meshC.setMatrixAt(idxC++, dummy.matrix);
+
+                dummy.position.set(x2, y, z2);
+                dummy.updateMatrix();
+                if (isAT) meshT.setMatrixAt(idxT++, dummy.matrix);
+                else meshG.setMatrixAt(idxG++, dummy.matrix);
+
+                // --- Hydrogen Bonds (Rungs) ---
+                // A-T has 2 bonds, C-G has 3 bonds
+                const bondCount = isAT ? 2 : 3;
+                const dist = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(z2 - z1, 2));
+                
+                // Direction vector from 1 to 2
+                const dirX = (x2 - x1) / dist;
+                const dirZ = (z2 - z1) / dist;
+
+                for (let b = 0; b < bondCount; b++) {
+                    // Spread bonds out along the rung axis
+                    // Normalize b to -0.5 to 0.5 range, then scale by distance * 0.8 (keep inside atoms)
+                    const offset = ((b / (bondCount - 1)) - 0.5) * dist * 0.8;
+                    
+                    // Start position (center + offset along direction)
+                    const startX = x1 + dirX * offset;
+                    const startZ = z1 + dirZ * offset;
+
+                    dummy.position.set(startX, y, startZ);
+                    dummy.scale.set(1, dist * 0.8, 1); // Length of bond
+                    
+                    // Look at the end point of the bond
+                    // The end point is just further along the direction vector
+                    dummy.lookAt(startX + dirX, y, startZ + dirZ);
+                    dummy.rotateX(Math.PI / 2); // Align cylinder Y axis with lookAt vector
+                    
+                    dummy.updateMatrix();
+                    meshHBond.setMatrixAt(idxHBond++, dummy.matrix);
+                }
+
+                // --- Backbone Connectors ---
+                if (i > 0) {
+                    // Strand 1 Connector
+                    const dist1 = Math.sqrt(Math.pow(x1 - prevX1, 2) + Math.pow(y - prevY1, 2) + Math.pow(z1 - prevZ1, 2));
+                    dummy.position.set(prevX1, prevY1, prevZ1); // Start at previous
+                    dummy.scale.set(1, dist1, 1);
+                    dummy.lookAt(x1, y, z1); // Look at current
+                    dummy.rotateX(Math.PI / 2);
+                    dummy.updateMatrix();
+                    meshConnector.setMatrixAt(idxConn++, dummy.matrix);
+
+                    // Strand 2 Connector
+                    const dist2 = Math.sqrt(Math.pow(x2 - prevX2, 2) + Math.pow(y - prevY2, 2) + Math.pow(z2 - prevZ2, 2));
+                    dummy.position.set(prevX2, prevY2, prevZ2);
+                    dummy.scale.set(1, dist2, 1);
+                    dummy.lookAt(x2, y, z2);
+                    dummy.rotateX(Math.PI / 2);
+                    dummy.updateMatrix();
+                    meshConnector.setMatrixAt(idxConn++, dummy.matrix);
+                }
+
+                prevX1 = x1; prevY1 = y; prevZ1 = z1;
+                prevX2 = x2; prevY2 = y; prevZ2 = z2;
+            }
+
+            dnaGroup.add(meshA, meshT, meshC, meshG, meshHBond, meshConnector);
+            scene.add(dnaGroup);
+        }
+
+        // --- Interaction Logic ---
+        function setupUIInteractions() {
+            // Slider
+            speedSlider.addEventListener('input', (e) => {
+                // Map 0-100 to 0-20
+                controls.autoRotateSpeed = (e.target.value / 100) * 20;
+            });
+
+            // Toggle Button
+            btnToggle.addEventListener('click', () => {
+                isAnimating = !isAnimating;
+                controls.autoRotate = isAnimating;
+                btnToggle.textContent = isAnimating ? "Pause" : "Resume";
+                btnToggle.classList.toggle('btn-primary');
+                btnToggle.classList.toggle('btn-secondary');
+            });
+
+            // Reset Button
+            btnReset.addEventListener('click', () => {
+                controls.reset();
+                camera.position.set(0, 10, 60);
+                camera.lookAt(0, 0, 0);
+                // Reset rotation speed to default
+                controls.autoRotateSpeed = 2.0;
+                speedSlider.value = 10; // 2.0 is 10% of 20
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- Fallback for CDN ---
+        setTimeout(() => {
+            if (document.getElementById('loader')) {
+                const loaderEl = document.getElementById('loader');
+                loaderEl.innerHTML = '<div style="text-align:center; padding:20px;">Error: Failed to load 3D engine.<br>Please check your internet connection.</div>';
+                loaderEl.style.background = '#220000';
+                loaderEl.style.color = '#ffcccc';
+            }
+        }, 5000);
+
+        // Start application
+        init();
+
+    </script>
+</body>
+</html>

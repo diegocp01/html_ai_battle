@@ -52,6 +52,8 @@ X (Twitter) posts showcasing the experiments:
 
 **Airplane:** https://x.com/diegocabezas01/status/2012528314326425871?s=20
 
+**DNA Helix:** https://x.com/diegocabezas01/status/2015064627642564747?s=20
+
 ---
 
 ## 📊 Future Work
