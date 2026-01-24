@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Rotating DNA Double Helix</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111; /* Dark background for contrast */
+            overflow: hidden; /* Prevent scrollbars */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #aaa;
+            font-family: sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            pointer-events: none; /* Let clicks pass through */
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="dnaCanvas"></canvas>
+    
+    <div class="controls">
+        <small>Rendering: HTML5 Canvas + Vanilla JS</small>
+    </div>
+
+    <script>
+        /**
+         * 3D DNA Double Helix Animation
+         * Uses simple 3D projection math to map (x, y, z) coordinates to 2D screen space.
+         */
+
+        const canvas = document.getElementById('dnaCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        
+        // DNA Configuration
+        const config = {
+            strandColor1: '#00d2ff', // Cyan
+            strandColor2: '#ff0055', // Magenta
+            basePairColor: 'rgba(255, 255, 255, 0.3)',
+            numRows: 45,             // Number of "steps" in the ladder
+            radius: 120,             // Width of the helix
+            strandSpeed: 0.02,       // Rotation speed
+            separation: 18,          // Vertical distance between rows
+            ballSize: 6              // Size of the particles
+        };
+
+        // State variables
+        let offset = 0; // Global rotation angle
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        function render() {
+            // Clear the canvas
+            ctx.fillStyle = '#111'; // Match body background
+            ctx.fillRect(0, 0, width, height);
+
+            // Calculate center of screen
+            const cx = width / 2;
+            const cy = height / 2;
+
+            // Update rotation
+            offset += config.strandSpeed;
+
+            // We need to collect all drawing operations to sort them by depth (Z-index)
+            // This ensures "back" parts are drawn before "front" parts.
+            const drawList = [];
+
+            // Generate the helix
+            for (let i = 0; i < config.numRows; i++) {
+                // Calculate the base Y position relative to center.
+                // We center the whole helix vertically.
+                const totalHeight = config.numRows * config.separation;
+                const yBase = (i * config.separation) - (totalHeight / 2);
+
+                // Math for the twisting helix
+                // We map the row index to an angle. 
+                // 0.2 determines how tight the twist is.
+                const angle = (i * 0.2) + offset;
+
+                // 3D Coordinates for Strand 1
+                const x1 = Math.cos(angle) * config.radius;
+                const z1 = Math.sin(angle) * config.radius; 
+                
+                // 3D Coordinates for Strand 2 (180 degrees / PI offset)
+                const x2 = Math.cos(angle + Math.PI) * config.radius;
+                const z2 = Math.sin(angle + Math.PI) * config.radius;
+
+                // Perspective Projection
+                // Simple formula: scale = focalLength / (focalLength + z)
+                const focalLength = 400;
+                
+                // Project Strand 1
+                const scale1 = focalLength / (focalLength + z1);
+                const screenX1 = cx + x1 * scale1;
+                const screenY1 = cy + yBase * scale1;
+
+                // Project Strand 2
+                const scale2 = focalLength / (focalLength + z2);
+                const screenX2 = cx + x2 * scale2;
+                const screenY2 = cy + yBase * scale2;
+
+                // Create draw objects for sorting
+                // We average the Z depth of the two points for the connecting line
+                const avgZ = (z1 + z2) / 2;
+
+                // Add Connector (Base Pair)
+                drawList.push({
+                    type: 'line',
+                    z: avgZ,
+                    x1: screenX1, y1: screenY1,
+                    x2: screenX2, y2: screenY2,
+                    alpha: Math.min(scale1, scale2) // Fade distant lines
+                });
+
+                // Add Particle 1
+                drawList.push({
+                    type: 'circle',
+                    z: z1,
+                    x: screenX1,
+                    y: screenY1,
+                    r: config.ballSize * scale1,
+                    color: config.strandColor1
+                });
+
+                // Add Particle 2
+                drawList.push({
+                    type: 'circle',
+                    z: z2,
+                    x: screenX2,
+                    y: screenY2,
+                    r: config.ballSize * scale2,
+                    color: config.strandColor2
+                });
+            }
+
+            // Sort by Z depth (back to front)
+            // In our coordinate system, a higher Z is "behind" the screen if we view from negative Z,
+            // or "closer" if we view from positive. 
+            // Here: sin() goes -1 to 1. 
+            // We want to draw the items with the SMALLEST scale (furthest away) first.
+            drawList.sort((a, b) => a.z - b.z);
+
+            // Draw everything
+            drawList.forEach(item => {
+                if (item.type === 'line') {
+                    ctx.beginPath();
+                    ctx.strokeStyle = config.basePairColor;
+                    ctx.lineWidth = 2 * item.alpha; // Thinner lines in back
+                    ctx.moveTo(item.x1, item.y1);
+                    ctx.lineTo(item.x2, item.y2);
+                    ctx.stroke();
+                } else if (item.type === 'circle') {
+                    ctx.beginPath();
+                    ctx.fillStyle = item.color;
+                    ctx.arc(item.x, item.y, item.r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            requestAnimationFrame(render);
+        }
+
+        // Start the loop
+        render();
+
+    </script>
+</body>
+</html>

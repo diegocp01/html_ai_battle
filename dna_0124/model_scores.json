@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "model_name": "gpt-5.2-extended-thinking.html",
+      "performance_score": 6.0,
+      "observations": "dude the sliders dont work, the helix is in 2D not 3D bad job, expected way more you GPT doggy"
+    },
+    {
+      "model_name": "gemini-3-pro.html",
+      "performance_score": 9.5,
+      "observations": "very nice helix, flows with no problem looks very nice, straight to the point, very nice simulation congrats"
+    },
+    {
+      "model_name": "grok-4.1-thinking.html",
+      "performance_score": 0.0,
+      "observations": "once again groky grok, this code you gave didnt work!!! I cant not even judge you, besides telling you did a bad job"
+    },
+    {
+      "model_name": "opus-4.5-thinking-32k.html",
+      "performance_score": 9.63,
+      "observations": "great job claude!!! you even added some nice details and colors, very cool space moving background and nice touch with the interactive buttons for speed of the spin"
+    }
+  ]
+}

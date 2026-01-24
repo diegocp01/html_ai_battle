@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3D DNA Double Helix</title>
+  <style>
+    :root{
+      --bg0:#05060a;
+      --bg1:#0a0d16;
+      --text:#e9ecff;
+
+      --radius: 120;          /* px */
+      --rise: 10;             /* px per step */
+      --twist: 18;            /* degrees per step */
+      --steps: 120;
+
+      --speed: 0.55;          /* base rotation speed */
+      --tilt: 14;             /* degrees */
+      --persp: 1000px;
+
+      --glow: 0.9;
+      --fog: 0.22;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+      background:
+        radial-gradient(1200px 800px at 70% 30%, rgba(120,140,255,0.10), transparent 55%),
+        radial-gradient(900px 700px at 25% 70%, rgba(255,120,210,0.08), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow:hidden;
+    }
+
+    /* Subtle star/dust */
+    .dust{
+      position:fixed; inset:-10%;
+      background:
+        radial-gradient(circle at 10% 20%, rgba(255,255,255,0.07) 0 1px, transparent 2px),
+        radial-gradient(circle at 40% 30%, rgba(255,255,255,0.05) 0 1px, transparent 2px),
+        radial-gradient(circle at 80% 60%, rgba(255,255,255,0.06) 0 1px, transparent 2px),
+        radial-gradient(circle at 55% 80%, rgba(255,255,255,0.04) 0 1px, transparent 2px);
+      background-size: 240px 240px, 320px 320px, 280px 280px, 360px 360px;
+      filter: blur(0.2px);
+      opacity: 0.8;
+      transform: translateZ(0);
+      animation: drift 18s linear infinite;
+      pointer-events:none;
+      mix-blend-mode: screen;
+    }
+    @keyframes drift{
+      0%{ transform: translate3d(0,0,0) scale(1.02); }
+      100%{ transform: translate3d(-3%,2%,0) scale(1.02); }
+    }
+
+    .hud{
+      position:fixed;
+      left:18px; top:18px;
+      padding:14px 14px 12px;
+      border-radius:14px;
+      background: rgba(10,12,20,0.55);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 18px 45px rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      width: min(360px, calc(100vw - 36px));
+    }
+    .hud h1{
+      margin:0 0 8px;
+      font-size:14px;
+      letter-spacing:0.35px;
+      font-weight:700;
+      color: rgba(233,236,255,0.92);
+    }
+    .hud .row{
+      display:flex; align-items:center; gap:10px;
+      margin:8px 0;
+      font-size:12px;
+      color: rgba(233,236,255,0.82);
+    }
+    .hud input[type="range"]{ width: 180px; }
+    .hud .pill{
+      margin-left:auto;
+      padding:4px 8px;
+      border-radius:999px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-variant-numeric: tabular-nums;
+    }
+    .hud .hint{
+      margin-top:10px;
+      font-size:11px;
+      line-height:1.35;
+      color: rgba(233,236,255,0.65);
+    }
+    .hud .kbd{
+      display:inline-block;
+      padding:1px 6px;
+      border-radius:6px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.06);
+      font-size:10px;
+      margin: 0 3px;
+    }
+
+    .stage{
+      position:fixed;
+      inset:0;
+      display:grid;
+      place-items:center;
+      perspective: var(--persp);
+      perspective-origin: 50% 45%;
+    }
+
+    .scene{
+      width: 1px;
+      height: 1px;
+      transform-style: preserve-3d;
+      position: relative;
+    }
+
+    .camera{
+      transform-style: preserve-3d;
+      position: absolute;
+      transform:
+        translate3d(0px, 0px, -180px)
+        rotateX(calc(var(--tilt) * 1deg))
+        rotateY(0deg);
+    }
+
+    .helix{
+      position:absolute;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    .unit{
+      position:absolute;
+      transform-style: preserve-3d;
+      will-change: transform, filter, opacity;
+    }
+
+    /* Backbone nodes (phosphate + sugar impression) */
+    .node{
+      width: 16px; height:16px;
+      border-radius: 999px;
+      position:absolute;
+      transform-style: preserve-3d;
+      box-shadow:
+        0 0 22px rgba(160,180,255,0.14),
+        0 12px 28px rgba(0,0,0,0.35);
+      filter: saturate(1.05);
+    }
+    .node::before{
+      content:"";
+      position:absolute; inset:-2px;
+      border-radius: inherit;
+      background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.65), rgba(255,255,255,0.08) 35%, rgba(0,0,0,0) 70%);
+      transform: translateZ(2px);
+      pointer-events:none;
+      mix-blend-mode: screen;
+      opacity: 0.9;
+    }
+    .node::after{
+      content:"";
+      position:absolute; inset:2px;
+      border-radius: inherit;
+      background: radial-gradient(circle at 70% 75%, rgba(0,0,0,0.35), rgba(0,0,0,0) 60%);
+      opacity: 0.9;
+      pointer-events:none;
+    }
+
+    .node.left{
+      background: radial-gradient(circle at 35% 30%, rgba(120,200,255,0.95), rgba(65,120,255,0.55) 50%, rgba(35,65,160,0.20) 100%);
+    }
+    .node.right{
+      background: radial-gradient(circle at 35% 30%, rgba(255,150,220,0.95), rgba(220,80,190,0.55) 50%, rgba(140,35,120,0.18) 100%);
+    }
+
+    /* Base (A/T/C/G) */
+    .base{
+      width: 18px; height: 10px;
+      border-radius: 8px;
+      position:absolute;
+      transform-style: preserve-3d;
+      box-shadow:
+        0 0 18px rgba(255,255,255,0.12),
+        0 10px 22px rgba(0,0,0,0.35);
+    }
+    .base::before{
+      content:"";
+      position:absolute; inset:1px;
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255,255,255,0.40), rgba(255,255,255,0.04));
+      opacity: 0.75;
+      pointer-events:none;
+      transform: translateZ(1px);
+    }
+
+    .base.A{ background: linear-gradient(90deg, rgba(120,255,190,0.92), rgba(55,190,130,0.40)); }
+    .base.T{ background: linear-gradient(90deg, rgba(255,225,110,0.92), rgba(200,150,55,0.40)); }
+    .base.C{ background: linear-gradient(90deg, rgba(150,210,255,0.92), rgba(60,120,200,0.40)); }
+    .base.G{ background: linear-gradient(90deg, rgba(255,160,160,0.92), rgba(200,70,70,0.40)); }
+
+    /* Rungs (base pair connector) */
+    .rung{
+      height: 6px;
+      border-radius: 999px;
+      position:absolute;
+      transform-style: preserve-3d;
+      box-shadow:
+        0 0 22px rgba(255,255,255,0.10),
+        0 12px 24px rgba(0,0,0,0.40);
+    }
+    .rung::before{
+      content:"";
+      position:absolute; inset:1px;
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255,255,255,0.30), rgba(255,255,255,0.03));
+      opacity: 0.85;
+    }
+
+    /* Soft fog based on depth */
+    .fog{
+      position:fixed; inset:0;
+      background: radial-gradient(900px 500px at 50% 45%, rgba(0,0,0,0), rgba(0,0,0,var(--fog)));
+      pointer-events:none;
+      mix-blend-mode: multiply;
+    }
+
+    /* Mobile friendly HUD placement */
+    @media (max-width: 520px){
+      .hud{ left:12px; top:12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dust"></div>
+
+  <div class="hud">
+    <h1>3D DNA Double Helix</h1>
+
+    <div class="row">
+      <span>Rotate</span>
+      <input id="speed" type="range" min="0" max="1.6" step="0.01" value="0.55" />
+      <span class="pill" id="speedVal">0.55</span>
+    </div>
+
+    <div class="row">
+      <span>Tilt</span>
+      <input id="tilt" type="range" min="-25" max="35" step="1" value="14" />
+      <span class="pill" id="tiltVal">14°</span>
+    </div>
+
+    <div class="row">
+      <span>Depth</span>
+      <input id="persp" type="range" min="650" max="1600" step="10" value="1000" />
+      <span class="pill" id="perspVal">1000</span>
+    </div>
+
+    <div class="hint">
+      Drag to orbit, scroll to zoom.<br/>
+      <span class="kbd">Space</span> pause, <span class="kbd">R</span> reset.
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="scene">
+      <div class="camera" id="camera">
+        <div class="helix" id="helix"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fog"></div>
+
+  <script>
+    // ---- Config ----
+    const cfg = {
+      steps: Number(getComputedStyle(document.documentElement).getPropertyValue("--steps")) || 120,
+      radius: Number(getComputedStyle(document.documentElement).getPropertyValue("--radius")) || 120,
+      rise: Number(getComputedStyle(document.documentElement).getPropertyValue("--rise")) || 10,
+      twistDeg: Number(getComputedStyle(document.documentElement).getPropertyValue("--twist")) || 18,
+      speed: Number(getComputedStyle(document.documentElement).getPropertyValue("--speed")) || 0.55,
+      tilt: Number(getComputedStyle(document.documentElement).getPropertyValue("--tilt")) || 14,
+      zOffset: -180,  // camera translateZ
+      zoom: 1.0
+    };
+
+    const helixEl = document.getElementById("helix");
+    const camEl = document.getElementById("camera");
+    const root = document.documentElement;
+
+    // DNA pairing rules
+    const complements = { A: "T", T: "A", C: "G", G: "C" };
+    const bases = ["A", "T", "C", "G"];
+
+    function rndBase() { return bases[(Math.random() * bases.length) | 0]; }
+
+    // Utility
+    const toRad = (deg) => deg * Math.PI / 180;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    // Build helix
+    function buildHelix(){
+      helixEl.innerHTML = "";
+      const frag = document.createDocumentFragment();
+      const centerY = (cfg.steps - 1) * cfg.rise * 0.5;
+
+      for(let i = 0; i < cfg.steps; i++){
+        const angle = toRad(i * cfg.twistDeg);
+        const x = Math.cos(angle) * cfg.radius;
+        const z = Math.sin(angle) * cfg.radius;
+        const y = (i * cfg.rise) - centerY;
+
+        const x2 = Math.cos(angle + Math.PI) * cfg.radius;
+        const z2 = Math.sin(angle + Math.PI) * cfg.radius;
+
+        const b1 = rndBase();
+        const b2 = complements[b1];
+
+        // Container for this step
+        const unit = document.createElement("div");
+        unit.className = "unit";
+        unit.dataset.i = i;
+
+        // Left backbone node
+        const nL = document.createElement("div");
+        nL.className = "node left";
+        nL.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+
+        // Right backbone node
+        const nR = document.createElement("div");
+        nR.className = "node right";
+        nR.style.transform = `translate3d(${x2}px, ${y}px, ${z2}px)`;
+
+        // Bases, slightly inward toward center
+        const inward = 26;
+        const bL = document.createElement("div");
+        bL.className = `base ${b1}`;
+        bL.style.transform = `
+          translate3d(${x - Math.cos(angle) * inward}px, ${y}px, ${z - Math.sin(angle) * inward}px)
+          rotateY(${-i * cfg.twistDeg}deg)
+          translateZ(6px)
+        `;
+
+        const bR = document.createElement("div");
+        bR.className = `base ${b2}`;
+        bR.style.transform = `
+          translate3d(${x2 - Math.cos(angle + Math.PI) * inward}px, ${y}px, ${z2 - Math.sin(angle + Math.PI) * inward}px)
+          rotateY(${-i * cfg.twistDeg}deg)
+          translateZ(6px)
+        `;
+
+        // Rung between bases
+        const rung = document.createElement("div");
+        rung.className = "rung";
+        // Compute rung length in 3D projected onto XZ plane for layout, keep it centered
+        const dx = (x2 - x);
+        const dz = (z2 - z);
+        const len = Math.hypot(dx, dz) - 40; // leave space for nodes/bases
+        const midX = (x + x2) / 2;
+        const midZ = (z + z2) / 2;
+
+        // rotation around Y so it points between the strands (in XZ plane)
+        const rotY = Math.atan2(dz, dx) * 180 / Math.PI;
+
+        // Color rung based on pair type
+        const isAT = (b1 === "A" && b2 === "T") || (b1 === "T" && b2 === "A");
+        rung.style.width = `${Math.max(20, len)}px`;
+        rung.style.background = isAT
+          ? "linear-gradient(90deg, rgba(120,255,190,0.55), rgba(255,225,110,0.55))"
+          : "linear-gradient(90deg, rgba(150,210,255,0.55), rgba(255,160,160,0.55))";
+        rung.style.transform = `
+          translate3d(${midX}px, ${y}px, ${midZ}px)
+          rotateY(${rotY}deg)
+          translateZ(2px)
+          translateX(${-Math.max(20, len)/2}px)
+        `;
+
+        unit.appendChild(rung);
+        unit.appendChild(nL);
+        unit.appendChild(nR);
+        unit.appendChild(bL);
+        unit.appendChild(bR);
+
+        frag.appendChild(unit);
+      }
+
+      helixEl.appendChild(frag);
+    }
+
+    buildHelix();
+
+    // ---- Animation and interaction ----
+    let t0 = performance.now();
+    let paused = false;
+
+    // Orbit controls
+    let drag = false;
+    let lastX = 0, lastY = 0;
+    let orbitY = 0;         // deg
+    let orbitX = cfg.tilt;  // deg
+
+    function applyCamera(){
+      // zoom is implemented by moving camera along Z and scaling a touch
+      const z = cfg.zOffset - (cfg.zoom - 1) * 240;
+      camEl.style.transform =
+        `translate3d(0px, 0px, ${z}px) rotateX(${orbitX}deg) rotateY(${orbitY}deg)`;
+      root.style.setProperty("--tilt", orbitX.toFixed(0));
+    }
+
+    applyCamera();
+
+    function shadeByDepth(){
+      // Quick depth cue: each unit adjusts opacity and blur based on its current Z after helix rotation
+      // We approximate by using each unit's local z (sin(angle)) which is good enough visually
+      const units = helixEl.children;
+      const baseTwist = cfg.twistDeg;
+
+      for(let i = 0; i < units.length; i++){
+        const u = units[i];
+        const idx = Number(u.dataset.i);
+        const a = toRad(idx * baseTwist + spinDeg);
+        // local depth in [-1,1]
+        const depth = Math.sin(a);
+        // Map to [0,1] where 1 is closer
+        const near = (depth + 1) * 0.5;
+
+        const opacity = 0.55 + near * 0.45;
+        const blur = (1 - near) * 0.55;
+
+        u.style.opacity = opacity.toFixed(3);
+        u.style.filter = `blur(${blur.toFixed(2)}px)`;
+      }
+    }
+
+    let spinDeg = 0;
+
+    function tick(now){
+      const dt = Math.min(0.05, (now - t0) / 1000);
+      t0 = now;
+
+      if(!paused){
+        spinDeg += dt * 90 * cfg.speed; // 90 deg per sec at speed=1
+      }
+
+      // Helix spin + subtle breathing wobble
+      const wobble = Math.sin(now / 1100) * 4;
+      const wobble2 = Math.cos(now / 1400) * 3;
+
+      helixEl.style.transform =
+        `rotateY(${spinDeg}deg) rotateX(${wobble2}deg) rotateZ(${wobble}deg)`;
+
+      // Depth shading pass
+      shadeByDepth();
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // Pointer interactions
+    window.addEventListener("pointerdown", (e) => {
+      drag = true;
+      lastX = e.clientX; lastY = e.clientY;
+    }, { passive:true });
+
+    window.addEventListener("pointermove", (e) => {
+      if(!drag) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+
+      orbitY += dx * 0.25;
+      orbitX = clamp(orbitX - dy * 0.18, -55, 55);
+      applyCamera();
+    }, { passive:true });
+
+    window.addEventListener("pointerup", () => { drag = false; }, { passive:true });
+    window.addEventListener("pointercancel", () => { drag = false; }, { passive:true });
+
+    // Scroll to zoom
+    window.addEventListener("wheel", (e) => {
+      cfg.zoom = clamp(cfg.zoom + (e.deltaY > 0 ? -0.04 : 0.04), 0.65, 2.2);
+      applyCamera();
+    }, { passive:true });
+
+    // Keyboard
+    window.addEventListener("keydown", (e) => {
+      if(e.code === "Space"){
+        e.preventDefault();
+        paused = !paused;
+      }
+      if(e.key.toLowerCase() === "r"){
+        orbitY = 0;
+        orbitX = cfg.tilt;
+        cfg.zoom = 1.0;
+        spinDeg = 0;
+        applyCamera();
+      }
+    });
+
+    // HUD controls
+    const speedEl = document.getElementById("speed");
+    const tiltEl  = document.getElementById("tilt");
+    const perspEl = document.getElementById("persp");
+
+    const speedVal = document.getElementById("speedVal");
+    const tiltVal  = document.getElementById("tiltVal");
+    const perspVal = document.getElementById("perspVal");
+
+    function setSpeed(v){
+      cfg.speed = Number(v);
+      speedVal.textContent = cfg.speed.toFixed(2);
+      root.style.setProperty("--speed", cfg.speed.toFixed(2));
+    }
+    function setTilt(v){
+      cfg.tilt = Number(v);
+      orbitX = cfg.tilt;
+      tiltVal.textContent = `${cfg.tilt}°`;
+      root.style.setProperty("--tilt", String(cfg.tilt));
+      applyCamera();
+    }
+    function setPersp(v){
+      root.style.setProperty("--persp", `${Number(v)}px`);
+      perspVal.textContent = String(Number(v));
+    }
+
+    speedEl.addEventListener("input", (e) => setSpeed(e.target.value));
+    tiltEl.addEventListener("input",  (e) => setTilt(e.target.value));
+    perspEl.addEventListener("input", (e) => setPersp(e.target.value));
+
+    // init HUD values
+    setSpeed(speedEl.value);
+    setTilt(tiltEl.value);
+    setPersp(perspEl.value);
+
+    // Optional: rebuild helix on resize for crispness (keeps it stable)
+    window.addEventListener("resize", () => {
+      // keep scene stable, no need to rebuild, but you can if you want:
+      // buildHelix();
+    });
+  </script>
+</body>
+</html>

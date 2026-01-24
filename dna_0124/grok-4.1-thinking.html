@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Rotating 3D DNA Double Helix</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+    </style>
+</head>
+<body>
+    <script src="https://threejs.org/build/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 20, 15);
+        scene.add(dirLight);
+
+        // DNA group (will rotate)
+        const dnaGroup = new THREE.Group();
+        scene.add(dnaGroup);
+
+        // Parameters
+        const radius = 5;
+        const turns = 10;
+        const heightPerTurn = 10;
+        const totalHeight = turns * heightPerTurn;
+        const tubeRadius = 0.8;
+        const radialSegments = 20;
+        const tubularSegments = 400;
+        const numBases = 105; // ~10.5 bases per turn (close to real DNA)
+
+        // Materials
+        const strandMat1 = new THREE.MeshPhongMaterial({ color: 0x4488ff }); // Blue strand
+        const strandMat2 = new THREE.MeshPhongMaterial({ color: 0xff8844 }); // Orange strand
+        const baseMat1 = new THREE.MeshPhongMaterial({ color: 0x88ff88 }); // Green bases (e.g., A-T)
+        const baseMat2 = new THREE.MeshPhongMaterial({ color: 0xffff88 }); // Yellow bases (e.g., G-C)
+
+        // Custom helix curve
+        class HelixCurve extends THREE.Curve {
+            constructor(phase = 0) {
+                super();
+                this.phase = phase;
+            }
+            getPoint(t, optionalTarget = new THREE.Vector3()) {
+                const angle = t * turns * Math.PI * 2 + this.phase;
+                const x = radius * Math.cos(angle);
+                const y = (t - 0.5) * totalHeight;
+                const z = radius * Math.sin(angle);
+                return optionalTarget.set(x, y, z);
+            }
+        }
+
+        // Create the two backbone strands (tubes)
+        const path1 = new HelixCurve(0);
+        const tubeGeo1 = new THREE.TubeGeometry(path1, tubularSegments, tubeRadius, radialSegments, false);
+        const strand1 = new THREE.Mesh(tubeGeo1, strandMat1);
+        dnaGroup.add(strand1);
+
+        const path2 = new HelixCurve(Math.PI);
+        const tubeGeo2 = new THREE.TubeGeometry(path2, tubularSegments, tubeRadius, radialSegments, false);
+        const strand2 = new THREE.Mesh(tubeGeo2, strandMat2);
+        dnaGroup.add(strand2);
+
+        // Create base pairs (cylinders connecting the strands)
+        for (let i = 0; i < numBases; i++) {
+            const t = i / (numBases - 1);
+            const point1 = path1.getPoint(t);
+            const point2 = path2.getPoint(t);
+
+            const center = point1.clone().add(point2).multiplyScalar(0.5);
+            const length = point1.distanceTo(point2);
+            const direction = point2.clone().sub(point1).normalize();
+
+            const baseGeo = new THREE.CylinderGeometry(0.5, 0.5, length, 12);
+            const baseMat = (i % 2 === 0) ? baseMat1 : baseMat2;
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            base.position.copy(center);
+            base.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+
+            dnaGroup.add(base);
+        }
+
+        // Camera position (good view of the full helix)
+        camera.position.set(40, 30, 80);
+        camera.lookAt(0, 0, 0);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Animation loop (slow rotation)
+        function animate() {
+            requestAnimationFrame(animate);
+            dnaGroup.rotation.y += 0.004;
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

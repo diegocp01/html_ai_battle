@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D DNA Double Helix</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at center, #0d1b2a 0%, #020408 100%);
+            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        .title {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(0, 200, 255, 0.5);
+        }
+        
+        .legend {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 30px;
+            color: white;
+            font-size: 14px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+        }
+        
+        .controls {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+        }
+        
+        .controls button {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .controls button:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .controls button.active {
+            background: rgba(0, 200, 255, 0.3);
+            border-color: rgba(0, 200, 255, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <div class="title">DNA Double Helix</div>
+    
+    <div class="controls">
+        <button id="btnSlow">Slow</button>
+        <button id="btnNormal" class="active">Normal</button>
+        <button id="btnFast">Fast</button>
+    </div>
+    
+    <canvas id="canvas"></canvas>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #00ff88;"></div>
+            <span>Adenine (A)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ff6b35;"></div>
+            <span>Thymine (T)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #a855f7;"></div>
+            <span>Guanine (G)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #fbbf24;"></div>
+            <span>Cytosine (C)</span>
+        </div>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // Animation settings
+        let rotationSpeed = 0.012;
+        let rotation = 0;
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetRotationX = 0;
+        let currentRotationX = 0;
+        
+        // DNA parameters
+        const numBasePairs = 25;
+        const helixRadius = 90;
+        const verticalSpacing = 22;
+        const twistPerStep = Math.PI / 5.25; // ~34.3 degrees per base pair (accurate to real DNA)
+        
+        // Colors
+        const colors = {
+            backbone1: '#00b4d8',
+            backbone2: '#ef476f',
+            A: '#00ff88',
+            T: '#ff6b35',
+            G: '#a855f7',
+            C: '#fbbf24'
+        };
+        
+        // Base pair rules: A-T and G-C
+        const basePairs = [];
+        const pairTypes = [['A', 'T'], ['T', 'A'], ['G', 'C'], ['C', 'G']];
+        
+        for (let i = 0; i < numBasePairs; i++) {
+            basePairs.push(pairTypes[Math.floor(Math.random() * 4)]);
+        }
+        
+        // Mouse interaction
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX - width / 2) / width;
+            mouseY = (e.clientY - height / 2) / height;
+        });
+        
+        // Speed controls
+        document.getElementById('btnSlow').addEventListener('click', function() {
+            rotationSpeed = 0.005;
+            updateButtons(this);
+        });
+        document.getElementById('btnNormal').addEventListener('click', function() {
+            rotationSpeed = 0.012;
+            updateButtons(this);
+        });
+        document.getElementById('btnFast').addEventListener('click', function() {
+            rotationSpeed = 0.025;
+            updateButtons(this);
+        });
+        
+        function updateButtons(activeBtn) {
+            document.querySelectorAll('.controls button').forEach(btn => btn.classList.remove('active'));
+            activeBtn.classList.add('active');
+        }
+        
+        // 3D projection with perspective
+        function project(x, y, z) {
+            const perspective = 600;
+            const scale = perspective / (perspective + z);
+            return {
+                x: width / 2 + x * scale,
+                y: height / 2 + y * scale,
+                z: z,
+                scale: scale
+            };
+        }
+        
+        // Rotate point around Y axis
+        function rotateY(x, y, z, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return {
+                x: x * cos - z * sin,
+                y: y,
+                z: x * sin + z * cos
+            };
+        }
+        
+        // Rotate point around X axis
+        function rotateX(x, y, z, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return {
+                x: x,
+                y: y * cos - z * sin,
+                z: y * sin + z * cos
+            };
+        }
+        
+        // Draw glowing sphere
+        function drawSphere(x, y, radius, color, glowIntensity = 1) {
+            // Outer glow
+            const glowGradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2.5);
+            glowGradient.addColorStop(0, color + '40');
+            glowGradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = glowGradient;
+            ctx.beginPath();
+            ctx.arc(x, y, radius * 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Main sphere with 3D shading
+            const sphereGradient = ctx.createRadialGradient(
+                x - radius * 0.3, y - radius * 0.3, 0,
+                x, y, radius
+            );
+            sphereGradient.addColorStop(0, '#ffffff');
+            sphereGradient.addColorStop(0.2, color);
+            sphereGradient.addColorStop(1, shadeColor(color, -50));
+            
+            ctx.fillStyle = sphereGradient;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Shade color utility
+        function shadeColor(color, percent) {
+            const num = parseInt(color.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+            const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amt));
+            const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+            return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+        }
+        
+        // Draw connection line with gradient
+        function drawConnection(x1, y1, x2, y2, color1, color2, lineWidth, alpha = 1) {
+            const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+        
+        // Draw curved backbone segment
+        function drawBackboneSegment(p1, p2, color, thickness) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = thickness;
+            ctx.lineCap = 'round';
+            ctx.globalAlpha = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+        
+        // Main animation loop
+        function animate() {
+            // Clear canvas with slight fade for trail effect
+            ctx.fillStyle = 'rgba(2, 4, 8, 0.2)';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Smooth mouse interaction
+            targetRotationX = mouseY * 0.5;
+            currentRotationX += (targetRotationX - currentRotationX) * 0.05;
+            
+            const elements = [];
+            const centerY = 0;
+            
+            // Generate all DNA elements
+            for (let i = 0; i < numBasePairs; i++) {
+                const baseAngle = i * twistPerStep;
+                const y = i * verticalSpacing - (numBasePairs * verticalSpacing) / 2 + centerY;
+                
+                // Calculate 3D positions for both strands
+                let pos1 = {
+                    x: Math.cos(baseAngle + rotation) * helixRadius,
+                    y: y,
+                    z: Math.sin(baseAngle + rotation) * helixRadius
+                };
+                
+                let pos2 = {
+                    x: Math.cos(baseAngle + rotation + Math.PI) * helixRadius,
+                    y: y,
+                    z: Math.sin(baseAngle + rotation + Math.PI) * helixRadius
+                };
+                
+                // Apply X rotation based on mouse
+                pos1 = rotateX(pos1.x, pos1.y, pos1.z, currentRotationX);
+                pos2 = rotateX(pos2.x, pos2.y, pos2.z, currentRotationX);
+                
+                // Project to 2D
+                const proj1 = project(pos1.x, pos1.y, pos1.z);
+                const proj2 = project(pos2.x, pos2.y, pos2.z);
+                
+                // Store base pair data
+                const bases = basePairs[i];
+                
+                // Add nucleotide spheres
+                elements.push({
+                    type: 'nucleotide',
+                    proj: proj1,
+                    color: colors.backbone1,
+                    baseColor: colors[bases[0]],
+                    base: bases[0]
+                });
+                
+                elements.push({
+                    type: 'nucleotide',
+                    proj: proj2,
+                    color: colors.backbone2,
+                    baseColor: colors[bases[1]],
+                    base: bases[1]
+                });
+                
+                // Add base pair connection
+                elements.push({
+                    type: 'basepair',
+                    proj1: proj1,
+                    proj2: proj2,
+                    z: (proj1.z + proj2.z) / 2,
+                    color1: colors[bases[0]],
+                    color2: colors[bases[1]],
+                    scale: (proj1.scale + proj2.scale) / 2
+                });
+                
+                // Add backbone connections to previous nucleotides
+                if (i > 0) {
+                    const prevAngle = (i - 1) * twistPerStep;
+                    const prevY = (i - 1) * verticalSpacing - (numBasePairs * verticalSpacing) / 2 + centerY;
+                    
+                    let prevPos1 = {
+                        x: Math.cos(prevAngle + rotation) * helixRadius,
+                        y: prevY,
+                        z: Math.sin(prevAngle + rotation) * helixRadius
+                    };
+                    let prevPos2 = {
+                        x: Math.cos(prevAngle + rotation + Math.PI) * helixRadius,
+                        y: prevY,
+                        z: Math.sin(prevAngle + rotation + Math.PI) * helixRadius
+                    };
+                    
+                    prevPos1 = rotateX(prevPos1.x, prevPos1.y, prevPos1.z, currentRotationX);
+                    prevPos2 = rotateX(prevPos2.x, prevPos2.y, prevPos2.z, currentRotationX);
+                    
+                    const prevProj1 = project(prevPos1.x, prevPos1.y, prevPos1.z);
+                    const prevProj2 = project(prevPos2.x, prevPos2.y, prevPos2.z);
+                    
+                    elements.push({
+                        type: 'backbone',
+                        proj1: prevProj1,
+                        proj2: proj1,
+                        z: (prevProj1.z + proj1.z) / 2,
+                        color: colors.backbone1
+                    });
+                    
+                    elements.push({
+                        type: 'backbone',
+                        proj1: prevProj2,
+                        proj2: proj2,
+                        z: (prevProj2.z + proj2.z) / 2,
+                        color: colors.backbone2
+                    });
+                }
+            }
+            
+            // Sort by Z-depth (painter's algorithm)
+            elements.sort((a, b) => {
+                const zA = a.type === 'nucleotide' ? a.proj.z : a.z;
+                const zB = b.type === 'nucleotide' ? b.proj.z : b.z;
+                return zA - zB;
+            });
+            
+            // Draw all elements
+            for (const el of elements) {
+                if (el.type === 'backbone') {
+                    const thickness = 4 * ((el.proj1.scale + el.proj2.scale) / 2);
+                    drawBackboneSegment(el.proj1, el.proj2, el.color, thickness);
+                } else if (el.type === 'basepair') {
+                    drawConnection(
+                        el.proj1.x, el.proj1.y,
+                        el.proj2.x, el.proj2.y,
+                        el.color1, el.color2,
+                        6 * el.scale,
+                        0.85
+                    );
+                } else if (el.type === 'nucleotide') {
+                    const radius = 14 * el.proj.scale;
+                    drawSphere(el.proj.x, el.proj.y, radius, el.color, el.proj.scale);
+                    
+                    // Draw smaller inner sphere for base
+                    const innerRadius = 7 * el.proj.scale;
+                    drawSphere(el.proj.x, el.proj.y, innerRadius, el.baseColor, el.proj.scale * 0.7);
+                }
+            }
+            
+            // Add ambient particles
+            drawParticles();
+            
+            rotation += rotationSpeed;
+            requestAnimationFrame(animate);
+        }
+        
+        // Ambient floating particles
+        const particles = [];
+        for (let i = 0; i < 50; i++) {
+            particles.push({
+                x: Math.random() * 2 - 1,
+                y: Math.random() * 2 - 1,
+                z: Math.random() * 400 - 200,
+                speed: Math.random() * 0.002 + 0.001,
+                size: Math.random() * 2 + 1
+            });
+        }
+        
+        function drawParticles() {
+            for (const p of particles) {
+                p.y -= p.speed;
+                if (p.y < -1) p.y = 1;
+                
+                const proj = project(p.x * 300, p.y * height / 2, p.z);
+                const alpha = Math.max(0, Math.min(1, (200 - Math.abs(p.z)) / 200)) * 0.5;
+                
+                ctx.fillStyle = `rgba(100, 200, 255, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(proj.x, proj.y, p.size * proj.scale, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
