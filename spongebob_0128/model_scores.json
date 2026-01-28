@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "model_name": "gpt-5.2-extended-thinking.html",
+      "performance_score": 9.15,
+      "observations": "nice! looks like sponge bob, the eyes when he blinks is probably the only issue, besides that great job, also the pineaple is shaped like a sqaure lol thats kind of weird, but nice efect of bubbles on click"
+    },
+    {
+      "model_name": "gemini-3-pro.html",
+      "performance_score": 8.88,
+      "observations": "what happen with bob's arm? 1 of them is just floting and his waist is completely gone, nice shape for the pineaple tho! and the teeth are just verrtical??? wtf. no hands either"
+    },
+    {
+      "model_name": "grok-4.1-thinking.html",
+      "performance_score": 6.15,
+      "observations": "grok what is this aberration dude!!! lol the pineaple is very weird sponge bob looks even crepier, nice touch with the bubbles but this needs work."
+    },
+    {
+      "model_name": "opus-4.5-thinking-32k.html",
+      "performance_score": 9.16,
+      "observations": "so the house pineaple not bad, bubbles pretty nice, but sponge bob is missing his nose completely and mouth is missing too!! good try but needs work too"
+    }
+  ]
+}

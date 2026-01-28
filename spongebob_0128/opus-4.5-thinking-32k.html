@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpongeBob Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #006994 0%, #004466 50%, #002233 100%);
+            overflow: hidden;
+        }
+
+        .scene {
+            position: relative;
+            width: 800px;
+            height: 600px;
+        }
+
+        /* Sandy Bottom */
+        .sand {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100px;
+            background: linear-gradient(180deg, #c2a366 0%, #8b7355 100%);
+            border-radius: 50% 50% 0 0;
+        }
+
+        .sand::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10%;
+            width: 80%;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+        }
+
+        /* Pineapple House */
+        .pineapple {
+            position: absolute;
+            bottom: 80px;
+            left: 450px;
+            z-index: 1;
+        }
+
+        .pineapple-body {
+            width: 180px;
+            height: 220px;
+            background: linear-gradient(135deg, #ff8c00 0%, #d2691e 50%, #8b4513 100%);
+            border-radius: 50% 50% 45% 45%;
+            position: relative;
+            box-shadow: inset -20px -20px 40px rgba(0,0,0,0.3);
+        }
+
+        /* Pineapple texture */
+        .pineapple-body::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(139,69,19,0.3) 15px, rgba(139,69,19,0.3) 17px),
+                repeating-linear-gradient(-45deg, transparent, transparent 15px, rgba(139,69,19,0.3) 15px, rgba(139,69,19,0.3) 17px);
+            border-radius: inherit;
+        }
+
+        .pineapple-leaves {
+            position: absolute;
+            top: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .leaf {
+            position: absolute;
+            width: 25px;
+            height: 80px;
+            background: linear-gradient(to top, #228b22, #32cd32);
+            border-radius: 50% 50% 50% 50%;
+            transform-origin: bottom center;
+        }
+
+        .leaf:nth-child(1) { transform: rotate(-40deg) translateX(-30px); }
+        .leaf:nth-child(2) { transform: rotate(-20deg) translateX(-15px); }
+        .leaf:nth-child(3) { transform: rotate(0deg); left: -12px; }
+        .leaf:nth-child(4) { transform: rotate(20deg) translateX(15px); }
+        .leaf:nth-child(5) { transform: rotate(40deg) translateX(30px); }
+
+        .pineapple-door {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 70px;
+            background: linear-gradient(135deg, #4169e1 0%, #1e3a8a 100%);
+            border-radius: 50% 50% 5px 5px;
+            border: 4px solid #2f4f4f;
+        }
+
+        .pineapple-window {
+            position: absolute;
+            width: 35px;
+            height: 35px;
+            background: linear-gradient(135deg, #87ceeb 0%, #4169e1 100%);
+            border-radius: 50%;
+            border: 4px solid #2f4f4f;
+        }
+
+        .pineapple-window.left {
+            top: 60px;
+            left: 25px;
+        }
+
+        .pineapple-window.right {
+            top: 60px;
+            right: 25px;
+        }
+
+        /* SpongeBob */
+        .spongebob {
+            position: absolute;
+            bottom: 100px;
+            left: 150px;
+            z-index: 2;
+            animation: bounce 1s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .body {
+            width: 100px;
+            height: 130px;
+            background: #ffeb3b;
+            border-radius: 10px;
+            position: relative;
+            border: 3px solid #8b7500;
+        }
+
+        /* Sponge holes */
+        .hole {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #9acd32;
+            border-radius: 50%;
+        }
+
+        .hole:nth-child(1) { top: 10px; left: 15px; }
+        .hole:nth-child(2) { top: 25px; right: 20px; width: 8px; height: 8px; }
+        .hole:nth-child(3) { top: 50px; left: 25px; width: 10px; height: 10px; }
+        .hole:nth-child(4) { top: 40px; right: 10px; }
+        .hole:nth-child(5) { top: 70px; left: 10px; width: 9px; height: 9px; }
+
+        .face {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90px;
+            height: 60px;
+        }
+
+        .eyes {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .eye {
+            width: 35px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            position: relative;
+            border: 2px solid #333;
+        }
+
+        .eye::before {
+            content: '';
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background: #00bfff;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .eye::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #000;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .eyelash {
+            position: absolute;
+            top: -5px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .eyelash span {
+            width: 2px;
+            height: 8px;
+            background: #333;
+        }
+
+        .nose {
+            width: 20px;
+            height: 25px;
+            background: #ffeb3b;
+            border-radius: 50%;
+            margin: 0 auto;
+            position: relative;
+            top: -5px;
+        }
+
+        .mouth {
+            width: 50px;
+            height: 20px;
+            background: #8b0000;
+            border-radius: 0 0 25px 25px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .teeth {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 2px;
+        }
+
+        .tooth {
+            width: 10px;
+            height: 12px;
+            background: white;
+            border-radius: 0 0 3px 3px;
+        }
+
+        .cheeks {
+            position: absolute;
+            top: 30px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 5px;
+        }
+
+        .cheek {
+            width: 15px;
+            height: 8px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            opacity: 0.6;
+        }
+
+        .freckles {
+            position: absolute;
+            display: flex;
+            gap: 3px;
+            flex-direction: column;
+        }
+
+        .freckles.left { left: 8px; top: 35px; }
+        .freckles.right { right: 8px; top: 35px; }
+
+        .freckle {
+            width: 4px;
+            height: 4px;
+            background: #8b4513;
+            border-radius: 50%;
+        }
+
+        /* Clothes */
+        .shirt {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 40px;
+            background: white;
+            border-radius: 0 0 10px 10px;
+        }
+
+        .collar {
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 15px;
+            background: white;
+            clip-path: polygon(20% 100%, 50% 0%, 80% 100%);
+        }
+
+        .tie {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 15px;
+            height: 30px;
+            background: #ff0000;
+            clip-path: polygon(50% 0%, 100% 20%, 80% 100%, 50% 85%, 20% 100%, 0% 20%);
+        }
+
+        /* Pants */
+        .pants {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90px;
+            height: 30px;
+            background: #8b4513;
+            border-radius: 0 0 5px 5px;
+        }
+
+        .belt {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 8px;
+            background: #1a1a1a;
+        }
+
+        /* Legs */
+        .legs {
+            position: absolute;
+            bottom: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+
+        .leg {
+            width: 12px;
+            height: 50px;
+            background: #ffeb3b;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .sock {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            height: 20px;
+            background: white;
+            border-radius: 3px;
+        }
+
+        .sock::before {
+            content: '';
+            position: absolute;
+            top: 3px;
+            width: 100%;
+            height: 3px;
+            background: #ff0000;
+        }
+
+        .sock::after {
+            content: '';
+            position: absolute;
+            top: 9px;
+            width: 100%;
+            height: 3px;
+            background: #0000ff;
+        }
+
+        .shoe {
+            position: absolute;
+            bottom: -8px;
+            left: -5px;
+            width: 25px;
+            height: 12px;
+            background: #1a1a1a;
+            border-radius: 5px 10px 5px 5px;
+        }
+
+        /* Arms */
+        .arms {
+            position: absolute;
+            top: 70px;
+            width: 140px;
+            left: -20px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .arm {
+            width: 12px;
+            height: 45px;
+            background: #ffeb3b;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .arm.left {
+            transform: rotate(20deg);
+            animation: wave 0.5s ease-in-out infinite alternate;
+        }
+
+        .arm.right {
+            transform: rotate(-20deg);
+        }
+
+        @keyframes wave {
+            0% { transform: rotate(20deg); }
+            100% { transform: rotate(45deg); }
+        }
+
+        .hand {
+            position: absolute;
+            bottom: -10px;
+            left: -5px;
+            width: 22px;
+            height: 18px;
+            background: #ffeb3b;
+            border-radius: 50%;
+        }
+
+        /* Bubbles */
+        .bubbles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), rgba(255,255,255,0.2));
+            border: 1px solid rgba(255,255,255,0.5);
+            animation: rise linear infinite;
+        }
+
+        @keyframes rise {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateY(-600px) scale(0.5);
+                opacity: 0;
+            }
+        }
+
+        /* Seaweed */
+        .seaweed {
+            position: absolute;
+            bottom: 80px;
+            width: 20px;
+            height: 80px;
+            background: linear-gradient(to top, #228b22, #32cd32);
+            border-radius: 50% 50% 0 0;
+            animation: sway 2s ease-in-out infinite;
+            transform-origin: bottom center;
+        }
+
+        .seaweed:nth-child(1) { left: 50px; height: 100px; animation-delay: 0s; }
+        .seaweed:nth-child(2) { left: 80px; height: 60px; animation-delay: 0.3s; }
+        .seaweed:nth-child(3) { right: 100px; height: 90px; animation-delay: 0.6s; }
+        .seaweed:nth-child(4) { right: 60px; height: 70px; animation-delay: 0.9s; }
+
+        @keyframes sway {
+            0%, 100% { transform: rotate(-10deg); }
+            50% { transform: rotate(10deg); }
+        }
+
+        /* Light rays */
+        .light-rays {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 50%),
+                repeating-linear-gradient(90deg, transparent, transparent 100px, rgba(255,255,255,0.03) 100px, rgba(255,255,255,0.03) 150px);
+            pointer-events: none;
+        }
+
+        /* Flowers on sand */
+        .coral {
+            position: absolute;
+            bottom: 70px;
+            width: 30px;
+            height: 40px;
+            background: #ff69b4;
+            border-radius: 50% 50% 0 0;
+        }
+
+        .coral:nth-child(1) { left: 300px; background: #ff6347; }
+        .coral:nth-child(2) { left: 330px; height: 30px; background: #ff69b4; }
+        .coral:nth-child(3) { right: 250px; background: #dda0dd; height: 35px; }
+    </style>
+</head>
+<body>
+    <div class="scene">
+        <div class="light-rays"></div>
+        
+        <!-- Bubbles container -->
+        <div class="bubbles" id="bubbles"></div>
+        
+        <!-- Seaweed -->
+        <div class="seaweed"></div>
+        <div class="seaweed"></div>
+        <div class="seaweed"></div>
+        <div class="seaweed"></div>
+        
+        <!-- Coral -->
+        <div class="coral"></div>
+        <div class="coral"></div>
+        <div class="coral"></div>
+        
+        <!-- Pineapple House -->
+        <div class="pineapple">
+            <div class="pineapple-leaves">
+                <div class="leaf"></div>
+                <div class="leaf"></div>
+                <div class="leaf"></div>
+                <div class="leaf"></div>
+                <div class="leaf"></div>
+            </div>
+            <div class="pineapple-body">
+                <div class="pineapple-window left"></div>
+                <div class="pineapple-window right"></div>
+                <div class="pineapple-door"></div>
+            </div>
+        </div>
+        
+        <!-- SpongeBob -->
+        <div class="spongebob">
+            <div class="arms">
+                <div class="arm left">
+                    <div class="hand"></div>
+                </div>
+                <div class="arm right">
+                    <div class="hand"></div>
+                </div>
+            </div>
+            <div class="body">
+                <div class="hole"></div>
+                <div class="hole"></div>
+                <div class="hole"></div>
+                <div class="hole"></div>
+                <div class="hole"></div>
+                
+                <div class="face">
+                    <div class="eyes">
+                        <div class="eye">
+                            <div class="eyelash">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                        <div class="eye">
+                            <div class="eyelash">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="nose"></div>
+                    <div class="mouth">
+                        <div class="teeth">
+                            <div class="tooth"></div>
+                            <div class="tooth"></div>
+                        </div>
+                    </div>
+                    <div class="cheeks">
+                        <div class="cheek"></div>
+                        <div class="cheek"></div>
+                    </div>
+                    <div class="freckles left">
+                        <div class="freckle"></div>
+                        <div class="freckle"></div>
+                        <div class="freckle"></div>
+                    </div>
+                    <div class="freckles right">
+                        <div class="freckle"></div>
+                        <div class="freckle"></div>
+                        <div class="freckle"></div>
+                    </div>
+                </div>
+                
+                <div class="shirt">
+                    <div class="collar"></div>
+                    <div class="tie"></div>
+                </div>
+            </div>
+            
+            <div class="pants">
+                <div class="belt"></div>
+            </div>
+            
+            <div class="legs">
+                <div class="leg">
+                    <div class="sock"></div>
+                    <div class="shoe"></div>
+                </div>
+                <div class="leg">
+                    <div class="sock"></div>
+                    <div class="shoe"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sand -->
+        <div class="sand"></div>
+    </div>
+
+    <script>
+        // Create bubbles
+        const bubblesContainer = document.getElementById('bubbles');
+        
+        function createBubble() {
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            
+            // Random properties
+            const size = Math.random() * 20 + 10;
+            const left = Math.random() * 800;
+            const duration = Math.random() * 4 + 3;
+            const delay = Math.random() * 2;
+            
+            bubble.style.width = size + 'px';
+            bubble.style.height = size + 'px';
+            bubble.style.left = left + 'px';
+            bubble.style.bottom = '100px';
+            bubble.style.animationDuration = duration + 's';
+            bubble.style.animationDelay = delay + 's';
+            
+            bubblesContainer.appendChild(bubble);
+            
+            // Remove bubble after animation
+            setTimeout(() => {
+                bubble.remove();
+            }, (duration + delay) * 1000);
+        }
+        
+        // Create bubbles periodically
+        setInterval(createBubble, 500);
+        
+        // Initial bubbles
+        for (let i = 0; i < 10; i++) {
+            setTimeout(createBubble, i * 200);
+        }
+
+        // Add blinking animation to SpongeBob's eyes
+        const eyes = document.querySelectorAll('.eye');
+        
+        function blink() {
+            eyes.forEach(eye => {
+                eye.style.transform = 'scaleY(0.1)';
+                setTimeout(() => {
+                    eye.style.transform = 'scaleY(1)';
+                }, 150);
+            });
+        }
+        
+        // Blink randomly
+        setInterval(() => {
+            if (Math.random() > 0.7) {
+                blink();
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

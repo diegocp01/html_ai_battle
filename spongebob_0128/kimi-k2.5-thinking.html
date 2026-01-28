@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bikini Bottom Interactive Scene</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            /* Official-ish Colors */
+            --sponge-yellow: #FFF56C;
+            --sponge-outline: #B8B033;
+            --sponge-pore: #E6D84A;
+            --pant-brown: #B47A3D;
+            --pant-dark: #8B5A2B;
+            --tie-red: #E53636;
+            --eye-blue: #4c8bc6;
+            --ocean-top: #4CA1AF;
+            --ocean-btm: #2C3E50;
+            --pineapple: #F9A602;
+            --pineapple-dark: #D98C00;
+            --leaf-green: #4CAF50;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(180deg, #2b95a1 0%, #123c49 100%);
+            font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+        }
+
+        /* --- The Environment --- */
+        .flower-cloud {
+            position: absolute;
+            opacity: 0.4;
+            animation: drift linear infinite;
+            z-index: 0;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
+        }
+
+        @keyframes drift {
+            from { transform: translateX(-200px) rotate(0deg); }
+            to { transform: translateX(120vw) rotate(360deg); }
+        }
+
+        .sand-floor {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 120px;
+            background: #F4E4BC;
+            border-top: 8px solid #E6D690;
+            z-index: 1;
+            box-shadow: 0 -10px 20px rgba(0,0,0,0.1);
+        }
+
+        /* --- SpongeBob Construction --- */
+        .spongebob-container {
+            position: absolute;
+            left: 20%; /* Positioned in front of house */
+            bottom: 100px;
+            width: 240px;
+            height: 320px;
+            z-index: 10;
+            animation: floatBob 3s ease-in-out infinite;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .spongebob-container:active {
+            transform: scale(0.95);
+        }
+
+        .sponge-body {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            background-color: var(--sponge-yellow);
+            border: 3px solid var(--sponge-outline);
+            box-shadow: inset -10px -10px 0 rgba(0,0,0,0.1);
+            /* Wavy bottom simulation */
+            clip-path: polygon(
+                0% 0%, 100% 0%, 100% 100%, 
+                95% 98%, 90% 100%, 85% 98%, 80% 100%, 75% 98%, 70% 100%, 
+                65% 98%, 60% 100%, 55% 98%, 50% 100%, 45% 98%, 40% 100%, 
+                35% 98%, 30% 100%, 25% 98%, 20% 100%, 15% 98%, 10% 100%, 
+                5% 98%, 0% 100%
+            );
+        }
+
+        /* Texture Pores */
+        .pore {
+            position: absolute;
+            background: var(--sponge-pore);
+            border-radius: 50%;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* Face */
+        .eye {
+            position: absolute;
+            top: 60px;
+            width: 70px;
+            height: 80px;
+            background: white;
+            border: 2px solid #333;
+            border-radius: 50%;
+            z-index: 5;
+        }
+        .eye.left { left: 35px; }
+        .eye.right { right: 35px; }
+
+        .eyelash {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            width: 2px;
+            height: 15px;
+            background: black;
+            transform-origin: bottom center;
+        }
+        
+        .pupil {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 30px;
+            height: 30px;
+            background: var(--eye-blue);
+            border: 2px solid black;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .pupil::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 12px;
+            height: 12px;
+            background: black;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .nose {
+            position: absolute;
+            top: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 40px;
+            background: var(--sponge-yellow);
+            border: 2px solid var(--sponge-outline);
+            border-bottom: none;
+            border-radius: 40% 40% 0 0;
+            z-index: 6;
+        }
+
+        .cheek {
+            position: absolute;
+            top: 120px;
+            width: 30px;
+            height: 30px;
+            background: #ffb7b2;
+            border-radius: 50%;
+            opacity: 0.6;
+            z-index: 4;
+        }
+        .cheek.left { left: 20px; }
+        .cheek.right { right: 20px; }
+        
+        .freckle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #d65a5a;
+            border-radius: 50%;
+        }
+
+        .mouth {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 40px;
+            border-bottom: 3px solid #9e1a1a;
+            border-radius: 50%;
+        }
+        .teeth {
+            position: absolute;
+            bottom: -3px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 2px;
+        }
+        .tooth {
+            width: 22px;
+            height: 22px;
+            background: white;
+            border: 2px solid #333;
+            border-bottom: none;
+            border-radius: 2px 2px 0 0;
+        }
+
+        /* Clothing */
+        .pants {
+            position: absolute;
+            bottom: -50px;
+            width: 200px;
+            height: 60px;
+            background: var(--pant-brown);
+            border: 3px solid var(--pant-dark);
+            z-index: 5;
+        }
+        
+        .shirt {
+            position: absolute;
+            bottom: -10px;
+            width: 200px;
+            height: 30px;
+            background: white;
+            border: 3px solid #ccc;
+            z-index: 5;
+        }
+
+        .tie {
+            position: absolute;
+            top: 198px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 40px;
+            background: var(--tie-red);
+            clip-path: polygon(0 0, 100% 0, 50% 100%);
+            z-index: 6;
+            border-left: 2px solid rgba(0,0,0,0.2);
+            border-right: 2px solid rgba(0,0,0,0.2);
+        }
+
+        .belt {
+            position: absolute;
+            top: 12px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .belt-loop {
+            width: 16px;
+            height: 12px;
+            border: 2px solid black;
+            border-radius: 4px;
+            transform: skew(-10deg);
+        }
+
+        /* Limbs */
+        .arm {
+            position: absolute;
+            top: 120px;
+            width: 60px;
+            height: 6px;
+            background: var(--sponge-yellow);
+            border: 2px solid var(--sponge-outline);
+            z-index: 0;
+            transform-origin: 0% 50%;
+        }
+        .arm.left { left: -10px; transform: rotate(-30deg); animation: waveLeft 4s infinite ease-in-out; }
+        .arm.right { right: -50px; transform: rotate(30deg); animation: waveRight 4s infinite ease-in-out; }
+
+        .leg {
+            position: absolute;
+            bottom: -100px;
+            width: 12px;
+            height: 50px;
+            background: var(--sponge-yellow);
+            border: 2px solid var(--sponge-outline);
+            z-index: 4;
+        }
+        .leg.left { left: 60px; animation: kick 1s infinite alternate; }
+        .leg.right { right: 60px; animation: kick 1s infinite alternate-reverse; }
+
+        .sock {
+            position: absolute;
+            bottom: -80px;
+            width: 16px;
+            height: 30px;
+            background: white;
+            border: 2px solid #ccc;
+            z-index: 4;
+            overflow: hidden;
+        }
+        .sock::before { /* Red stripe */
+            content: ''; position: absolute; top: 5px; left: 0; width: 100%; height: 4px; background: red;
+        }
+        .sock::after { /* Blue stripe */
+            content: ''; position: absolute; top: 15px; left: 0; width: 100%; height: 4px; background: blue;
+        }
+        .sock.left { left: 58px; animation: sockKick 1s infinite alternate; }
+        .sock.right { right: 58px; animation: sockKick 1s infinite alternate-reverse; }
+
+        .shoe {
+            position: absolute;
+            bottom: -100px;
+            width: 50px;
+            height: 30px;
+            background: black;
+            border-radius: 50% 50% 10% 10%;
+            z-index: 5;
+        }
+        .shoe.left { left: 40px; animation: shoeKick 1s infinite alternate; }
+        .shoe.right { right: 40px; animation: shoeKick 1s infinite alternate-reverse; }
+
+        /* --- Pineapple House --- */
+        .house-container {
+            position: absolute;
+            right: 15%;
+            bottom: 120px;
+            width: 320px;
+            height: 450px;
+            z-index: 1;
+        }
+        
+        .house-body {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background: radial-gradient(circle at 30% 30%, #ffae42, #d98c00);
+            border-radius: 40% 40% 45% 45%;
+            border: 4px solid #b87300;
+            box-shadow: inset -20px -20px 0 rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        /* Pineapple texture lines */
+        .cross-hatch {
+            position: absolute;
+            width: 140%;
+            height: 4px;
+            background: rgba(139, 69, 19, 0.4);
+            left: -20%;
+        }
+
+        .leaves {
+            position: absolute;
+            top: -90px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 120px;
+            z-index: -1;
+        }
+        .leaf {
+            position: absolute;
+            bottom: 0;
+            width: 60px;
+            height: 120px;
+            background: var(--leaf-green);
+            border-radius: 50% 50% 0 0;
+            border: 2px solid #2E7D32;
+            transform-origin: bottom center;
+        }
+        .leaf:nth-child(1) { transform: rotate(-20deg); height: 110px; left: 20px; background: #388E3C; }
+        .leaf:nth-child(2) { transform: rotate(0deg); height: 140px; left: 70px; z-index: 2; }
+        .leaf:nth-child(3) { transform: rotate(20deg); height: 110px; left: 120px; background: #388E3C; }
+
+        .window {
+            position: absolute;
+            top: 50px;
+            right: 50px;
+            width: 80px;
+            height: 80px;
+            background: #87CEEB;
+            border: 6px solid #5D4037;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: inset 5px 5px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .window:hover { background: #ADD8E6; }
+        
+        .window-shine {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 20px;
+            height: 20px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 50%;
+        }
+
+        .door {
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 140px;
+            background: #8D6E63;
+            border: 4px solid #5D4037;
+            border-radius: 100px 100px 0 0;
+            border-bottom: none;
+        }
+        .door-detail {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 0;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-bottom: none;
+            border-radius: 100px 100px 0 0;
+        }
+        .door-knob {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            width: 12px;
+            height: 12px;
+            background: #333;
+            border-radius: 50%;
+        }
+
+        .chimney {
+            position: absolute;
+            top: 100px;
+            left: -20px;
+            width: 40px;
+            height: 80px;
+            background: #78909C;
+            border: 3px solid #455A64;
+            transform: rotate(-15deg);
+            z-index: -1;
+        }
+
+        /* --- Animations --- */
+        @keyframes floatBob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        @keyframes waveLeft {
+            0%, 100% { transform: rotate(-30deg); }
+            50% { transform: rotate(-45deg); }
+        }
+        @keyframes waveRight {
+            0%, 100% { transform: rotate(30deg); }
+            50% { transform: rotate(45deg); }
+        }
+        @keyframes kick {
+            from { transform: rotate(0deg); transform-origin: top center; }
+            to { transform: rotate(10deg); transform-origin: top center; }
+        }
+        @keyframes sockKick {
+            from { transform: rotate(0deg); transform-origin: top center; }
+            to { transform: rotate(10deg); transform-origin: top center; }
+        }
+        @keyframes shoeKick {
+            from { transform: rotate(0deg) translateX(0); transform-origin: top center; }
+            to { transform: rotate(10deg) translateX(5px); transform-origin: top center; }
+        }
+
+        /* --- Bubbles --- */
+        .bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: absolute;
+            top: -80px;
+            right: -100px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 2px solid black;
+            font-size: 16px;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+        }
+        .speech-bubble.show {
+            opacity: 1;
+            transform: translateY(-10px);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 20px;
+            border-width: 10px 10px 0;
+            border-style: solid;
+            border-color: black transparent;
+            display: block;
+            width: 0;
+        }
+
+        /* Sign */
+        .sign {
+            position: absolute;
+            right: 40%;
+            bottom: 140px;
+            width: 100px;
+            height: 80px;
+            z-index: 2;
+            transform: rotate(-5deg);
+            font-family: 'Comic Sans MS', sans-serif;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            padding-top: 10px;
+        }
+        .sign-board {
+            width: 100%;
+            height: 60px;
+            background: #8D6E63;
+            border: 3px solid #5D4037;
+            position: relative;
+            line-height: 50px;
+            font-size: 14px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        .sign-post {
+            width: 8px;
+            height: 40px;
+            background: #5D4037;
+            margin: -3px auto 0;
+        }
+
+        /* Eyes Follow Cursor */
+        .eye-socket {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Elements -->
+    <div id="sky-objects"></div>
+    <div class="sand-floor"></div>
+    
+    <!-- Sign -->
+    <div class="sign">
+        <div class="sign-board">Bikini<br>Bottom</div>
+        <div class="sign-post"></div>
+    </div>
+
+    <!-- House -->
+    <div class="house-container">
+        <div class="leaves">
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+            <div class="leaf"></div>
+        </div>
+        <div class="chimney"></div>
+        <div class="house-body">
+            <!-- Texture -->
+            <div class="cross-hatch" style="top: 20%; transform: rotate(20deg);"></div>
+            <div class="cross-hatch" style="top: 50%; transform: rotate(-20deg);"></div>
+            <div class="cross-hatch" style="top: 80%; transform: rotate(20deg);"></div>
+            
+            <div class="window" onclick="pokeWindow(this)">
+                <div class="window-shine"></div>
+            </div>
+            <div class="door">
+                <div class="door-detail"></div>
+                <div class="door-knob"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SpongeBob -->
+    <div class="spongebob-container" onclick="spongeLaugh()">
+        <div class="speech-bubble" id="sb-speech">I'm ready!</div>
+        
+        <!-- Limbs -->
+        <div class="arm left"></div>
+        <div class="arm right"></div>
+        <div class="leg left"></div>
+        <div class="leg right"></div>
+        <div class="sock left"></div>
+        <div class="sock right"></div>
+        <div class="shoe left"></div>
+        <div class="shoe right"></div>
+
+        <div class="sponge-body">
+            <!-- Pores -->
+            <div class="pore" style="width: 15px; height: 15px; top: 20px; left: 20px;"></div>
+            <div class="pore" style="width: 8px; height: 8px; top: 50px; left: 160px;"></div>
+            <div class="pore" style="width: 12px; height: 12px; top: 140px; left: 30px;"></div>
+            <div class="pore" style="width: 10px; height: 10px; top: 170px; left: 150px;"></div>
+
+            <!-- Face -->
+            <div class="eye left">
+                <div class="eyelash" style="transform: rotate(-20deg); left: 40%;"></div>
+                <div class="eyelash" style="left: 50%;"></div>
+                <div class="eyelash" style="transform: rotate(20deg); left: 60%;"></div>
+                <div class="eye-socket">
+                    <div class="pupil" id="pupil-left"></div>
+                </div>
+            </div>
+            <div class="eye right">
+                <div class="eyelash" style="transform: rotate(-20deg); left: 40%;"></div>
+                <div class="eyelash" style="left: 50%;"></div>
+                <div class="eyelash" style="transform: rotate(20deg); left: 60%;"></div>
+                <div class="eye-socket">
+                    <div class="pupil" id="pupil-right"></div>
+                </div>
+            </div>
+            
+            <div class="nose"></div>
+            
+            <div class="cheek left">
+                <div class="freckle" style="top: 10px; left: 5px;"></div>
+                <div class="freckle" style="top: 5px; left: 15px;"></div>
+                <div class="freckle" style="top: 10px; left: 25px;"></div>
+            </div>
+            <div class="cheek right">
+                <div class="freckle" style="top: 10px; right: 5px;"></div>
+                <div class="freckle" style="top: 5px; right: 15px;"></div>
+                <div class="freckle" style="top: 10px; right: 25px;"></div>
+            </div>
+
+            <div class="mouth">
+                <div class="teeth">
+                    <div class="tooth"></div>
+                    <div class="tooth"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Clothes -->
+        <div class="shirt"></div>
+        <div class="pants">
+            <div class="belt">
+                <div class="belt-loop"></div>
+                <div class="belt-loop"></div>
+                <div class="belt-loop"></div>
+            </div>
+        </div>
+        <div class="tie"></div>
+    </div>
+
+    <script>
+        // 1. Generate Background Flower Clouds
+        const sky = document.getElementById('sky-objects');
+        const colors = ['#ff9ff3', '#feca57', '#ff6b6b', '#48dbfb', '#1dd1a1'];
+        
+        for (let i = 0; i < 5; i++) {
+            const flower = document.createElement('div');
+            flower.className = 'flower-cloud';
+            flower.style.top = Math.random() * 60 + '%';
+            flower.style.animationDuration = (Math.random() * 20 + 20) + 's';
+            flower.style.animationDelay = -(Math.random() * 20) + 's';
+            flower.style.transform = `scale(${Math.random() * 0.5 + 0.5})`;
+            
+            // Create SVG Flower
+            flower.innerHTML = `
+                <svg width="100" height="100" viewBox="0 0 100 100" fill="${colors[i % colors.length]}">
+                    <path d="M50 0 C60 30 70 40 100 50 C70 60 60 70 50 100 C40 70 30 60 0 50 C30 40 40 30 50 0 Z" />
+                    <circle cx="50" cy="50" r="10" fill="#ffeaa7" />
+                </svg>
+            `;
+            sky.appendChild(flower);
+        }
+
+        // 2. Bubble System
+        function createBubble() {
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            
+            // Random properties
+            const size = Math.random() * 20 + 10;
+            const left = Math.random() * window.innerWidth;
+            const duration = Math.random() * 5 + 5;
+            
+            bubble.style.width = size + 'px';
+            bubble.style.height = size + 'px';
+            bubble.style.left = left + 'px';
+            bubble.style.bottom = '-50px';
+            
+            // Animation
+            let pos = -50;
+            let wobble = 0;
+            const speed = Math.random() * 2 + 1;
+            
+            document.body.appendChild(bubble);
+            
+            function animate() {
+                pos += speed;
+                wobble += 0.05;
+                const wobbleX = Math.sin(wobble) * 20;
+                
+                bubble.style.transform = `translate(${wobbleX}px, -${pos}px)`;
+                
+                if (pos < window.innerHeight + 50) {
+                    requestAnimationFrame(animate);
+                } else {
+                    bubble.remove();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // Spawn bubbles periodically
+        setInterval(createBubble, 800);
+        
+        // Extra bubbles on click
+        document.addEventListener('click', (e) => {
+            // Don't bubble if clicking SB
+            if(e.target.closest('.spongebob-container')) return;
+            
+            for(let i=0; i<3; i++) {
+                setTimeout(createBubble, i*100);
+            }
+        });
+
+        // 3. Eye Tracking Logic
+        const pupils = [document.getElementById('pupil-left'), document.getElementById('pupil-right')];
+        const eyes = document.querySelectorAll('.eye');
+        
+        document.addEventListener('mousemove', (e) => {
+            eyes.forEach((eye, index) => {
+                const rect = eye.getBoundingClientRect();
+                const eyeCenterX = rect.left + rect.width / 2;
+                const eyeCenterY = rect.top + rect.height / 2;
+                
+                const angle = Math.atan2(e.clientY - eyeCenterY, e.clientX - eyeCenterX);
+                const distance = Math.min(
+                    Math.hypot(e.clientX - eyeCenterX, e.clientY - eyeCenterY), 
+                    10 // Limit movement radius
+                );
+                
+                const x = Math.cos(angle) * distance;
+                const y = Math.sin(angle) * distance;
+                
+                pupils[index].style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+            });
+        });
+
+        // 4. Interactions
+        function spongeLaugh() {
+            const sb = document.querySelector('.spongebob-container');
+            const speech = document.getElementById('sb-speech');
+            
+            // Visual laugh
+            sb.style.transform = 'scale(1.05, 0.95)'; // Squish
+            setTimeout(() => sb.style.transform = 'scale(0.95, 1.05)', 100);
+            setTimeout(() => sb.style.transform = 'scale(1, 1)', 200);
+            
+            // Speech
+            speech.classList.add('show');
+            setTimeout(() => speech.classList.remove('show'), 2000);
+        }
+
+        function pokeWindow(el) {
+            // Change window color briefly
+            el.style.background = '#FFD700';
+            setTimeout(() => el.style.background = '#87CEEB', 300);
+            
+            // Spawn bubbles from window
+            for(let i=0; i<5; i++) {
+                const b = document.createElement('div');
+                b.className = 'bubble';
+                b.style.width = '10px';
+                b.style.height = '10px';
+                b.style.left = (el.getBoundingClientRect().left + 40) + 'px';
+                b.style.top = (el.getBoundingClientRect().top + 40) + 'px';
+                document.body.appendChild(b);
+                
+                // Explosion physics
+                let vx = (Math.random() - 0.5) * 4;
+                let vy = (Math.random() - 0.5) * 4;
+                let x = 0, y = 0;
+                
+                function anim() {
+                    x += vx;
+                    y += vy;
+                    b.style.transform = `translate(${x}px, ${y}px)`;
+                    b.style.opacity = parseFloat(b.style.opacity || 1) - 0.02;
+                    if(b.style.opacity > 0) requestAnimationFrame(anim);
+                    else b.remove();
+                }
+                anim();
+            }
+        }
+    </script>
+</body>
+</html>

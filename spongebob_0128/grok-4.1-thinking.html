@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpongeBob Underwater Animation</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: linear-gradient(to bottom, #1e90ff, #87ceeb);
+    overflow: hidden;
+    font-family: sans-serif;
+  }
+
+  .ocean {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .sand {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 180px;
+    background: linear-gradient(to bottom, #deb887, #f4a460);
+    z-index: 0;
+  }
+
+  .bubble {
+    position: absolute;
+    bottom: -100px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    animation: rise linear infinite;
+  }
+
+  @keyframes rise {
+    0% {
+      transform: translateY(0) translateX(0) rotate(0deg);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.7;
+    }
+    90% {
+      opacity: 0.7;
+    }
+    100% {
+      transform: translateY(-150vh) translateX(var(--sway)) rotate(360deg);
+      opacity: 0;
+    }
+  }
+
+  .pineapple-house {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    animation: sway 12s infinite ease-in-out;
+  }
+
+  @keyframes sway {
+    0%, 100% { transform: translateX(-50%) rotate(0deg); }
+    50% { transform: translateX(-50%) rotate(3deg); }
+  }
+
+  .spongebob {
+    position: absolute;
+    bottom: 160px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    animation: bob 4s infinite ease-in-out;
+  }
+
+  @keyframes bob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-20px); }
+  }
+
+  .left-arm { transform-origin: 40px 100px; animation: wave-left 3s infinite ease-in-out; }
+  .right-arm { transform-origin: 160px 100px; animation: wave-right 3s infinite ease-in-out; }
+
+  @keyframes wave-left {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-40deg); }
+  }
+
+  @keyframes wave-right {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(40deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="ocean">
+
+  <div class="sand"></div>
+
+  <!-- Pineapple House (behind) -->
+  <div class="pineapple-house">
+    <svg width="320" height="520" viewBox="0 0 320 520">
+      <!-- Leaves -->
+      <path d="M160 40 L130 0 L160 50 L190 0 L160 40" fill="#228B22"/>
+      <path d="M110 80 L80 30 L120 70 L140 30 L110 80" fill="#006400"/>
+      <path d="M210 80 L240 30 L200 70 L180 30 L210 80" fill="#006400"/>
+      <path d="M160 100 L140 50 L160 80 L180 50 L160 100" fill="#228B22"/>
+      
+      <!-- Pineapple body -->
+      <ellipse cx="160" cy="320" rx="120" ry="180" fill="#FFD700" stroke="#FFA500" stroke-width="8"/>
+      
+      <!-- Pineapple texture (simple criss-cross) -->
+      <g stroke="#B8860B" stroke-width="4" opacity="0.6">
+        <line x1="80" y1="200" x2="240" y2="360"/>
+        <line x1="100" y1="160" x2="220" y2="400"/>
+        <line x1="120" y1="120" x2="200" y2="440"/>
+        <line x1="240" y1="200" x2="80" y2="360"/>
+        <line x1="220" y1="160" x2="100" y2="400"/>
+        <line x1="200" y1="120" x2="120" y2="440"/>
+      </g>
+      
+      <!-- Door -->
+      <rect x="120" y="340" width="80" height="140" fill="#8B4513" rx="40"/>
+      <!-- Door window -->
+      <circle cx="160" cy="410" r="25" fill="#87CEEB"/>
+      <!-- Knob -->
+      <circle cx="180" cy="430" r="6" fill="#FFD700"/>
+      
+      <!-- Windows -->
+      <circle cx="110" cy="260" r="25" fill="#87CEEB"/>
+      <circle cx="210" cy="260" r="25" fill="#87CEEB"/>
+    </svg>
+  </div>
+
+  <!-- SpongeBob (in front) -->
+  <div class="spongebob">
+    <svg width="240" height="380" viewBox="0 0 240 380">
+      <!-- Body -->
+      <rect x="60" y="60" width="120" height="180" fill="#FFFF00" rx="20"/>
+      
+      <!-- Sponge holes -->
+      <circle cx="90" cy="100" r="14" fill="#E0E000"/>
+      <circle cx="150" cy="100" r="14" fill="#E0E000"/>
+      <circle cx="120" cy="140" r="18" fill="#E0E000"/>
+      <circle cx="80" cy="180" r="12" fill="#E0E000"/>
+      <circle cx="160" cy="180" r="12" fill="#E0E000"/>
+      
+      <!-- Shirt and pants -->
+      <rect x="60" y="210" width="120" height="30" fill="white"/>
+      <rect x="60" y="230" width="120" height="50" fill="#8B4513"/>
+      
+      <!-- Tie -->
+      <path d="M110 230 L130 230 L120 260 Z" fill="red"/>
+      
+      <!-- Eyes -->
+      <circle cx="100" cy="100" r="35" fill="white"/>
+      <circle cx="140" cy="100" r="35" fill="white"/>
+      <circle cx="100" cy="100" r="20" fill="#00BFFF"/>
+      <circle cx="140" cy="100" r="20" fill="#00BFFF"/>
+      <circle cx="105" cy="95" r="10" fill="black"/>
+      <circle cx="145" cy="95" r="10" fill="black"/>
+      <circle cx="108" cy="92" r="4" fill="white"/>
+      <circle cx="148" cy="92" r="4" fill="white"/>
+      
+      <!-- Mouth (happy smile) -->
+      <path d="M80 140 Q120 190 160 140" stroke="black" stroke-width="6" fill="none"/>
+      <!-- Teeth -->
+      <rect x="100" y="145" width="15" height="25" fill="white"/>
+      <rect x="125" y="145" width="15" height="25" fill="white"/>
+      
+      <!-- Arms (waving) -->
+      <g class="left-arm">
+        <rect x="20" y="120" width="50" height="120" fill="#FFFF00" rx="25"/>
+        <circle cx="45" cy="240" r="25" fill="#FFFF00"/>
+      </g>
+      <g class="right-arm">
+        <rect x="170" y="120" width="50" height="120" fill="#FFFF00" rx="25"/>
+        <circle cx="195" cy="240" r="25" fill="#FFFF00"/>
+      </g>
+      
+      <!-- Legs -->
+      <rect x="90" y="280" width="25" height="80" fill="#FFFF00"/>
+      <rect x="125" y="280" width="25" height="80" fill="#FFFF00"/>
+      
+      <!-- Socks -->
+      <rect x="90" y="340" width="25" height="40" fill="white"/>
+      <rect x="125" y="340" width="25" height="40" fill="white"/>
+      
+      <!-- Shoes -->
+      <rect x="80" y="370" width="45" height="25" fill="black"/>
+      <rect x="115" y="370" width="45" height="25" fill="black"/>
+    </svg>
+  </div>
+
+</div>
+
+<script>
+  function createBubble() {
+    const bubble = document.createElement('div');
+    bubble.classList.add('bubble');
+    
+    const size = Math.random() * 60 + 20;
+    bubble.style.width = bubble.style.height = size + 'px';
+    bubble.style.left = Math.random() * 100 + '%';
+    
+    const duration = Math.random() * 15 + 10;
+    bubble.style.animationDuration = duration + 's';
+    
+    const delay = Math.random() * 5;
+    bubble.style.animationDelay = delay + 's';
+    
+    const swayDirection = Math.random() > 0.5 ? 1 : -1;
+    const sway = swayDirection * Math.random() * 150;
+    bubble.style.setProperty('--sway', sway + 'px');
+    
+    document.querySelector('.ocean').appendChild(bubble);
+  }
+
+  // Create many bubbles for a lively underwater effect
+  for (let i = 0; i < 25; i++) {
+    createBubble();
+  }
+</script>
+
+</body>
+</html>

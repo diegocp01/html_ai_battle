@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Underwater SpongeBob + Pineapple Home (Single File)</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      overflow: hidden;
+      background: #001a2b;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    .hud {
+      position: fixed;
+      left: 14px;
+      top: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.28);
+      color: rgba(255,255,255,0.9);
+      backdrop-filter: blur(8px);
+      user-select: none;
+      pointer-events: none;
+      max-width: 360px;
+      line-height: 1.25;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .hud b { color: white; }
+    .hint { opacity: 0.9; font-size: 13px; }
+    .badge {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      font-size: 12px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .badge::after { content: " (reduced motion)"; opacity: 0.9; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="hud">
+    <div><b>Underwater scene</b> (single HTML file)</div>
+    <div class="hint">Move your mouse for parallax. Click to spawn bubbles.</div>
+    <div class="badge">Canvas + JS</div>
+  </div>
+
+<script>
+(() => {
+  // --- Canvas setup (HiDPI) ---
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  const DPR = () => Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+  let W = 0, H = 0, dpr = DPR();
+
+  function resize() {
+    dpr = DPR();
+    W = Math.floor(innerWidth);
+    H = Math.floor(innerHeight);
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener("resize", resize, { passive: true });
+  resize();
+
+  const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // --- Helpers ---
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w * 0.5, h * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function strokeGlow(color, width, blur) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // --- Mouse parallax ---
+  const mouse = { x: 0.5, y: 0.45, px: 0.5, py: 0.45 };
+  addEventListener("pointermove", (e) => {
+    mouse.x = e.clientX / W;
+    mouse.y = e.clientY / H;
+  }, { passive: true });
+
+  // --- Particles / bubbles ---
+  class Bubble {
+    constructor(x, y, r) {
+      this.x = x; this.y = y; this.r = r;
+      this.vy = rand(30, 90);
+      this.vx = rand(-15, 15);
+      this.wob = rand(0.8, 2.1);
+      this.phase = rand(0, Math.PI * 2);
+      this.life = 0;
+      this.max = rand(5, 11);
+      this.alpha = rand(0.25, 0.65);
+    }
+    step(dt) {
+      this.life += dt;
+      const t = this.life;
+      this.x += (this.vx + Math.sin(t * this.wob + this.phase) * 10) * dt;
+      this.y -= this.vy * dt;
+      this.r *= (1 + 0.012 * dt);
+      return (this.life < this.max) && (this.y + this.r > -40);
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = this.alpha * (1 - this.life / this.max);
+      // outer
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(220,245,255,0.9)";
+      ctx.lineWidth = 1.3;
+      ctx.shadowColor = "rgba(180,240,255,0.8)";
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      // highlight
+      ctx.beginPath();
+      ctx.arc(this.x - this.r*0.25, this.y - this.r*0.25, this.r*0.22, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class Speck {
+    constructor() {
+      this.reset(true);
+    }
+    reset(initial=false) {
+      this.x = rand(0, W);
+      this.y = initial ? rand(0, H) : (H + rand(0, 80));
+      this.s = rand(0.6, 2.0);
+      this.vy = rand(6, 18);
+      this.vx = rand(-5, 5);
+      this.a = rand(0.05, 0.18);
+    }
+    step(dt) {
+      this.x += this.vx * dt;
+      this.y -= this.vy * dt;
+      if (this.y < -20) this.reset(false);
+      if (this.x < -20) this.x = W + 20;
+      if (this.x > W + 20) this.x = -20;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = this.a;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.s, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(220,255,255,1)";
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  const bubbles = [];
+  const specks = Array.from({ length: 140 }, () => new Speck());
+
+  function spawnBubbles(cx, cy, n = 10) {
+    for (let i = 0; i < n; i++) {
+      bubbles.push(new Bubble(
+        cx + rand(-18, 18),
+        cy + rand(-10, 10),
+        rand(4, 14)
+      ));
+    }
+  }
+
+  addEventListener("pointerdown", (e) => {
+    spawnBubbles(e.clientX, e.clientY, 18);
+  });
+
+  // --- Seaweed ---
+  const weeds = Array.from({ length: 18 }, (_, i) => ({
+    x: (i + 0.5) / 18,
+    h: rand(0.12, 0.26),
+    w: rand(18, 30),
+    phase: rand(0, Math.PI*2),
+    hue: rand(160, 185)
+  }));
+
+  function drawSeaweed(t, par) {
+    const baseY = H * 0.92;
+    for (const w of weeds) {
+      const x = w.x * W + (par * 18);
+      const topY = baseY - H * w.h;
+      const amp = 18 + 10 * Math.sin(t * 0.7 + w.phase);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, baseY);
+      const segs = 10;
+      for (let s = 1; s <= segs; s++) {
+        const p = s / segs;
+        const yy = lerp(baseY, topY, p);
+        const sway = Math.sin(t * 1.3 + w.phase + p * 2.2) * amp * p;
+        ctx.lineTo(x + sway, yy);
+      }
+      ctx.strokeStyle = `rgba(40, ${120 + w.hue}, 90, 0.45)`;
+      ctx.lineWidth = w.w * 0.18;
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(0,0,0,0.2)";
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+
+      // little leaves
+      for (let s = 3; s <= segs; s += 2) {
+        const p = s / segs;
+        const yy = lerp(baseY, topY, p);
+        const sway = Math.sin(t * 1.3 + w.phase + p * 2.2) * amp * p;
+        const xx = x + sway;
+        ctx.beginPath();
+        ctx.ellipse(xx + 10 * Math.sin(w.phase + p*5),
+                    yy,
+                    10 * (1 - p) + 5,
+                    5 * (1 - p) + 3,
+                    (w.phase + p) * 0.6,
+                    0, Math.PI * 2);
+        ctx.fillStyle = `rgba(40, ${140 + w.hue}, 105, 0.22)`;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  // --- Pineapple house ---
+  function drawPineappleHouse(t, cx, cy, scale, par) {
+    ctx.save();
+    ctx.translate(cx + par * 14, cy + par * 6);
+    ctx.scale(scale, scale);
+
+    // shadow base
+    ctx.beginPath();
+    ctx.ellipse(0, 160, 145, 30, 0, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fill();
+
+    // body
+    const grd = ctx.createLinearGradient(0, -160, 0, 170);
+    grd.addColorStop(0, "#f8b21a");
+    grd.addColorStop(1, "#d9830c");
+    roundRect(-140, -140, 280, 300, 70);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    // texture diamonds
+    ctx.save();
+    ctx.clip();
+    ctx.globalAlpha = 0.24;
+    ctx.lineWidth = 3;
+    for (let y = -130; y < 150; y += 28) {
+      for (let x = -150; x < 150; x += 32) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 18, y + 14);
+        ctx.lineTo(x, y + 28);
+        ctx.lineTo(x - 18, y + 14);
+        ctx.closePath();
+        ctx.strokeStyle = "rgba(120,60,10,0.6)";
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // window (blue)
+    ctx.save();
+    ctx.translate(52, -40);
+    ctx.rotate(0.05 * Math.sin(t*0.8));
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 46, 46, 0, 0, Math.PI*2);
+    ctx.fillStyle = "#3aaee8";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 36, 36, 0, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.8)";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    // cross
+    ctx.beginPath();
+    ctx.moveTo(-34, 0); ctx.lineTo(34, 0);
+    ctx.moveTo(0, -34); ctx.lineTo(0, 34);
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.restore();
+
+    // door
+    ctx.save();
+    ctx.translate(-40, 65);
+    const wob = 0.02 * Math.sin(t*1.2);
+    ctx.rotate(wob);
+    roundRect(-55, -65, 110, 150, 40);
+    ctx.fillStyle = "#1e78b6";
+    ctx.fill();
+    roundRect(-48, -58, 96, 136, 34);
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    // porthole
+    ctx.beginPath();
+    ctx.arc(0, -5, 18, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -5, 18, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // knob
+    ctx.beginPath();
+    ctx.arc(30, 25, 6, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(255,230,140,0.9)";
+    ctx.fill();
+    ctx.restore();
+
+    // leafy top
+    ctx.save();
+    ctx.translate(0, -165);
+    for (let i = 0; i < 9; i++) {
+      const a = -0.9 + (i / 8) * 1.8;
+      const sway = 0.15 * Math.sin(t * 1.1 + i * 0.7);
+      ctx.save();
+      ctx.rotate(a + sway);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(20, -25, 18, -80);
+      ctx.quadraticCurveTo(0, -95, -18, -80);
+      ctx.quadraticCurveTo(-20, -25, 0, 0);
+      ctx.closePath();
+      ctx.fillStyle = i % 2 ? "#2dbb6f" : "#20a85e";
+      ctx.shadowColor = "rgba(0,0,0,0.25)";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // little chimney-ish detail
+    ctx.save();
+    ctx.translate(95, -118);
+    roundRect(-18, -24, 38, 52, 14);
+    ctx.fillStyle = "rgba(150,80,10,0.35)";
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // --- SpongeBob (stylized) ---
+  function drawSpongeBob(t, cx, cy, scale, par) {
+    ctx.save();
+    ctx.translate(cx + par * 26, cy + par * 10);
+    ctx.scale(scale, scale);
+
+    const bob = Math.sin(t * 2.6) * 6;
+    ctx.translate(0, bob);
+
+    // Subtle shadow on sand
+    ctx.beginPath();
+    ctx.ellipse(0, 156, 95, 20, 0, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.fill();
+
+    // walking cycle
+    const walk = Math.sin(t * 4.4);
+    const arm = Math.sin(t * 3.2);
+    const blink = Math.pow(clamp(Math.sin(t * 0.85 + 1.0), 0, 1), 18); // occasional blink spike
+    const eyeOpen = 1 - blink * 0.92;
+
+    // body
+    roundRect(-85, -95, 170, 190, 18);
+    ctx.fillStyle = "#ffd522";
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(80,55,10,0.28)";
+    ctx.stroke();
+
+    // sponge holes
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+    const holes = [
+      [-45, -35, 10], [-10, -55, 7], [35, -30, 9],
+      [-55, 15, 8], [5, 10, 12], [50, 25, 7],
+      [-25, 50, 9], [30, 60, 6]
+    ];
+    for (const [hx, hy, hr] of holes) {
+      ctx.beginPath();
+      ctx.arc(hx, hy, hr, 0, Math.PI*2);
+      ctx.fillStyle = "#8a7a13";
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // shirt + pants
+    // shirt band
+    roundRect(-85, 15, 170, 46, 10);
+    ctx.fillStyle = "#f5f5f5";
+    ctx.fill();
+    // pants
+    roundRect(-85, 50, 170, 50, 10);
+    ctx.fillStyle = "#7a4b17";
+    ctx.fill();
+
+    // belt + buckle
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(-85, 62, 170, 8);
+    ctx.restore();
+    roundRect(-10, 56, 20, 18, 4);
+    ctx.strokeStyle = "rgba(255,230,140,0.8)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // tie
+    ctx.save();
+    ctx.translate(0, 42);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-10, -10);
+    ctx.lineTo(10, -10);
+    ctx.closePath();
+    ctx.fillStyle = "#c3202d";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0, 3);
+    ctx.lineTo(-14, 26);
+    ctx.lineTo(0, 44);
+    ctx.lineTo(14, 26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // arms
+    function armSide(side) {
+      const s = side; // -1 left, +1 right
+      ctx.save();
+      ctx.translate(85 * s, -25);
+      const a = (0.35 * s) + arm * 0.18 * s;
+      ctx.rotate(a);
+      ctx.lineCap = "round";
+
+      // sleeve
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(30 * s, 15);
+      ctx.strokeStyle = "#f5f5f5";
+      ctx.lineWidth = 12;
+      ctx.stroke();
+
+      // arm
+      ctx.beginPath();
+      ctx.moveTo(18 * s, 10);
+      ctx.lineTo(58 * s, 28);
+      ctx.strokeStyle = "#ffd522";
+      ctx.lineWidth = 10;
+      ctx.stroke();
+
+      // hand
+      ctx.beginPath();
+      ctx.arc(64 * s, 30, 10, 0, Math.PI*2);
+      ctx.fillStyle = "#ffd522";
+      ctx.fill();
+
+      // fingers
+      ctx.save();
+      ctx.translate(64 * s, 30);
+      ctx.rotate(0.35 * s);
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(14 * s, i * 6);
+        ctx.strokeStyle = "rgba(80,55,10,0.18)";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.restore();
+    }
+    armSide(-1);
+    armSide(1);
+
+    // legs
+    function leg(side) {
+      const s = side; // -1 left, +1 right
+      ctx.save();
+      ctx.translate(35 * s, 100);
+      const swing = walk * 0.35 * s;
+      ctx.rotate(swing);
+
+      // leg line
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, 42);
+      ctx.strokeStyle = "#ffd522";
+      ctx.lineWidth = 8;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      // sock
+      ctx.beginPath();
+      ctx.moveTo(0, 24);
+      ctx.lineTo(0, 42);
+      ctx.strokeStyle = "#f5f5f5";
+      ctx.lineWidth = 10;
+      ctx.stroke();
+
+      // stripes
+      ctx.beginPath();
+      ctx.moveTo(-6, 30); ctx.lineTo(6, 30);
+      ctx.moveTo(-6, 35); ctx.lineTo(6, 35);
+      ctx.strokeStyle = s < 0 ? "#1d7bd6" : "#c3202d";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // shoe
+      ctx.save();
+      ctx.translate(0, 50);
+      ctx.rotate(-swing * 0.6);
+      roundRect(-18, -10, 36, 20, 10);
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, -5, 14, 6, 0, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.fill();
+      ctx.restore();
+
+      ctx.restore();
+    }
+    leg(-1);
+    leg(1);
+
+    // face (eyes)
+    function eye(ex) {
+      ctx.save();
+      ctx.translate(ex, -35);
+
+      // white
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 26, 34, 0, 0, Math.PI*2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.stroke();
+
+      // eyelid (blink)
+      if (eyeOpen < 0.92) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(0, -10 + (1-eyeOpen)*34, 27, 24, 0, 0, Math.PI*2);
+        ctx.fillStyle = "#ffd522";
+        ctx.globalAlpha = 0.95;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // pupil tracking
+      const mx = (mouse.px - 0.5) * 2;
+      const my = (mouse.py - 0.45) * 2;
+      const px = clamp(mx * 6, -6, 6);
+      const py = clamp(my * 6, -6, 6);
+
+      // iris
+      ctx.beginPath();
+      ctx.arc(px, py, 9, 0, Math.PI*2);
+      ctx.fillStyle = "#53a7ff";
+      ctx.fill();
+      // pupil
+      ctx.beginPath();
+      ctx.arc(px, py, 4.5, 0, Math.PI*2);
+      ctx.fillStyle = "#111";
+      ctx.fill();
+      // highlight
+      ctx.beginPath();
+      ctx.arc(px - 2.2, py - 2.4, 2, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fill();
+
+      // lashes
+      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-12, -34); ctx.lineTo(-18, -48);
+      ctx.moveTo(0, -36);   ctx.lineTo(0, -52);
+      ctx.moveTo(12, -34);  ctx.lineTo(18, -48);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+    eye(-28);
+    eye(28);
+
+    // nose
+    ctx.save();
+    ctx.translate(0, -18);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 18, 0, 0, Math.PI*2);
+    ctx.fillStyle = "#ffd522";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(80,55,10,0.2)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+
+    // mouth + cheeks
+    ctx.save();
+    ctx.translate(0, 0);
+    const smile = 12 + 4 * Math.sin(t * 1.4);
+    ctx.beginPath();
+    ctx.arc(0, 20, 48, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.strokeStyle = "rgba(0,0,0,0.45)";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+
+    // dimples
+    ctx.beginPath();
+    ctx.arc(-44, 22, 8, Math.PI*0.65, Math.PI*1.35);
+    ctx.arc(44, 22, 8, Math.PI*1.65, Math.PI*0.35, true);
+    ctx.strokeStyle = "rgba(0,0,0,0.25)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // teeth
+    ctx.save();
+    ctx.translate(0, 32);
+    roundRect(-12, -8, 12, 14, 3);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    roundRect(0, -8, 12, 14, 3);
+    ctx.fill();
+    ctx.restore();
+
+    // cheeks
+    ctx.globalAlpha = 0.12;
+    ctx.beginPath();
+    ctx.arc(-52, 6, 14, 0, Math.PI*2);
+    ctx.arc(52, 6, 14, 0, Math.PI*2);
+    ctx.fillStyle = "#ff6b7a";
+    ctx.fill();
+    ctx.restore();
+
+    // subtle outline glow
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    roundRect(-86, -96, 172, 192, 18);
+    strokeGlow("rgba(255,255,120,0.25)", 8, 18);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // --- Background layers ---
+  function drawBackground(t) {
+    // ocean gradient
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#062a4a");
+    g.addColorStop(0.45, "#04335a");
+    g.addColorStop(1, "#022238");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // light rays
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    for (let i = 0; i < 9; i++) {
+      const x = (i / 9) * W + (Math.sin(t * 0.25 + i) * 30);
+      ctx.beginPath();
+      ctx.moveTo(x, -40);
+      ctx.lineTo(x + 180, H * 0.9);
+      ctx.lineTo(x + 260, H * 0.9);
+      ctx.lineTo(x + 60, -40);
+      ctx.closePath();
+      const rg = ctx.createLinearGradient(x, 0, x + 260, 0);
+      rg.addColorStop(0, "rgba(120,220,255,0)");
+      rg.addColorStop(0.5, "rgba(120,220,255,0.55)");
+      rg.addColorStop(1, "rgba(120,220,255,0)");
+      ctx.fillStyle = rg;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // far blobs (subtle "water texture")
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    for (let i = 0; i < 7; i++) {
+      const bx = (i + 0.5) * (W / 7) + Math.sin(t * 0.35 + i * 1.3) * 25;
+      const by = H * (0.20 + i * 0.06);
+      ctx.beginPath();
+      ctx.ellipse(bx, by, 160, 60, Math.sin(i) * 0.5, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(200,255,255,1)";
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawSand(t, par) {
+    const y = H * 0.82;
+    // base
+    const sg = ctx.createLinearGradient(0, y, 0, H);
+    sg.addColorStop(0, "#c9a76a");
+    sg.addColorStop(1, "#9a7945");
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, y, W, H - y);
+
+    // dunes
+    ctx.save();
+    ctx.beginPath();
+    const amp = 18;
+    ctx.moveTo(0, y + 30);
+    for (let x = 0; x <= W + 10; x += 40) {
+      const wave = Math.sin(t * 0.7 + x * 0.01) * amp;
+      ctx.quadraticCurveTo(x + 20, y + 30 + wave, x + 40, y + 30);
+    }
+    ctx.lineTo(W, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
+    ctx.fill();
+    ctx.restore();
+
+    // little rocks
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    for (let i = 0; i < 16; i++) {
+      const rx = ((i * 97 + 33) % W) + Math.sin(t * 0.1 + i) * 8 + par * 12;
+      const ry = y + 60 + ((i * 47) % 140);
+      ctx.beginPath();
+      ctx.ellipse(rx, ry, 6 + (i % 4), 4 + ((i + 1) % 3), 0.3, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(70,40,10,0.35)";
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // --- Main loop ---
+  let last = performance.now();
+  let t = 0;
+
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+
+    // smoothing mouse (for nicer parallax)
+    mouse.px = lerp(mouse.px, mouse.x, 0.09);
+    mouse.py = lerp(mouse.py, mouse.y, 0.09);
+
+    if (!prefersReducedMotion) t += dt;
+
+    // parallax amount: center = 0, edges move slightly
+    const parX = (mouse.px - 0.5) * 2;
+    const parY = (mouse.py - 0.5) * 2;
+    const par = parX * 1.0;
+
+    drawBackground(t);
+
+    // drifting specks
+    if (!prefersReducedMotion) {
+      for (const s of specks) s.step(dt);
+    }
+    for (const s of specks) s.draw();
+
+    // mid: pineapple house behind
+    const houseX = W * 0.62;
+    const houseY = H * 0.54;
+    const houseScale = Math.min(W, H) / 900;
+    drawPineappleHouse(t, houseX, houseY, houseScale * 1.15, parX * 0.8);
+
+    // seaweed behind spongebob
+    drawSeaweed(t, parX * 0.6);
+
+    // sand floor
+    drawSand(t, parX * 0.5);
+
+    // foreground: SpongeBob
+    const sbX = W * 0.38;
+    const sbY = H * 0.63;
+    const sbScale = Math.min(W, H) / 950;
+    drawSpongeBob(t, sbX, sbY, sbScale * 1.35, parX);
+
+    // bubbles
+    if (!prefersReducedMotion) {
+      // ambient bubbles occasionally
+      if (Math.random() < 0.02) spawnBubbles(rand(40, W-40), H * rand(0.75, 0.98), 2 + (Math.random()*4|0));
+
+      for (let i = bubbles.length - 1; i >= 0; i--) {
+        if (!bubbles[i].step(dt)) bubbles.splice(i, 1);
+      }
+    }
+    for (const b of bubbles) b.draw();
+
+    // soft vignette
+    ctx.save();
+    const vg = ctx.createRadialGradient(W*0.5, H*0.45, Math.min(W,H)*0.35, W*0.5, H*0.5, Math.max(W,H)*0.75);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,0,0,0.35)");
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+
+  // a little starter pop of bubbles
+  setTimeout(() => spawnBubbles(W*0.5, H*0.8, 18), 200);
+})();
+</script>
+</body>
+</html>
