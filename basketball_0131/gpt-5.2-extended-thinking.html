@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Free Throw Bank Shot Simulation</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: center;
+      background: radial-gradient(1200px 700px at 50% 25%, #1b2330 0%, #0b0f15 60%, #070a0f 100%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow: hidden;
+    }
+    .wrap {
+      width: min(980px, 96vw);
+      aspect-ratio: 16/9;
+      position: relative;
+      border-radius: 18px;
+      box-shadow: 0 14px 50px rgba(0,0,0,.45);
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+    }
+    canvas { width: 100%; height: 100%; display: block; }
+    .hud {
+      position: absolute;
+      left: 14px;
+      top: 12px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: none;
+      user-select: none;
+    }
+    .pill {
+      pointer-events: none;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(10,14,20,.55);
+      border: 1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: rgba(255,255,255,.92);
+      line-height: 1.25;
+      font-size: 13px;
+      max-width: 52ch;
+    }
+    .pill strong { font-weight: 700; }
+    .hint { opacity: .9; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="c"></canvas>
+    <div class="hud">
+      <div class="pill">
+        <strong>Basketball Free Throw</strong><br/>
+        <span class="hint">Click anywhere to shoot a bank shot (backboard hit, then swish).</span>
+      </div>
+      <div class="pill" id="scorePill">Made: 0</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const scorePill = document.getElementById("scorePill");
+
+  // Fixed internal resolution for stable physics.
+  const W = 960;
+  const H = 540;
+
+  function resize() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // Court geometry
+  const floorY = 490;
+
+  const hoop = {
+    x: 720,
+    y: 165,
+    rimR: 18,
+    // net region is a little wider than rim to feel natural
+    netW: 52,
+    netH: 120,
+  };
+
+  const backboard = {
+    // We'll treat x as the LEFT FACE for collision realism.
+    x: 792,     // left face
+    y: 75,
+    w: 14,
+    h: 170,
+  };
+
+  const shooter = { x: 160, y: 440 };
+
+  // Physics
+  const g = 1400;                // px/s^2 (tuned for this layout)
+  const fixedStep = 1 / 240;     // stable collision steps
+  let accumulator = 0;
+  let lastT = performance.now();
+
+  // Ball
+  const ball = {
+    r: 14,
+    x: shooter.x,
+    y: shooter.y,
+    vx: 0,
+    vy: 0,
+    inFlight: false,
+    hitBoard: false,
+    swished: false,
+    passedRimLine: false,
+    trail: [],
+  };
+
+  let made = 0;
+
+  // Net animation state
+  let netWobble = 0;     // 0..1
+  let netWobbleVel = 0;
+
+  // Sound: tiny "swish" using WebAudio (optional, silent if blocked)
+  let audioCtx = null;
+  function swishSound() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = audioCtx.currentTime;
+
+      const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.18, audioCtx.sampleRate);
+      const data = noiseBuf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.8);
+
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = noiseBuf;
+
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.setValueAtTime(1400, t0);
+      bp.Q.setValueAtTime(0.9, t0);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0, t0);
+      gain.gain.linearRampToValueAtTime(0.24, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+
+      noise.connect(bp).connect(gain).connect(audioCtx.destination);
+      noise.start(t0);
+      noise.stop(t0 + 0.18);
+    } catch { /* ignore */ }
+  }
+
+  function resetBall() {
+    ball.x = shooter.x;
+    ball.y = shooter.y;
+    ball.vx = 0;
+    ball.vy = 0;
+    ball.inFlight = false;
+    ball.hitBoard = false;
+    ball.swished = false;
+    ball.passedRimLine = false;
+    ball.trail.length = 0;
+  }
+
+  // Tuned bank shot. It will:
+  // 1) travel up and right
+  // 2) hit the backboard
+  // 3) rebound leftward and drop through the rim
+  function shoot() {
+    // reset even if mid-flight, so repeated clicks feel responsive
+    resetBall();
+
+    ball.inFlight = true;
+
+    // These velocities are tuned with g=1400 and the above geometry.
+    // Backboard rebound factor will make it drop into the rim.
+    ball.vx = 725;
+    ball.vy = -950;
+
+    // Small cosmetic wobble reset
+    netWobble = 0;
+    netWobbleVel = 0;
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function step(dt) {
+    if (!ball.inFlight) return;
+
+    const prevX = ball.x;
+    const prevY = ball.y;
+
+    // Integrate
+    ball.vy += g * dt;
+    ball.x  += ball.vx * dt;
+    ball.y  += ball.vy * dt;
+
+    // Trail
+    ball.trail.push({ x: ball.x, y: ball.y });
+    if (ball.trail.length > 18) ball.trail.shift();
+
+    // Floor bounce (rare, but keeps things tidy if you click repeatedly)
+    if (ball.y + ball.r > floorY) {
+      ball.y = floorY - ball.r;
+      ball.vy = -ball.vy * 0.35;
+      ball.vx *= 0.70;
+
+      // Stop once it settles
+      if (Math.abs(ball.vy) < 120) {
+        ball.inFlight = false;
+        ball.vx = 0;
+        ball.vy = 0;
+      }
+    }
+
+    // Backboard collision (left face)
+    // Detect crossing into the board face to avoid tunneling.
+    const faceX = backboard.x;
+    const top = backboard.y;
+    const bottom = backboard.y + backboard.h;
+
+    if (!ball.hitBoard && ball.vx > 0) {
+      const wasLeft = (prevX + ball.r) < faceX;
+      const isOver = (ball.x + ball.r) >= faceX;
+
+      if (wasLeft && isOver && ball.y > top && ball.y < bottom) {
+        ball.x = faceX - ball.r;
+
+        // Bank shot tuning:
+        // Reverse x velocity with a low restitution so it drops into the hoop instead of flying away.
+        ball.vx = -Math.abs(ball.vx) * 0.25;
+        ball.vy *= 0.95;
+
+        // Slightly angle based on impact point, adds realism
+        const impact = (ball.y - (top + bottom) * 0.5) / (backboard.h * 0.5);
+        ball.vy += clamp(impact, -1, 1) * 30;
+
+        ball.hitBoard = true;
+      }
+    }
+
+    // Rim "soft collision" (kept gentle so the tuned shot swishes)
+    // If the ball would hit the rim ring from above, nudge it away a bit.
+    const dx = ball.x - hoop.x;
+    const dy = ball.y - hoop.y;
+    const dist = Math.hypot(dx, dy);
+    const ring = hoop.rimR + ball.r;
+
+    if (dist < ring && ball.y < hoop.y + 8) {
+      const nx = dx / (dist || 1);
+      const ny = dy / (dist || 1);
+      const vn = ball.vx * nx + ball.vy * ny;
+
+      // Only resolve if moving into the rim
+      if (vn < 0) {
+        ball.vx -= 1.7 * vn * nx;
+        ball.vy -= 1.7 * vn * ny;
+        ball.vx *= 0.86;
+        ball.vy *= 0.86;
+
+        // push out of overlap
+        const push = ring - dist;
+        ball.x += nx * push;
+        ball.y += ny * push;
+      }
+    }
+
+    // Swish detection
+    // When it crosses the rim line while inside the opening after hitting the board.
+    if (ball.hitBoard && !ball.passedRimLine) {
+      const crossed = (prevY < hoop.y) && (ball.y >= hoop.y);
+      const inside = Math.abs(ball.x - hoop.x) < (hoop.rimR - 2);
+      if (crossed && inside) {
+        ball.passedRimLine = true;
+
+        // Start net wobble
+        netWobble = 1;
+        netWobbleVel = 0.0;
+
+        // Score it once
+        if (!ball.swished) {
+          ball.swished = true;
+          made += 1;
+          scorePill.textContent = `Made: ${made}`;
+          swishSound();
+        }
+      }
+    }
+
+    // End the shot after it falls below the net area
+    if (ball.y > hoop.y + hoop.netH + 40) {
+      ball.inFlight = false;
+    }
+
+    // Net wobble physics
+    if (netWobble > 0.0001) {
+      // damped spring to settle nicely
+      netWobbleVel += (-netWobble * 18) * dt;
+      netWobbleVel *= Math.pow(0.06, dt); // damping
+      netWobble += netWobbleVel * dt;
+      netWobble = clamp(netWobble, 0, 1);
+    } else {
+      netWobble = 0;
+      netWobbleVel = 0;
+    }
+  }
+
+  function drawCourt() {
+    // Background glow
+    const glow = ctx.createRadialGradient(hoop.x - 80, hoop.y - 30, 30, hoop.x - 80, hoop.y - 30, 420);
+    glow.addColorStop(0, "rgba(255, 220, 160, 0.16)");
+    glow.addColorStop(1, "rgba(255, 220, 160, 0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+
+    // Floor
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    ctx.fillRect(0, floorY, W, H - floorY);
+
+    // Court line
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, floorY);
+    ctx.lineTo(W, floorY);
+    ctx.stroke();
+
+    // Free throw arc marker
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(shooter.x + 105, floorY, 110, Math.PI, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawBackboardAndHoop() {
+    // Backboard plate
+    ctx.save();
+    ctx.translate(0, 0);
+
+    // Board fill
+    ctx.fillStyle = "rgba(220,235,255,0.10)";
+    ctx.fillRect(backboard.x, backboard.y, backboard.w, backboard.h);
+
+    // Board outline
+    ctx.strokeStyle = "rgba(220,235,255,0.35)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(backboard.x + 0.5, backboard.y + 0.5, backboard.w - 1, backboard.h - 1);
+
+    // Target square
+    ctx.strokeStyle = "rgba(220,235,255,0.28)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(backboard.x - 56, hoop.y - 30, 48, 42);
+
+    // Rim
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "rgba(255,110,60,0.95)";
+    ctx.beginPath();
+    ctx.arc(hoop.x, hoop.y, hoop.rimR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Rim inner highlight
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.arc(hoop.x, hoop.y, hoop.rimR - 3, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Net
+    const wob = netWobble;
+    const sway = Math.sin(performance.now() * 0.02) * (wob * 6);
+    const pinch = 1 - wob * 0.22;
+
+    const topY = hoop.y + 6;
+    const botY = hoop.y + hoop.netH;
+    const halfW = hoop.netW * 0.5;
+
+    ctx.strokeStyle = "rgba(240,240,255,0.40)";
+    ctx.lineWidth = 1.5;
+
+    // Outer net outline
+    ctx.beginPath();
+    ctx.moveTo(hoop.x - halfW, topY);
+    ctx.lineTo(hoop.x - halfW * pinch + sway, botY);
+    ctx.moveTo(hoop.x + halfW, topY);
+    ctx.lineTo(hoop.x + halfW * pinch + sway, botY);
+    ctx.stroke();
+
+    // Net strands
+    const strands = 9;
+    for (let i = 0; i <= strands; i++) {
+      const t = i / strands;
+      const xTop = hoop.x - halfW + t * (2 * halfW);
+      const xBot = hoop.x + (xTop - hoop.x) * pinch + sway;
+      ctx.beginPath();
+      ctx.moveTo(xTop, topY);
+      ctx.lineTo(xBot, botY);
+      ctx.stroke();
+    }
+
+    // Horizontal weave lines
+    const rows = 6;
+    for (let r = 1; r <= rows; r++) {
+      const ty = topY + (r / rows) * (botY - topY);
+      const width = halfW * (0.95 - (r / rows) * 0.35) * pinch;
+      ctx.beginPath();
+      ctx.moveTo(hoop.x - width + sway * (r / rows), ty);
+      ctx.lineTo(hoop.x + width + sway * (r / rows), ty);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawBall() {
+    // Trail
+    if (ball.trail.length > 1) {
+      for (let i = 0; i < ball.trail.length; i++) {
+        const p = ball.trail[i];
+        const a = i / ball.trail.length;
+        ctx.fillStyle = `rgba(255, 170, 70, ${0.05 + a * 0.12})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, ball.r * (0.55 + a * 0.35), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Shadow
+    const shadowY = floorY + 2;
+    const height = clamp((shadowY - ball.y) / 260, 0, 1);
+    const shadowR = ball.r * (1.4 - height * 0.7);
+    ctx.fillStyle = `rgba(0,0,0,${0.18 + height * 0.18})`;
+    ctx.beginPath();
+    ctx.ellipse(ball.x, shadowY, shadowR, shadowR * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ball gradient
+    const grd = ctx.createRadialGradient(ball.x - 6, ball.y - 8, 3, ball.x, ball.y, ball.r + 10);
+    grd.addColorStop(0, "rgba(255, 205, 140, 1)");
+    grd.addColorStop(0.35, "rgba(255, 150, 60, 1)");
+    grd.addColorStop(1, "rgba(155, 60, 20, 1)");
+
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Seams
+    ctx.strokeStyle = "rgba(40, 16, 10, 0.55)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r * 0.92, -0.6, 0.6);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r * 0.92, Math.PI - 0.6, Math.PI + 0.6);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(ball.x, ball.y, ball.r * 0.35, ball.r * 0.92, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Highlight
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.beginPath();
+    ctx.arc(ball.x - 6, ball.y - 8, ball.r * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawShooterMarker() {
+    // Simple marker for start position
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath();
+    ctx.arc(shooter.x, shooter.y + 12, 24, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    ctx.beginPath();
+    ctx.arc(shooter.x, shooter.y + 12, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    drawCourt();
+    drawShooterMarker();
+    drawBackboardAndHoop();
+    drawBall();
+
+    // Small status text near shooter
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(ball.inFlight ? "Shooting..." : "Click to shoot", shooter.x - 38, shooter.y - 18);
+  }
+
+  function loop(now) {
+    const dt = Math.min(0.03, (now - lastT) / 1000);
+    lastT = now;
+
+    accumulator += dt;
+
+    while (accumulator >= fixedStep) {
+      step(fixedStep);
+      accumulator -= fixedStep;
+    }
+
+    render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // Click to shoot
+  canvas.addEventListener("pointerdown", (e) => {
+    // Resume audio context on gesture if needed
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume?.();
+    shoot();
+  });
+
+  // Start scene
+  resetBall();
+})();
+</script>
+</body>
+</html>

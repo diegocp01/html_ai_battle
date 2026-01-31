@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "model_name": "gpt-5.2-extended-thinking.html",
+      "performance_score": 5.0,
+      "observations": "the ball is not shot after i click, it just moves a little bit, not working at all, goo try tho gpt"
+    },
+    {
+      "model_name": "gemini-3-pro.html",
+      "performance_score": 7.57,
+      "observations": "it doesnt matter where I click, the ball is never going to hit the hoop! and that sucks because it was part of your prompt"
+    },
+    {
+      "model_name": "grok-4.1-thinking.html",
+      "performance_score": 6.65,
+      "observations": "I had faith in you but the ball tries to avoid the hoop instead of going in it, doesnt matter where I click the ball will never go in the hoop"
+    },
+    {
+      "model_name": "opus-4.5-thinking-32k.html",
+      "performance_score": 9.38,
+      "observations": "very nice, you added power and direction, fantastic, the ball swishes through the net, very cool to play"
+    }
+  ]
+}

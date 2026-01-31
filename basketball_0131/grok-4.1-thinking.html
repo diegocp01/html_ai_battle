@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Basketball Free Throw Simulation</title>
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(to bottom, skyblue 60%, #81C784);
+    font-family: Arial, sans-serif;
+  }
+
+  #court {
+    width: 1000px;
+    height: 600px;
+    position: relative;
+    background: #D2691E;
+    border: 10px solid #8B4513;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  /* Simple free-throw line */
+  #free-throw-line {
+    position: absolute;
+    left: 100px;
+    bottom: 100px;
+    width: 200px;
+    height: 6px;
+    background: white;
+  }
+
+  /* Backboard */
+  #backboard {
+    position: absolute;
+    right: 150px;
+    top: 150px;
+    width: 30px;
+    height: 200px;
+    background: rgba(255,255,255,0.9);
+    border: 6px solid #555;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  }
+
+  /* Rim */
+  #rim {
+    position: absolute;
+    right: 180px;
+    top: 250px;
+    width: 180px;
+    height: 16px;
+    background: #FF4500;
+    border-radius: 10px;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.4);
+  }
+
+  /* Simple net (white hanging cords) */
+  #net {
+    position: absolute;
+    right: 180px;
+    top: 266px;
+    width: 180px;
+    height: 120px;
+    pointer-events: none;
+  }
+  #net::before, #net::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(90deg, transparent, transparent 15px, white 15px, white 18px);
+    opacity: 0.7;
+  }
+  #net::after {
+    transform: rotate(90deg);
+    opacity: 0.4;
+  }
+
+  /* Basketball */
+  #ball {
+    position: absolute;
+    left: 150px;
+    bottom: 100px;
+    width: 60px;
+    height: 60px;
+    background: #FF7300;
+    border-radius: 50%;
+    box-shadow: inset -15px -15px 40px rgba(0,0,0,0.4), 0 10px 20px rgba(0,0,0,0.5);
+    z-index: 10;
+  }
+  #ball::before {
+    content: '';
+    position: absolute;
+    top: 25px;
+    left: -5px;
+    width: 70px;
+    height: 10px;
+    background: black;
+    border-radius: 5px;
+  }
+  #ball::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 25px;
+    width: 10px;
+    height: 70px;
+    background: black;
+    border-radius: 5px;
+  }
+
+  /* Swish message */
+  #message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 70px;
+    font-weight: bold;
+    color: #2E7D32;
+    text-shadow: 2px 2px 10px white;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  /* Animations when shooting */
+  .shooting #ball {
+    animation: shoot 3s forwards, spin 3s linear;
+  }
+
+  .shooting #backboard {
+    animation: shake 0.5s ease-in-out 2.1s; /* Shake when ball "hits" (~70% of 3s) */
+  }
+
+  .shooting #net {
+    animation: swish-net 1s ease-out 2.2s; /* Net sways slightly as ball passes through */
+  }
+
+  @keyframes shoot {
+    0%   { left: 150px; bottom: 100px; }
+    30%  { left: 400px; bottom: 400px; }
+    60%  { left: 700px; bottom: 450px; }
+    70%  { left: 780px; bottom: 410px; } /* Hits backboard */
+    80%  { left: 760px; bottom: 360px; }
+    90%  { left: 740px; bottom: 280px; }
+    100% { left: 745px; bottom: -100px; } /* Falls through the net */
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(720deg); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(8px); }
+    75%      { transform: translateX(-8px); }
+  }
+
+  @keyframes swish-net {
+    0%   { transform: translateX(0); }
+    30%  { transform: translateX(12px); }
+    70%  { transform: translateX(-10px); }
+    100% { transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+
+<div id="court">
+  <div id="free-throw-line"></div>
+  <div id="backboard"></div>
+  <div id="rim"></div>
+  <div id="net"></div>
+  <div id="ball"></div>
+  <div id="message">Swish!</div>
+</div>
+
+<script>
+  const court = document.getElementById('court');
+  const ball = document.getElementById('ball');
+  const message = document.getElementById('message');
+
+  court.addEventListener('click', function() {
+    if (this.classList.contains('shooting')) return;
+
+    this.classList.add('shooting');
+
+    // Show "Swish!" near the end of the shot
+    setTimeout(() => {
+      message.style.opacity = 1;
+    }, 2200);
+
+    // Reset everything after animation ends
+    ball.addEventListener('animationend', function reset() {
+      court.classList.remove('shooting');
+      message.style.opacity = 0;
+
+      // Reset ball position (animation was "forwards")
+      ball.style.left = '150px';
+      ball.style.bottom = '100px';
+      ball.style.transform = 'rotate(0deg)';
+    }, { once: true });
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,5 @@
+LLM Model,Visual type,LLM Reasoning Time (s),LLM Response Time (s),Reasoning Total words,Reasoning Total characters,Reasoning Total sentences,Reasoning top keyword,Reasoning top keyword repetitions,Input Word Count,Lines of HTML,Platform,Code in Reasoning?,prompt_adherence_score (0-10),functional_correctness_score (0-10),ui_score (0-10),Performance Score (0-10),Song style
+gpt-5.2-extended-thinking,simple,250,366,"2,346","18,679",70,rim,27,36,537,Web UI,y,5.0,5.0,5.0,5.0,"hip hop, pop"
+gemini-3-pro,simple,24,56,574,"3,566",32,i'm,18,36,367,Web UI,n,7.5,7.0,8.5,7.6,"hip hop, pop"
+grok-4.1-thinking,simple,232,252,553,"3,544",43,ball,22,36,215,Web UI,n,7.0,6.0,7.0,6.7,"hip hop, pop"
+opus-4.5-thinking-32k,simple,71,167,"1,655","12,779",44,ball,25,36,862,LMArena,y,9.5,9.5,9.0,9.4,"hip hop, pop"
