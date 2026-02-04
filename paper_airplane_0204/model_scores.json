@@ -1,0 +1,24 @@
+{
+  "models": [
+    {
+      "model_name": "gpt-5.2-extended-thinking.html",
+      "performance_score": 9.2,
+      "observations": "nice, you can control the wind, and the airplane flies in a very natural motion, good job GPT. Only feedback will be the weird shape of the clouds"
+    },
+    {
+      "model_name": "gemini-3-pro.html",
+      "performance_score": 1.4,
+      "observations": "The program works only once, then it freezes, plus the plane doesnt even fly at all, it only moves in an angle, terrible job gemini my doggy"
+    },
+    {
+      "model_name": "grok-4.1-thinking.html",
+      "performance_score": 9.2,
+      "observations": "HEy you really did what asked, nothing to complain, it was actually a good job, simple straight to the point Groky"
+    },
+    {
+      "model_name": "opus-4.5-thinking-32k.html",
+      "performance_score": 7.5,
+      "observations": "The airplane starts in circles, very weird but very nice that is interactive drag and throw the paper airplane, that was nice, nice detail of the little birds accross the screen"
+    }
+  ]
+}

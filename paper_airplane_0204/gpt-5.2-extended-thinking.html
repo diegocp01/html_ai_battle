@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Paper Airplane Glide</title>
+  <style>
+    html, body { height: 100%; margin: 0; background:#0b1220; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    canvas { display:block; width:100vw; height:100vh; }
+
+    .hud {
+      position: fixed; inset: 16px auto auto 16px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 14px;
+      padding: 12px 12px 10px 12px;
+      color: #e5e7eb;
+      width: min(340px, calc(100vw - 32px));
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      user-select: none;
+    }
+    .hud h1 { font-size: 14px; margin: 0 0 6px 0; font-weight: 650; letter-spacing: 0.2px; }
+    .hud .tip { font-size: 12px; line-height: 1.25rem; color: rgba(226, 232, 240, 0.9); margin-bottom: 8px; }
+    .row { display:flex; gap:10px; align-items:center; margin: 8px 0; }
+    .row label { font-size: 12px; color: rgba(226, 232, 240, 0.9); width: 110px; }
+    .row input[type="range"] { flex: 1; }
+    .row .val { width: 56px; font-variant-numeric: tabular-nums; text-align:right; font-size: 12px; color: rgba(226, 232, 240, 0.9); }
+    .row .btn {
+      appearance:none; border: 1px solid rgba(148, 163, 184, 0.25);
+      background: rgba(30, 41, 59, 0.55);
+      color:#e5e7eb; border-radius: 12px;
+      padding: 8px 10px; font-size: 12px; cursor:pointer;
+    }
+    .row .btn:active { transform: translateY(1px); }
+    .stats {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(148,163,184,0.18);
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.9);
+      font-variant-numeric: tabular-nums;
+    }
+    .chip {
+      display:flex; justify-content:space-between; align-items:center;
+      padding: 6px 8px;
+      border-radius: 12px;
+      background: rgba(2, 6, 23, 0.25);
+      border: 1px solid rgba(148,163,184,0.15);
+    }
+
+    .hint {
+      position: fixed; inset: auto 16px 16px 16px;
+      color: rgba(226, 232, 240, 0.82);
+      font-size: 12px;
+      text-align:center;
+      pointer-events:none;
+      text-shadow: 0 1px 10px rgba(0,0,0,0.45);
+    }
+    .hint kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: rgba(15,23,42,0.7);
+      border: 1px solid rgba(148,163,184,0.22);
+      border-bottom-color: rgba(148,163,184,0.35);
+      padding: 2px 6px;
+      border-radius: 8px;
+      margin: 0 2px;
+      color: rgba(226,232,240,0.95);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div class="hud">
+    <h1>Paper Airplane Glide</h1>
+    <div class="tip">
+      Drag and release to throw. The plane glides using simple lift and drag physics.
+      <br/>Press <b>R</b> to reset, <b>Space</b> for a quick toss.
+    </div>
+
+    <div class="row">
+      <label for="wind">Wind</label>
+      <input id="wind" type="range" min="-18" max="18" step="0.1" value="2.5" />
+      <div class="val" id="windVal">2.5</div>
+    </div>
+
+    <div class="row">
+      <label for="turb">Turbulence</label>
+      <input id="turb" type="range" min="0" max="1.2" step="0.01" value="0.35" />
+      <div class="val" id="turbVal">0.35</div>
+    </div>
+
+    <div class="row">
+      <label for="trim">Nose trim</label>
+      <input id="trim" type="range" min="-10" max="10" step="0.1" value="2.4" />
+      <div class="val" id="trimVal">2.4</div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="resetBtn">Reset</button>
+      <button class="btn" id="gentleBtn">Gentle throw</button>
+      <button class="btn" id="fastBtn">Fast throw</button>
+    </div>
+
+    <div class="stats">
+      <div class="chip"><span>Speed</span><span id="spd">0.0</span></div>
+      <div class="chip"><span>Altitude</span><span id="alt">0.0</span></div>
+      <div class="chip"><span>Angle</span><span id="ang">0.0</span></div>
+      <div class="chip"><span>AoA</span><span id="aoa">0.0</span></div>
+    </div>
+  </div>
+
+  <div class="hint">
+    Throw: click-drag-release · <kbd>Space</kbd> quick toss · <kbd>R</kbd> reset · <kbd>Esc</kbd> stop
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  // Controls
+  const windEl = document.getElementById("wind");
+  const turbEl = document.getElementById("turb");
+  const trimEl = document.getElementById("trim");
+  const windVal = document.getElementById("windVal");
+  const turbVal = document.getElementById("turbVal");
+  const trimVal = document.getElementById("trimVal");
+  const resetBtn = document.getElementById("resetBtn");
+  const gentleBtn = document.getElementById("gentleBtn");
+  const fastBtn = document.getElementById("fastBtn");
+
+  const spdEl = document.getElementById("spd");
+  const altEl = document.getElementById("alt");
+  const angEl = document.getElementById("ang");
+  const aoaEl = document.getElementById("aoa");
+
+  const DPR = Math.max(1, Math.min(2, devicePixelRatio || 1));
+  function resize() {
+    const w = Math.floor(innerWidth);
+    const h = Math.floor(innerHeight);
+    canvas.width = Math.floor(w * DPR);
+    canvas.height = Math.floor(h * DPR);
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  // Helpers
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const wrapPi = (a) => {
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
+    return a;
+  };
+  const rad = (deg) => (deg * Math.PI) / 180;
+  const deg = (r) => (r * 180) / Math.PI;
+
+  // World
+  function world() {
+    const w = innerWidth;
+    const h = innerHeight;
+    const groundY = h * 0.86;
+    return { w, h, groundY };
+  }
+
+  // Plane state
+  const plane = {
+    x: 120,
+    y: 200,
+    vx: 0,
+    vy: 0,
+    angle: rad(-12),
+    omega: 0,
+    alive: true,
+    stopped: false,
+    lastAlpha: 0,
+    trail: [],
+  };
+
+  // Aerodynamics and feel knobs (tuned to look nice, not to be "real")
+  const aero = {
+    rho: 1.0,        // "air density" (scaled)
+    area: 0.014,     // reference area (scaled)
+    mass: 0.065,     // kg-ish (scaled)
+    g: 9.2,          // gravity
+    Cl_alpha: 5.6,   // lift slope
+    Cl_max: 1.25,    // stall clamp
+    Cd0: 0.06,       // base drag
+    Cd_k: 0.11,      // induced drag factor
+    stab: 10.5,      // pitch stability
+    damp: 3.4,       // angular damping
+  };
+
+  let wind = parseFloat(windEl.value);        // m/s-ish (scaled to pixels)
+  let turb = parseFloat(turbEl.value);
+  let trimDeg = parseFloat(trimEl.value);
+
+  windEl.addEventListener("input", () => {
+    wind = parseFloat(windEl.value);
+    windVal.textContent = wind.toFixed(1);
+  });
+  turbEl.addEventListener("input", () => {
+    turb = parseFloat(turbEl.value);
+    turbVal.textContent = turb.toFixed(2);
+  });
+  trimEl.addEventListener("input", () => {
+    trimDeg = parseFloat(trimEl.value);
+    trimVal.textContent = trimDeg.toFixed(1);
+  });
+
+  resetBtn.addEventListener("click", () => resetPlane());
+  gentleBtn.addEventListener("click", () => tossPreset("gentle"));
+  fastBtn.addEventListener("click", () => tossPreset("fast"));
+
+  function resetPlane() {
+    const { h, groundY } = world();
+    plane.x = 120;
+    plane.y = Math.min(h * 0.35, groundY - 200);
+    plane.vx = 0;
+    plane.vy = 0;
+    plane.angle = rad(-12);
+    plane.omega = 0;
+    plane.alive = true;
+    plane.stopped = false;
+    plane.trail.length = 0;
+  }
+
+  function tossPreset(mode) {
+    const { h, groundY } = world();
+    plane.x = 120;
+    plane.y = Math.min(h * 0.40, groundY - 220);
+    plane.angle = rad(-15);
+    plane.omega = 0;
+    plane.trail.length = 0;
+    plane.stopped = false;
+
+    const spd = mode === "fast" ? 420 : 270; // px/s
+    plane.vx = spd * Math.cos(plane.angle);
+    plane.vy = spd * Math.sin(plane.angle) - 10;
+  }
+
+  // Pointer throw
+  let drag = {
+    active: false,
+    sx: 0, sy: 0,
+    cx: 0, cy: 0,
+    t0: 0,
+  };
+
+  function toCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left),
+      y: (e.clientY - rect.top),
+    };
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    const p = toCanvasPos(e);
+    drag.active = true;
+    drag.sx = p.x; drag.sy = p.y;
+    drag.cx = p.x; drag.cy = p.y;
+    drag.t0 = performance.now();
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag.active) return;
+    const p = toCanvasPos(e);
+    drag.cx = p.x; drag.cy = p.y;
+  });
+
+  canvas.addEventListener("pointerup", (e) => {
+    if (!drag.active) return;
+    drag.active = false;
+
+    const dt = Math.max(0.05, (performance.now() - drag.t0) / 1000);
+    const dx = drag.sx - drag.cx;
+    const dy = drag.sy - drag.cy;
+
+    // Map drag vector to throw velocity.
+    const strength = clamp(Math.hypot(dx, dy), 20, 380);
+    const dir = Math.atan2(dy, dx);
+    const base = (strength / dt) * 0.9;
+
+    const { h, groundY } = world();
+    plane.x = clamp(drag.cx, 60, innerWidth - 60);
+    plane.y = clamp(drag.cy, 60, groundY - 60);
+
+    plane.vx = base * Math.cos(dir);
+    plane.vy = base * Math.sin(dir);
+    plane.angle = dir + rad(-6); // slight nose-up bias
+    plane.omega = 0;
+    plane.stopped = false;
+    plane.trail.length = 0;
+  });
+
+  // Keyboard
+  addEventListener("keydown", (e) => {
+    if (e.key === "r" || e.key === "R") resetPlane();
+    if (e.key === " " ) {
+      e.preventDefault();
+      tossPreset("gentle");
+    }
+    if (e.key === "Escape") {
+      plane.stopped = true;
+      plane.vx = 0;
+      plane.vy = 0;
+      plane.omega = 0;
+    }
+  });
+
+  // Procedural clouds
+  const clouds = Array.from({ length: 9 }, (_, i) => ({
+    x: Math.random() * innerWidth,
+    y: lerp(40, innerHeight * 0.55, Math.random()),
+    r: lerp(40, 140, Math.random()),
+    s: lerp(8, 26, Math.random()),
+    p: Math.random() * Math.PI * 2,
+    k: lerp(0.2, 0.55, Math.random()),
+  }));
+
+  function drawBackground(t) {
+    const { w, h, groundY } = world();
+
+    // Sky gradient
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, "#0b2a52");
+    g.addColorStop(0.52, "#0f4b78");
+    g.addColorStop(1, "#0b1220");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+
+    // Soft vignette
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.arc(w * 0.5, h * 0.5, Math.max(w, h) * 0.62, 0, Math.PI * 2, true);
+    ctx.fill("evenodd");
+    ctx.restore();
+
+    // Clouds
+    ctx.save();
+    for (const c of clouds) {
+      const drift = wind * 10; // px/s
+      c.x += (drift + c.s) * 0.016;
+      if (c.x - c.r > w + 200) c.x = -200 - c.r;
+
+      const bob = Math.sin(t * 0.0006 + c.p) * 8 * c.k;
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = "#e8f0ff";
+      blob(c.x, c.y + bob, c.r);
+    }
+    ctx.restore();
+
+    // Ground
+    ctx.save();
+    const gg = ctx.createLinearGradient(0, groundY, 0, h);
+    gg.addColorStop(0, "rgba(16, 40, 32, 0.9)");
+    gg.addColorStop(1, "rgba(4, 10, 9, 0.95)");
+    ctx.fillStyle = gg;
+    ctx.fillRect(0, groundY, w, h - groundY);
+
+    // Ground line
+    ctx.strokeStyle = "rgba(226, 232, 240, 0.12)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, groundY + 1);
+    ctx.lineTo(w, groundY + 1);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function blob(x, y, r) {
+    ctx.beginPath();
+    const bumps = 6;
+    for (let i = 0; i <= bumps; i++) {
+      const a = (i / bumps) * Math.PI * 2;
+      const rr = r * (0.75 + 0.18 * Math.sin(a * 2.7 + 1.3));
+      const px = x + Math.cos(a) * rr;
+      const py = y + Math.sin(a) * rr * 0.55;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.quadraticCurveTo(
+        x + Math.cos(a - 0.35) * rr,
+        y + Math.sin(a - 0.35) * rr * 0.55,
+        px, py
+      );
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawTrail() {
+    if (plane.trail.length < 2) return;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(226, 232, 240, 0.26)";
+    ctx.beginPath();
+    for (let i = 0; i < plane.trail.length; i++) {
+      const p = plane.trail[i];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPlane() {
+    ctx.save();
+    ctx.translate(plane.x, plane.y);
+    ctx.rotate(plane.angle);
+
+    // Subtle wobble
+    const wob = Math.sin(performance.now() * 0.012) * 0.006 * turb;
+    ctx.rotate(wob);
+
+    // Paper plane body (simple polygon + folds)
+    const s = 1.0;
+    ctx.scale(s, s);
+
+    // Shadow
+    ctx.save();
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.beginPath();
+    ctx.ellipse(6, 10, 28, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Main sheet
+    ctx.fillStyle = "#f4f7ff";
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.22)";
+    ctx.lineWidth = 1.5;
+
+    ctx.beginPath();
+    ctx.moveTo(-28, -4);  // tail left
+    ctx.lineTo(34, 0);    // nose tip
+    ctx.lineTo(-26, 14);  // tail right
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Upper wing
+    ctx.fillStyle = "#eef2ff";
+    ctx.beginPath();
+    ctx.moveTo(-18, 2);
+    ctx.lineTo(30, 0);
+    ctx.lineTo(-10, 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Lower fold line
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.18)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-22, 10);
+    ctx.lineTo(22, 2);
+    ctx.stroke();
+
+    // Center crease
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.22)";
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(-20, 4);
+    ctx.lineTo(33, 0);
+    ctx.stroke();
+
+    // Nose highlight
+    ctx.globalAlpha = 0.65;
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(22, -2);
+    ctx.lineTo(33, 0);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawThrowGuide() {
+    if (!drag.active) return;
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+
+    // Line
+    ctx.strokeStyle = "rgba(226,232,240,0.55)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(drag.cx, drag.cy);
+    ctx.lineTo(drag.sx, drag.sy);
+    ctx.stroke();
+
+    // Arrowhead
+    const dx = drag.sx - drag.cx, dy = drag.sy - drag.cy;
+    const a = Math.atan2(dy, dx);
+    const len = Math.hypot(dx, dy);
+    const head = clamp(len * 0.08, 8, 18);
+
+    ctx.fillStyle = "rgba(226,232,240,0.75)";
+    ctx.beginPath();
+    ctx.moveTo(drag.sx, drag.sy);
+    ctx.lineTo(drag.sx - Math.cos(a - 0.35) * head, drag.sy - Math.sin(a - 0.35) * head);
+    ctx.lineTo(drag.sx - Math.cos(a + 0.35) * head, drag.sy - Math.sin(a + 0.35) * head);
+    ctx.closePath();
+    ctx.fill();
+
+    // Ghost plane
+    ctx.translate(drag.cx, drag.cy);
+    ctx.rotate(a + rad(-6));
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = "rgba(244,247,255,0.7)";
+    ctx.strokeStyle = "rgba(226,232,240,0.35)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-22, -3);
+    ctx.lineTo(28, 0);
+    ctx.lineTo(-20, 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // Physics update
+  let lastT = performance.now();
+  function step(now) {
+    const dtRaw = (now - lastT) / 1000;
+    const dt = clamp(dtRaw, 0.001, 0.033); // stability
+    lastT = now;
+
+    const { w, h, groundY } = world();
+    ctx.clearRect(0, 0, w, h);
+    drawBackground(now);
+
+    if (!plane.stopped) integrate(dt, now);
+
+    drawTrail();
+    drawPlane();
+    drawThrowGuide();
+
+    updateHUD();
+
+    requestAnimationFrame(step);
+  }
+
+  function integrate(dt, now) {
+    const { w, h, groundY } = world();
+
+    // Wind and turbulence (wind affects relative airspeed)
+    const gust = (Math.sin(now * 0.0017) + Math.sin(now * 0.0031 + 2.3)) * 0.5;
+    const windX = wind * 18 + gust * turb * 35;    // px/s
+    const windY = Math.sin(now * 0.0022 + 1.7) * turb * 12;
+
+    // Relative air velocity
+    const rvx = plane.vx - windX;
+    const rvy = plane.vy - windY;
+    const v = Math.hypot(rvx, rvy);
+
+    // If very slow, just fall and drift
+    const eps = 1e-6;
+    const gamma = Math.atan2(rvy, rvx + eps); // flight path angle
+    const alpha = wrapPi(plane.angle - gamma); // angle of attack
+    plane.lastAlpha = alpha;
+
+    // Lift and drag coefficients (simple stall clamp)
+    let Cl = aero.Cl_alpha * alpha;
+    Cl = clamp(Cl, -aero.Cl_max, aero.Cl_max);
+
+    const Cd = aero.Cd0 + aero.Cd_k * (Cl * Cl);
+
+    // Dynamic pressure (scaled to pixels)
+    const q = 0.5 * aero.rho * v * v;
+
+    // Force magnitudes
+    const L = q * aero.area * Cl;
+    const D = q * aero.area * Cd;
+
+    // Directions
+    const ux = (rvx / (v + eps));
+    const uy = (rvy / (v + eps));
+
+    // Drag opposite relative velocity
+    const FxD = -D * ux;
+    const FyD = -D * uy;
+
+    // Lift perpendicular to velocity
+    // Perp vector (left-hand) gives upward lift when alpha is positive in screen coordinates
+    const lx = -uy;
+    const ly =  ux;
+    const FxL = L * lx;
+    const FyL = L * ly;
+
+    // Gravity
+    const FxG = 0;
+    const FyG = aero.mass * aero.g * 40; // scale gravity to pixels
+
+    // Combine and scale: convert "force-like" values to px/s^2
+    // The aerodynamic forces above are already in the "px units" vibe, just damp overall.
+    const Fscale = 0.85;
+    const ax = (FxD + FxL + FxG) / aero.mass * Fscale;
+    const ay = (FyD + FyL + FyG) / aero.mass * Fscale;
+
+    // Integrate translational motion
+    plane.vx += ax * dt;
+    plane.vy += ay * dt;
+    plane.x  += plane.vx * dt;
+    plane.y  += plane.vy * dt;
+
+    // Pitch stability: encourage angle to follow velocity + trim (with some turbulence)
+    const trim = rad(trimDeg);
+    const target = gamma + trim;
+
+    // Add flutter near stall
+    const stall = clamp((Math.abs(alpha) - rad(8)) / rad(18), 0, 1);
+    const flutter = (Math.sin(now * 0.028) + Math.sin(now * 0.041 + 1.3)) * 0.5 * turb * stall;
+
+    const err = wrapPi(target - plane.angle);
+    const torque = aero.stab * err - aero.damp * plane.omega + flutter * 6.0;
+
+    plane.omega += torque * dt;
+    plane.angle += plane.omega * dt;
+
+    // Trail
+    const speed = Math.hypot(plane.vx, plane.vy);
+    if (speed > 40 && plane.y < groundY - 6) {
+      plane.trail.push({ x: plane.x, y: plane.y });
+      if (plane.trail.length > 70) plane.trail.shift();
+    } else if (plane.trail.length) {
+      plane.trail.shift();
+    }
+
+    // Collisions and bounds
+    // Ground hit: slide and settle
+    if (plane.y > groundY - 4) {
+      plane.y = groundY - 4;
+
+      // If coming in fast, bounce a bit
+      if (Math.abs(plane.vy) > 120) {
+        plane.vy *= -0.22;
+        plane.vx *= 0.72;
+        plane.omega *= 0.6;
+      } else {
+        // Settle
+        plane.vy = 0;
+        plane.vx *= 0.92;
+        plane.omega *= 0.75;
+
+        // Stop after slowing down
+        if (Math.abs(plane.vx) < 18) {
+          plane.vx = 0;
+          plane.omega = 0;
+          plane.stopped = true;
+        }
+      }
+    }
+
+    // Side bounds: softly reflect
+    if (plane.x < 20) {
+      plane.x = 20;
+      plane.vx *= -0.35;
+      plane.omega *= 0.8;
+    }
+    if (plane.x > w - 20) {
+      plane.x = w - 20;
+      plane.vx *= -0.35;
+      plane.omega *= 0.8;
+    }
+
+    // Ceiling: reflect gently
+    if (plane.y < 20) {
+      plane.y = 20;
+      plane.vy *= 0.25;
+      plane.angle = lerp(plane.angle, 0, 0.1);
+    }
+  }
+
+  function updateHUD() {
+    const { groundY } = world();
+    const speed = Math.hypot(plane.vx, plane.vy);
+    const altitude = Math.max(0, groundY - plane.y);
+
+    spdEl.textContent = (speed / 60).toFixed(1);   // scaled display
+    altEl.textContent = altitude.toFixed(0);
+    angEl.textContent = deg(plane.angle).toFixed(1) + "°";
+    aoaEl.textContent = deg(plane.lastAlpha).toFixed(1) + "°";
+  }
+
+  // Initialize labels
+  windVal.textContent = parseFloat(windEl.value).toFixed(1);
+  turbVal.textContent = parseFloat(turbEl.value).toFixed(2);
+  trimVal.textContent = parseFloat(trimEl.value).toFixed(1);
+
+  resetPlane();
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>

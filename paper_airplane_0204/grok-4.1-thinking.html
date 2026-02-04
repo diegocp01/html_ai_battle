@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Airplane Gliding Simulation</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #000; /* fallback */
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Draw sky background
+        function drawBackground() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(1, '#E0F7FA');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Simple fluffy clouds
+        class Cloud {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * (canvas.height * 0.4);
+                this.size = 60 + Math.random() * 80;
+                this.speed = 0.3 + Math.random() * 0.4;
+            }
+            update() {
+                this.x -= this.speed;
+                if (this.x < -this.size * 2) {
+                    this.reset();
+                    this.x = canvas.width + this.size;
+                }
+            }
+            draw() {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                const r = this.size / 4;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, r * 1.5, 0, Math.PI * 2);
+                ctx.arc(this.x + r * 1.2, this.y - r * 0.3, r, 0, Math.PI * 2);
+                ctx.arc(this.x - r * 1.2, this.y - r * 0.3, r, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y + r * 0.5, r * 1.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const clouds = [];
+        for (let i = 0; i < 8; i++) {
+            clouds.push(new Cloud());
+        }
+
+        // Airplane state
+        let airplane = {
+            x: -150,
+            y: canvas.height * 0.3,
+            vx: 12,
+            vy: -2,
+            angle: 0
+        };
+
+        const gravity = 0.08; // gentle downward acceleration
+
+        function resetAirplane() {
+            airplane.x = -150;
+            airplane.y = canvas.height * (0.2 + Math.random() * 0.3);
+            airplane.vx = 10 + Math.random() * 6;
+            airplane.vy = -3 + Math.random() * 3; // slight variation in launch angle
+        }
+
+        function drawAirplane() {
+            const a = airplane;
+            ctx.save();
+            ctx.translate(a.x, a.y);
+            ctx.rotate(a.angle);
+
+            ctx.fillStyle = '#f8f8f8';
+            ctx.strokeStyle = '#333333';
+            ctx.lineWidth = 2.5;
+
+            // Main body (long pointed fuselage)
+            ctx.beginPath();
+            ctx.moveTo(80, 25);   // nose
+            ctx.lineTo(0, 10);    // top back
+            ctx.lineTo(0, 40);    // bottom back
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Rear wings
+            ctx.beginPath();
+            ctx.moveTo(50, 18);
+            ctx.lineTo(0, 25);
+            ctx.lineTo(50, 32);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function animate() {
+            drawBackground();
+
+            // Update and draw clouds
+            clouds.forEach(cloud => {
+                cloud.update();
+                cloud.draw();
+            });
+
+            // Physics update
+            airplane.vy += gravity;
+            airplane.x += airplane.vx;
+            airplane.y += airplane.vy;
+
+            // Point the airplane in the direction of travel
+            airplane.angle = Math.atan2(airplane.vy, airplane.vx);
+
+            drawAirplane();
+
+            // Launch a new airplane when the current one leaves the screen
+            if (airplane.x > canvas.width + 150 ||
+                airplane.y > canvas.height + 150 ||
+                airplane.y < -150) {
+                resetAirplane();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

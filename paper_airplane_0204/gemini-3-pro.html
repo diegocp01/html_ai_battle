@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Airplane Flight Simulator</title>
+    <style>
+        :root {
+            --sky-top: #87CEEB;
+            --sky-btm: #E0F7FA;
+            --grass: #4CAF50;
+            --ui-bg: rgba(255, 255, 255, 0.9);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        /* The Sky Background */
+        body {
+            background: linear-gradient(to bottom, var(--sky-top), var(--sky-btm));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Game Canvas */
+        #simCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        /* Control Panel Overlay */
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 300px;
+            padding: 20px;
+            background: var(--ui-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            backdrop-filter: blur(5px);
+            z-index: 10;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .value-display {
+            float: right;
+            color: #007BFF;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #stats {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 0.85rem;
+            color: #444;
+            line-height: 1.6;
+        }
+
+        /* Instructions overlay */
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #555;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <h2> Flight Controls</h2>
+        
+        <div class="control-group">
+            <label>Throw Force <span id="forceVal" class="value-display">15</span> m/s</label>
+            <input type="range" id="forceInput" min="5" max="30" value="15" step="0.5">
+        </div>
+
+        <div class="control-group">
+            <label>Throw Angle <span id="angleVal" class="value-display">0</span>°</label>
+            <input type="range" id="angleInput" min="-45" max="45" value="0">
+        </div>
+
+        <button id="launchBtn">Throw Airplane</button>
+
+        <div id="stats">
+            Status: <span id="statusText">Ready</span><br>
+            Distance: <span id="distText">0.0</span> m<br>
+            Altitude: <span id="altText">0.0</span> m<br>
+            Speed: <span id="speedText">0.0</span> m/s
+        </div>
+    </div>
+
+    <div class="instructions">Click and drag on the screen to aim manually!</div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <script>
+        // --- Physics Constants ---
+        const GRAVITY = 9.81;  
+        const AIR_DENSITY = 1.225; 
+        const SCALE = 10;      // Pixels per meter
+        const DT = 1/60;       // Time step (60fps)
+
+        // Paper Airplane Properties
+        const MASS = 0.05;     // kg
+        const WING_AREA = 0.03; // m^2
+        
+        // --- State Variables ---
+        let plane = {
+            x: 0, 
+            y: 0,
+            vx: 0, 
+            vy: 0,
+            angle: 0,          // Pitch angle (radians)
+            angularVel: 0,     // Rotation speed
+            landed: true,
+            trail: []
+        };
+
+        let view = { x: 0, y: 0 }; // Camera position
+        let animationId;
+
+        // --- DOM Elements ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const forceInput = document.getElementById('forceInput');
+        const angleInput = document.getElementById('angleInput');
+        const forceVal = document.getElementById('forceVal');
+        const angleVal = document.getElementById('angleVal');
+        const launchBtn = document.getElementById('launchBtn');
+        const statusText = document.getElementById('statusText');
+        const distText = document.getElementById('distText');
+        const altText = document.getElementById('altText');
+        const speedText = document.getElementById('speedText');
+
+        // --- Resize Handling ---
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            resetCamera();
+        }
+        window.addEventListener('resize', resize);
+
+        // --- Input Handling ---
+        forceInput.oninput = () => forceVal.textContent = forceInput.value;
+        angleInput.oninput = () => angleVal.textContent = angleInput.value;
+
+        // Manual Aiming (Mouse/Touch Drag)
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+
+        canvas.addEventListener('mousedown', e => {
+            if(!plane.landed) return;
+            isDragging = true;
+            dragStart = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            // Visual feedback could be added here
+        });
+
+        window.addEventListener('mouseup', e => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            // Calculate vector
+            const dx = dragStart.x - e.clientX;
+            const dy = dragStart.y - e.clientY; // Inverted Y for screen coords
+            
+            // Scale mouse movement to force
+            const force = Math.min(Math.sqrt(dx*dx + dy*dy) * 0.1, 30);
+            let angle = Math.atan2(dy, dx);
+            
+            // Clamp angle to reasonable throw
+            if (angle > Math.PI/2) angle = Math.PI/2;
+            if (angle < -Math.PI/2) angle = -Math.PI/2;
+
+            launch(force, angle);
+        });
+
+        launchBtn.addEventListener('click', () => {
+            const f = parseFloat(forceInput.value);
+            const a = parseFloat(angleInput.value) * -1; // DOM input is degrees, neg is up in screen Y
+            // Convert degrees to radians and invert for physics (Up is +Y in physics usually, but here we use Screen Coords logic partially)
+            // Let's stick to standard math: +Y is Down (Screen), -Y is Up
+            const rad = a * (Math.PI / 180);
+            launch(f, rad);
+        });
+
+        function launch(speed, angleRad) {
+            // Reset Plane
+            plane.x = 0;
+            plane.y = canvas.height - 150; // Start near bottom-left
+            plane.vx = speed * Math.cos(angleRad);
+            plane.vy = speed * Math.sin(angleRad); // Screen Y: neg is up
+            plane.angle = angleRad;
+            plane.angularVel = 0;
+            plane.landed = false;
+            plane.trail = [];
+            
+            statusText.textContent = "Flying";
+            statusText.style.color = "#007BFF";
+            
+            if (!animationId) loop();
+        }
+
+        function resetCamera() {
+            view.x = 0;
+            view.y = 0;
+        }
+
+        // --- Physics Engine ---
+        function updatePhysics() {
+            if (plane.landed) return;
+
+            // 1. Calculate Speeds
+            const speed = Math.sqrt(plane.vx*plane.vx + plane.vy*plane.vy);
+            if (speed < 0.1) {
+                plane.landed = true; // Stopped
+                return;
+            }
+
+            // Flight Path Angle (Velocity direction)
+            const flightPathAngle = Math.atan2(plane.vy, plane.vx);
+
+            // Angle of Attack (Alpha) = Pitch Angle - Flight Path Angle
+            // (Wrap to -PI...PI)
+            let alpha = plane.angle - flightPathAngle;
+            while (alpha <= -Math.PI) alpha += 2*Math.PI;
+            while (alpha > Math.PI) alpha -= 2*Math.PI;
+
+            // 2. Coefficients (Simplified aerodynamics)
+            // Lift Coefficient: approx linear with stall drop-off
+            // Simple model: 2 * PI * alpha for small angles, drops after stall (~15-20 deg)
+            let cl = 0;
+            let cd = 0;
+
+            // Stall logic
+            const stallAngle = 0.35; // ~20 degrees
+            if (Math.abs(alpha) < stallAngle) {
+                cl = 2 * Math.PI * alpha; 
+                cd = 0.05 + (cl * cl) / (Math.PI * 10); // Induced drag
+            } else {
+                // Post-stall: Lift drops, Drag increases massively
+                cl = Math.sign(alpha) * 0.8; // Flat plate lift
+                cd = 0.3 + 1.5 * Math.sin(Math.abs(alpha)); // High drag
+            }
+
+            // 3. Forces
+            const dynamicPressure = 0.5 * AIR_DENSITY * speed * speed * WING_AREA;
+            
+            const lift = cl * dynamicPressure;
+            const drag = cd * dynamicPressure;
+
+            // Force Vectors
+            // Lift is perpendicular to Velocity (-PI/2 rotation)
+            const liftX = lift * Math.cos(flightPathAngle - Math.PI/2);
+            const liftY = lift * Math.sin(flightPathAngle - Math.PI/2);
+
+            // Drag is opposite to Velocity
+            const dragX = -drag * Math.cos(flightPathAngle);
+            const dragY = -drag * Math.sin(flightPathAngle);
+
+            // Gravity (down is +Y in screen coords)
+            const gravX = 0;
+            const gravY = MASS * GRAVITY;
+
+            // Total Force
+            const fx = liftX + dragX + gravX;
+            const fy = liftY + dragY + gravY;
+
+            // 4. Integration (Newton's 2nd Law)
+            const ax = fx / MASS;
+            const ay = fy / MASS;
+
+            plane.vx += ax * DT;
+            plane.vy += ay * DT;
+
+            plane.x += plane.vx * DT * SCALE;
+            plane.y += plane.vy * DT * SCALE;
+
+            // 5. Angular Dynamics (Stability)
+            // Paper planes have natural stability (nose wants to align with velocity)
+            // Torque = -Stiffness * alpha - Damping * angularVel
+            const stiffness = 20.0; // How hard it tries to align with wind
+            const damping = 2.0;    // Resistance to rotation
+
+            // Damping logic must also consider speed (aerodynamic forces vary with v^2)
+            // We simplify by scaling stiffness with speed^2 slightly to mimic real aero stiffening
+            const speedFactor = (speed * speed) / 100; 
+            const torque = (-stiffness * alpha - damping * plane.angularVel) * Math.max(0.2, speedFactor);
+            
+            // Assume Moment of Inertia (arbitrary small value for a light object)
+            const momentOfInertia = 0.001; 
+            const angularAcc = torque / momentOfInertia;
+
+            plane.angularVel += angularAcc * DT;
+            plane.angle += plane.angularVel * DT;
+
+            // 6. Ground Collision
+            const groundY = canvas.height - 20;
+            if (plane.y >= groundY) {
+                plane.y = groundY;
+                
+                // Simple friction/bounce
+                if (Math.abs(plane.vy) < 20 && Math.abs(plane.vx) < 20) {
+                    plane.vx = 0;
+                    plane.vy = 0;
+                    plane.angularVel = 0;
+                    plane.landed = true;
+                    plane.angle = 0; // Lay flat
+                    statusText.textContent = "Landed";
+                    statusText.style.color = "#4CAF50";
+                } else {
+                    // Crash/Bounce
+                    plane.vy *= -0.3; // Damped bounce
+                    plane.vx *= 0.6;  // Friction
+                    plane.angularVel = 0;
+                }
+            }
+
+            // Trail Logic
+            if (plane.trail.length === 0 || 
+                Math.hypot(plane.x - plane.trail[plane.trail.length-1].x, plane.y - plane.trail[plane.trail.length-1].y) > 10) {
+                plane.trail.push({x: plane.x, y: plane.y});
+                if (plane.trail.length > 200) plane.trail.shift();
+            }
+        }
+
+        function updateCamera() {
+            // Keep plane centered horizontally, but clamped at start
+            let targetX = -plane.x + canvas.width / 4;
+            
+            // Keep plane centered vertically-ish
+            let targetY = -plane.y + canvas.height / 2;
+            
+            // Clamp to ground
+            if (targetY < -500) targetY = -plane.y + canvas.height/2; // Follow up high
+            if (targetY > 0) targetY = 0; // Don't show underground
+
+            // Smooth interpolation
+            view.x += (targetX - view.x) * 0.1;
+            view.y += (targetY - view.y) * 0.1;
+        }
+
+        // --- Render Loop ---
+        function draw() {
+            // Clear Background
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(view.x, view.y);
+
+            // Draw Ground
+            ctx.fillStyle = "#4CAF50";
+            ctx.fillRect(-10000, canvas.height - 20, 50000, 500);
+            
+            // Draw Distance Markers
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            ctx.font = "12px sans-serif";
+            for(let i=0; i<50000; i+=100) { // Every 10m (100px)
+                if (i % 500 === 0) {
+                    ctx.fillRect(i, canvas.height - 20, 2, -15);
+                    ctx.fillText(Math.floor(i/SCALE) + "m", i - 10, canvas.height - 40);
+                }
+            }
+
+            // Draw Trail
+            if (plane.trail.length > 1) {
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+                ctx.lineWidth = 2;
+                ctx.moveTo(plane.trail[0].x, plane.trail[0].y);
+                for (let p of plane.trail) ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+            }
+
+            // Draw Airplane
+            ctx.save();
+            ctx.translate(plane.x, plane.y);
+            ctx.rotate(plane.angle);
+            
+            // Plane Graphics (Simple folded paper style)
+            ctx.beginPath();
+            ctx.fillStyle = "#FFF";
+            ctx.strokeStyle = "#DDD";
+            ctx.lineWidth = 1;
+            
+            // Main Body
+            ctx.moveTo(20, 0);   // Nose
+            ctx.lineTo(-20, 10); // Left Wing tip
+            ctx.lineTo(-10, 0);  // Tail center
+            ctx.lineTo(-20, -10);// Right Wing tip
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Center crease
+            ctx.beginPath();
+            ctx.strokeStyle = "#CCC";
+            ctx.moveTo(20, 0);
+            ctx.lineTo(-10, 0);
+            ctx.stroke();
+
+            ctx.restore(); // End Plane
+
+            // Aiming Line (if dragging)
+            if (isDragging) {
+                ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform for UI overlay
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255,0,0,0.5)";
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(dragStart.x, dragStart.y);
+                
+                // Get current mouse pos from logic... actually simpler to just draw circle at start
+                // Since we don't have current mouse event here, we skip line or need global var
+            }
+
+            ctx.restore(); // End World View
+        }
+
+        function updateUI() {
+            // Stats
+            const speed = Math.sqrt(plane.vx*plane.vx + plane.vy*plane.vy);
+            const dist = plane.x / SCALE;
+            const alt = (canvas.height - 20 - plane.y) / SCALE;
+
+            speedText.innerText = speed.toFixed(1);
+            distText.innerText = Math.max(0, dist).toFixed(1);
+            altText.innerText = Math.max(0, alt).toFixed(1);
+
+            if (plane.landed && plane.x > 10) {
+                statusText.textContent = "Landed - Distance: " + dist.toFixed(1) + "m";
+            }
+        }
+
+        function loop() {
+            updatePhysics();
+            updateCamera();
+            draw();
+            updateUI();
+            
+            animationId = requestAnimationFrame(loop);
+        }
+
+        // Initialize
+        resize();
+        plane.y = canvas.height - 150;
+        draw(); // Draw once initial state
+
+    </script>
+</body>
+</html>

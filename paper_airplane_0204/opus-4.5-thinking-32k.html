@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Airplane Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        #ui h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        #stats {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 14px;
+            color: #333;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        #resetBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        #resetBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="ui">
+        <h3>✈️ Flight Stats</h3>
+        <div id="stats">
+            <div>Speed: <span id="speed">0</span> m/s</div>
+            <div>Altitude: <span id="altitude">0</span> m</div>
+            <div>Distance: <span id="distance">0</span> m</div>
+        </div>
+    </div>
+    
+    <button id="resetBtn">🔄 Reset Flight</button>
+    
+    <div id="instructions">🖱️ Click and drag to throw the paper airplane!</div>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+        
+        // Physics constants
+        const GRAVITY = 0.03;
+        const AIR_RESISTANCE = 0.995;
+        const LIFT_COEFFICIENT = 0.04;
+        const ANGULAR_DAMPING = 0.95;
+        
+        // Airplane state
+        let airplane = {
+            x: width / 4,
+            y: height / 2,
+            vx: 4,
+            vy: -1,
+            angle: -0.2,
+            angularVel: 0,
+            trail: []
+        };
+        
+        let totalDistance = 0;
+        let startX = airplane.x;
+        
+        // Clouds
+        let clouds = [];
+        for (let i = 0; i < 15; i++) {
+            clouds.push({
+                x: Math.random() * width * 1.5,
+                y: Math.random() * height * 0.5,
+                size: 40 + Math.random() * 80,
+                speed: 0.3 + Math.random() * 0.5,
+                opacity: 0.4 + Math.random() * 0.4
+            });
+        }
+        
+        // Birds
+        let birds = [];
+        for (let i = 0; i < 5; i++) {
+            birds.push({
+                x: Math.random() * width,
+                y: 50 + Math.random() * height * 0.3,
+                phase: Math.random() * Math.PI * 2,
+                speed: 1 + Math.random() * 2
+            });
+        }
+        
+        // Wind particles
+        let windParticles = [];
+        
+        // Mouse interaction
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let dragEnd = { x: 0, y: 0 };
+        
+        // Time
+        let lastTime = 0;
+        let windTime = 0;
+        
+        function drawSky() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, '#1e3c72');
+            gradient.addColorStop(0.3, '#4a90d9');
+            gradient.addColorStop(0.7, '#87CEEB');
+            gradient.addColorStop(1, '#e8f4f8');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+            
+            // Sun
+            const sunX = width - 150;
+            const sunY = 120;
+            const sunGradient = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 80);
+            sunGradient.addColorStop(0, 'rgba(255, 255, 200, 1)');
+            sunGradient.addColorStop(0.3, 'rgba(255, 220, 100, 0.8)');
+            sunGradient.addColorStop(1, 'rgba(255, 200, 50, 0)');
+            ctx.fillStyle = sunGradient;
+            ctx.beginPath();
+            ctx.arc(sunX, sunY, 80, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function drawCloud(x, y, size, opacity) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.beginPath();
+            ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+            ctx.arc(x + size * 0.4, y - size * 0.15, size * 0.4, 0, Math.PI * 2);
+            ctx.arc(x + size * 0.8, y, size * 0.5, 0, Math.PI * 2);
+            ctx.arc(x + size * 0.4, y + size * 0.15, size * 0.35, 0, Math.PI * 2);
+            ctx.arc(x + size * 0.6, y - size * 0.1, size * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function drawBird(x, y, phase) {
+            const wingY = Math.sin(phase) * 5;
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(x - 10, y + wingY);
+            ctx.quadraticCurveTo(x - 3, y - 2, x, y);
+            ctx.quadraticCurveTo(x + 3, y - 2, x + 10, y + wingY);
+            ctx.stroke();
+        }
+        
+        function drawGround() {
+            const groundGradient = ctx.createLinearGradient(0, height - 100, 0, height);
+            groundGradient.addColorStop(0, '#90EE90');
+            groundGradient.addColorStop(1, '#228B22');
+            ctx.fillStyle = groundGradient;
+            ctx.fillRect(0, height - 50, width, 50);
+            
+            // Trees
+            for (let i = 0; i < width; i += 80) {
+                const treeHeight = 20 + Math.sin(i * 0.1) * 10;
+                ctx.fillStyle = '#228B22';
+                ctx.beginPath();
+                ctx.moveTo(i + 40, height - 50);
+                ctx.lineTo(i + 20, height - 50 - treeHeight);
+                ctx.lineTo(i + 60, height - 50 - treeHeight);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+        
+        function drawAirplane(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            
+            // Shadow
+            ctx.save();
+            ctx.translate(3, 3);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.beginPath();
+            ctx.moveTo(35, 0);
+            ctx.lineTo(-20, -15);
+            ctx.lineTo(-10, 0);
+            ctx.lineTo(-20, 15);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            
+            // Main body - top wing
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#cccccc';
+            ctx.lineWidth = 1;
+            
+            ctx.beginPath();
+            ctx.moveTo(35, 0);
+            ctx.lineTo(-20, -15);
+            ctx.lineTo(-10, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Bottom wing
+            ctx.fillStyle = '#f0f0f0';
+            ctx.beginPath();
+            ctx.moveTo(35, 0);
+            ctx.lineTo(-10, 0);
+            ctx.lineTo(-20, 15);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Center fold
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(35, 0);
+            ctx.lineTo(-15, 0);
+            ctx.stroke();
+            
+            // Wing fold lines
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(20, -2);
+            ctx.lineTo(-15, -10);
+            ctx.moveTo(20, 2);
+            ctx.lineTo(-15, 10);
+            ctx.stroke();
+            
+            // Tail fins
+            ctx.fillStyle = '#f8f8f8';
+            ctx.beginPath();
+            ctx.moveTo(-15, 0);
+            ctx.lineTo(-25, -8);
+            ctx.lineTo(-20, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(-15, 0);
+            ctx.lineTo(-25, 8);
+            ctx.lineTo(-20, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        
+        function drawTrail() {
+            if (airplane.trail.length < 2) return;
+            
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            for (let i = 1; i < airplane.trail.length; i++) {
+                const alpha = i / airplane.trail.length;
+                const width = alpha * 3;
+                
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+                ctx.lineWidth = width;
+                
+                ctx.beginPath();
+                ctx.moveTo(airplane.trail[i - 1].x, airplane.trail[i - 1].y);
+                ctx.lineTo(airplane.trail[i].x, airplane.trail[i].y);
+                ctx.stroke();
+            }
+        }
+        
+        function drawWindParticles() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            for (const p of windParticles) {
+                const alpha = p.life / p.maxLife;
+                ctx.globalAlpha = alpha * 0.5;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+        
+        function drawDragIndicator() {
+            if (!isDragging) return;
+            
+            const dx = dragStart.x - dragEnd.x;
+            const dy = dragStart.y - dragEnd.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+            
+            // Power indicator
+            const power = Math.min(distance / 200, 1);
+            const hue = 120 - power * 120; // Green to red
+            
+            ctx.strokeStyle = `hsla(${hue}, 70%, 50%, 0.8)`;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([10, 5]);
+            
+            ctx.beginPath();
+            ctx.moveTo(dragStart.x, dragStart.y);
+            ctx.lineTo(dragEnd.x, dragEnd.y);
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+            
+            // Arrow head
+            ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.8)`;
+            ctx.beginPath();
+            ctx.moveTo(dragStart.x, dragStart.y);
+            ctx.lineTo(
+                dragStart.x - 20 * Math.cos(angle - 0.3),
+                dragStart.y - 20 * Math.sin(angle - 0.3)
+            );
+            ctx.lineTo(
+                dragStart.x - 20 * Math.cos(angle + 0.3),
+                dragStart.y - 20 * Math.sin(angle + 0.3)
+            );
+            ctx.closePath();
+            ctx.fill();
+            
+            // Preview airplane
+            ctx.globalAlpha = 0.5;
+            drawAirplane(dragStart.x, dragStart.y, angle);
+            ctx.globalAlpha = 1;
+            
+            // Power meter
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(dragEnd.x - 50, dragEnd.y + 30, 100, 10);
+            ctx.fillStyle = `hsla(${hue}, 70%, 50%, 1)`;
+            ctx.fillRect(dragEnd.x - 50, dragEnd.y + 30, power * 100, 10);
+        }
+        
+        function updateAirplane(dt) {
+            // Get speed
+            const speed = Math.sqrt(airplane.vx * airplane.vx + airplane.vy * airplane.vy);
+            const moveAngle = Math.atan2(airplane.vy, airplane.vx);
+            
+            // Angle of attack
+            let angleOfAttack = airplane.angle - moveAngle;
+            while (angleOfAttack > Math.PI) angleOfAttack -= Math.PI * 2;
+            while (angleOfAttack < -Math.PI) angleOfAttack += Math.PI * 2;
+            
+            // Apply gravity
+            airplane.vy += GRAVITY * dt;
+            
+            // Apply lift (perpendicular to velocity)
+            if (speed > 0.5) {
+                const liftMagnitude = speed * speed * LIFT_COEFFICIENT * Math.sin(angleOfAttack * 2);
+                const liftAngle = moveAngle - Math.PI / 2;
+                airplane.vx += Math.cos(liftAngle) * liftMagnitude * dt;
+                airplane.vy += Math.sin(liftAngle) * liftMagnitude * dt;
+            }
+            
+            // Apply drag
+            airplane.vx *= Math.pow(AIR_RESISTANCE, dt);
+            airplane.vy *= Math.pow(AIR_RESISTANCE, dt);
+            
+            // Angular velocity based on angle of attack
+            airplane.angularVel += angleOfAttack * 0.002 * dt;
+            airplane.angularVel *= ANGULAR_DAMPING;
+            airplane.angle += airplane.angularVel * dt;
+            
+            // Stall behavior
+            if (speed < 1 && airplane.y < height - 100) {
+                airplane.angularVel += 0.001 * dt;
+            }
+            
+            // Update position
+            airplane.x += airplane.vx * dt;
+            airplane.y += airplane.vy * dt;
+            
+            // Update trail
+            airplane.trail.push({ x: airplane.x, y: airplane.y });
+            if (airplane.trail.length > 50) {
+                airplane.trail.shift();
+            }
+            
+            // Update distance
+            totalDistance += Math.abs(airplane.vx * dt);
+            
+            // Boundary checks
+            if (airplane.y > height - 60) {
+                airplane.y = height - 60;
+                airplane.vy *= -0.3;
+                airplane.vx *= 0.8;
+                if (Math.abs(airplane.vy) < 0.5) airplane.vy = 0;
+            }
+            
+            if (airplane.x > width + 50) {
+                airplane.x = -50;
+            }
+            if (airplane.x < -50) {
+                airplane.x = width + 50;
+            }
+            if (airplane.y < -50) {
+                airplane.y = -50;
+                airplane.vy = Math.abs(airplane.vy) * 0.5;
+            }
+            
+            // Wind particles
+            if (speed > 2 && Math.random() < 0.3) {
+                const offsetAngle = airplane.angle + (Math.random() - 0.5) * 0.5;
+                windParticles.push({
+                    x: airplane.x - Math.cos(airplane.angle) * 25,
+                    y: airplane.y - Math.sin(airplane.angle) * 25,
+                    vx: -Math.cos(offsetAngle) * speed * 0.3 + (Math.random() - 0.5) * 2,
+                    vy: -Math.sin(offsetAngle) * speed * 0.3 + (Math.random() - 0.5) * 2,
+                    life: 40,
+                    maxLife: 40,
+                    size: 2 + Math.random() * 3
+                });
+            }
+        }
+        
+        function updateParticles(dt) {
+            for (let i = windParticles.length - 1; i >= 0; i--) {
+                const p = windParticles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+                
+                if (p.life <= 0) {
+                    windParticles.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateClouds(dt) {
+            for (const cloud of clouds) {
+                cloud.x -= cloud.speed * dt;
+                if (cloud.x < -cloud.size * 2) {
+                    cloud.x = width + cloud.size;
+                    cloud.y = Math.random() * height * 0.5;
+                }
+            }
+        }
+        
+        function updateBirds(dt) {
+            for (const bird of birds) {
+                bird.x -= bird.speed * dt;
+                bird.phase += 0.15 * dt;
+                bird.y += Math.sin(bird.phase * 0.5) * 0.2;
+                
+                if (bird.x < -20) {
+                    bird.x = width + 20;
+                    bird.y = 50 + Math.random() * height * 0.3;
+                }
+            }
+        }
+        
+        function updateStats() {
+            const speed = Math.sqrt(airplane.vx * airplane.vx + airplane.vy * airplane.vy);
+            document.getElementById('speed').textContent = (speed * 10).toFixed(1);
+            document.getElementById('altitude').textContent = Math.max(0, Math.floor((height - 50 - airplane.y) / 5));
+            document.getElementById('distance').textContent = Math.floor(totalDistance / 10);
+        }
+        
+        function animate(currentTime) {
+            const dt = Math.min((currentTime - lastTime) / 16, 3);
+            lastTime = currentTime;
+            windTime += dt;
+            
+            // Update
+            updateAirplane(dt);
+            updateParticles(dt);
+            updateClouds(dt);
+            updateBirds(dt);
+            
+            // Draw
+            drawSky();
+            
+            for (const cloud of clouds) {
+                drawCloud(cloud.x, cloud.y, cloud.size, cloud.opacity);
+            }
+            
+            for (const bird of birds) {
+                drawBird(bird.x, bird.y, bird.phase);
+            }
+            
+            drawGround();
+            drawTrail();
+            drawWindParticles();
+            drawAirplane(airplane.x, airplane.y, airplane.angle);
+            drawDragIndicator();
+            
+            updateStats();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        function launchAirplane(startX, startY, endX, endY) {
+            const dx = startX - endX;
+            const dy = startY - endY;
+            const power = Math.min(Math.sqrt(dx * dx + dy * dy) * 0.08, 20);
+            const angle = Math.atan2(dy, dx);
+            
+            airplane.x = startX;
+            airplane.y = startY;
+            airplane.vx = Math.cos(angle) * power;
+            airplane.vy = Math.sin(angle) * power;
+            airplane.angle = angle;
+            airplane.angularVel = 0;
+            airplane.trail = [];
+            
+            totalDistance = 0;
+        }
+        
+        function resetAirplane() {
+            airplane.x = width / 4;
+            airplane.y = height / 2;
+            airplane.vx = 4;
+            airplane.vy = -1;
+            airplane.angle = -0.2;
+            airplane.angularVel = 0;
+            airplane.trail = [];
+            totalDistance = 0;
+        }
+        
+        // Event listeners
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            dragStart.x = e.clientX;
+            dragStart.y = e.clientY;
+            dragEnd.x = e.clientX;
+            dragEnd.y = e.clientY;
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                dragEnd.x = e.clientX;
+                dragEnd.y = e.clientY;
+            }
+        });
+        
+        canvas.addEventListener('mouseup', (e) => {
+            if (isDragging) {
+                isDragging = false;
+                launchAirplane(dragStart.x, dragStart.y, dragEnd.x, dragEnd.y);
+            }
+        });
+        
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isDragging = true;
+            dragStart.x = e.touches[0].clientX;
+            dragStart.y = e.touches[0].clientY;
+            dragEnd.x = e.touches[0].clientX;
+            dragEnd.y = e.touches[0].clientY;
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isDragging) {
+                dragEnd.x = e.touches[0].clientX;
+                dragEnd.y = e.touches[0].clientY;
+            }
+        });
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (isDragging) {
+                isDragging = false;
+                launchAirplane(dragStart.x, dragStart.y, dragEnd.x, dragEnd.y);
+            }
+        });
+        
+        document.getElementById('resetBtn').addEventListener('click', resetAirplane);
+        
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+        
+        // Start
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
