@@ -1,66 +1,68 @@
-# 🧪 HTML AI Battle, HTML Animation Experiment
+# The Single-File Test
 
-**TLDR:**  
-4 frontier LLMs received the exact same prompt to generate an interactive HTML animation. This repo preserves the raw outputs for direct comparison.
+Longitudinal evaluation of frontier LLM web generation under a first-output-only protocol, plus supervised analysis of what predicts social reach.
 
-## ✅ Experiment Rules
-	•	✅ Same exact prompt for all models
-	•	✅ First output only (no retries, no iterations)
-	•	✅ Raw HTML outputs preserved exactly
-	•	✅ No human edits
+## Quick Links
+- Research notebook: [`research_supervised_ml.ipynb`](./research_supervised_ml.ipynb)
+- Paper archive (placeholder): [`paper/`](./paper/)
 
----
+## Abstract
+This repository contains the analysis for a study of how frontier LLMs perform on single-file HTML generation tasks and whether technical generation metrics predict 24-hour social engagement.
 
-🔗 Popular Posts
+The study uses a real-world workflow (public model UIs, first response only, no iterative correction) and links model-side properties (reasoning time, code length, score quality, audio packaging) to distribution outcomes on X, TikTok, and YouTube.
 
-X (Twitter) posts showcasing the experiments:
+## Study Setup
+- Data window: 2025-12-10 to 2026-02-04
+- Scope: 17 experiments, 68 model runs (4 model outputs per experiment)
+- Model families: GPT, Gemini, Grok, Opus
+- Protocol: same prompt per experiment, first output only, raw outputs preserved, no post-edit before evaluation
 
+## Research Questions
+- Does more model compute (reasoning time / response time) improve output quality?
+- Are AI-as-judge scores aligned with human scoring?
+- Do technical generation features predict 24-hour impressions?
 
-**Robot Arm:** https://x.com/diegocabezas01/status/1996356823436169623?s=20
+## Methods (Notebook)
+- Notebook: [`research_supervised_ml.ipynb`](./research_supervised_ml.ipynb)
+- Data is analyzed at two levels:
+- `df`: model-level rows (68 rows)
+- `exp_df`: experiment-level aggregation (17 rows)
+- Target for virality modeling: `log(1 + X_Impressions_24h)`
+- Main regression model: Ridge (L2) with Leave-One-Out Cross-Validation (LOOCV)
+- Final four model inputs for prediction:
+- `ReasonTime_mean`
+- `Reasoning_Ratio_mean`
+- `Suno_version`
+- `Song_BPM`
 
-**Six Shot Revolver:** https://x.com/diegocabezas01/status/1994114205314633757?s=20
+## Key Findings
+- Compute does not reliably improve quality across models.
+- For Gemini, higher reasoning/inference time correlated with lower performance (Spearman `r=-0.540, p=0.025` for reasoning time; `r=-0.577, p=0.015` for response time).
+- AI judging showed measurable self-bias/leniency.
+- Gemini vs human functional correctness: Wilcoxon `p=0.0372` (significant), with higher Gemini self-scores on average.
+- Virality was poorly predicted from technical pre-publication features.
+- Ridge LOOCV out-of-sample performance: MAE `+/- 46,221` impressions, `R^2 = -0.331`.
+- Strongest correlation with impressions was account-timeline related (starting followers), not code/compute quality (`X_followers r=-0.828`).
+- Prompt length, song BPM, and most posting/audio variables showed weak or non-significant relationships in this sample.
 
-**F1 Drifting:** https://x.com/diegocabezas01/status/1999825601604002211?s=46&t=SsiRKZ2Q9HeqSo2ULlEsyg
+## Repository Map
+- [`research_supervised_ml.ipynb`](./research_supervised_ml.ipynb): full analysis notebook (EDA, stats tests, modeling, prediction playground)
+- [`paper/`](./paper/): paper assets and archive placeholder
+- `paper/experiment_tracker.xlsx`: experiment tracker data source used in analysis
+- `experiments/`: per-experiment model outputs and assets
+- `data_collection_program/`: collection utilities and scripts used in the broader workflow
 
-**Flappy bird:** https://x.com/diegocabezas01/status/1998925426085998887?s=46&t=SsiRKZ2Q9HeqSo2ULlEsyg
+## Reproducibility
+- Open `research_supervised_ml.ipynb` and run cells top to bottom.
+- Python packages used in the notebook include:
+- `pandas`
+- `numpy`
+- `scipy`
+- `scikit-learn`
+- `matplotlib`
+- `seaborn`
+- `gradio`
 
-**Falling Sand:** https://x.com/diegocabezas01/status/1998009023568674887?s=20
-
-**Drinking Water:** https://x.com/diegocabezas01/status/1997292440194302397?s=20 
-
-**Pinball:** https://x.com/diegocabezas01/status/1994782149548150952?s=20
-
-**Speedometer:** https://x.com/diegocabezas01/status/1995561697084670443?s=20
-
-**DVD Logo:** https://x.com/diegocabezas01/status/2002364713133387793?s=20
-
-**Flower Blooming:** https://x.com/diegocabezas01/status/2001400005312287181?s=20
-
-**Super Mario Bros:** https://x.com/diegocabezas01/status/2003817172502503505?s=20
-
-**Rocket Launch:** https://x.com/diegocabezas01/status/2004908584656617578?s=20
-
-**New Year's Eve:** https://x.com/diegocabezas01/status/2006340874104353078?s=20
-
-**Dog Fetch:** https://x.com/diegocabezas01/status/2007439963172831693?s=20
-
-**Pirate Ship:** https://x.com/diegocabezas01/status/2009974566903329210?s=20
-
-**Tearable Cloth:** https://x.com/diegocabezas01/status/2009025822951100493?s=20
-
-**Backflip:** https://x.com/diegocabezas01/status/2011490487828693413?s=20
-
-**Airplane:** https://x.com/diegocabezas01/status/2012528314326425871?s=20
-
-**DNA Helix:** https://x.com/diegocabezas01/status/2015064627642564747?s=20
-
----
-
-## 📊 Future Work
-	•	Correlation matrix between:
-	•	Lines of code
-	•	Visual accuracy
-	•	Prompt adherence
-	•	Physics stability
-	•	Interactivity quality
-    •	Scoring framework
+## Notes
+- Sample size is intentionally small (`n=17` experiments), so inferential results should be treated as directional.
+- This repo tracks an ongoing longitudinal process; metrics and conclusions may evolve as new experiments are added.
