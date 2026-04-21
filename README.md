@@ -14,7 +14,6 @@ This repository is the public archive of that process. It includes the raw exper
 | --- | --- |
 | Browse the actual model outputs | [`experiments/`](./experiments/) |
 | Open one example experiment first | [`experiments/paper_airplane_0204/`](./experiments/paper_airplane_0204/) |
-| Read the current paper draft | [`paper/paper_final.md`](./paper/paper_final.md) |
 | Open the analysis notebook | [`paper/research.ipynb`](./paper/research.ipynb) |
 | Download the dataset as CSV | [`paper/experiment_tracker.csv`](./paper/experiment_tracker.csv) |
 | Inspect the tracking spreadsheet | [`paper/experiment_tracker.xlsx`](./paper/experiment_tracker.xlsx) |
@@ -67,15 +66,14 @@ Good folders to start with:
 
 ### [`paper/`](./paper/)
 
-This folder contains the paper and its supporting assets:
+This folder contains the public analysis materials that support the project:
 
-- [`paper/paper_final.pdf`](./paper/paper_final.pdf): the current paper draft
-- [`paper/paper_final.md`](./paper/paper_final.md): paper source in Markdown
-- [`paper/paper_final.tex`](./paper/paper_final.tex): LaTeX version
 - [`paper/research.ipynb`](./paper/research.ipynb): analysis notebook
+- [`paper/experiment_tracker.csv`](./paper/experiment_tracker.csv): public CSV export
+- [`paper/experiment_tracker.xlsx`](./paper/experiment_tracker.xlsx): tracking spreadsheet
 - [`paper/figures/`](./paper/figures/) and [`paper/tables/`](./paper/tables/): exported visuals
 
-Important scope note: the current paper focuses on 17 experiments collected from December 10, 2025 to February 4, 2026, while the repository itself is the broader working archive and currently contains more than that paper subset. In other words, the repo and the paper are related, but they are not exactly the same thing.
+Important scope note: the current analysis focuses on 17 experiments collected from December 10, 2025 to February 4, 2026, while the repository itself is the broader working archive and currently contains more than that subset. In other words, the repo and the formal write-up are related, but they are not exactly the same thing.
 
 ### [`data_collection_program/`](./data_collection_program/)
 
