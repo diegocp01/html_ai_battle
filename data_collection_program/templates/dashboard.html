@@ -1,0 +1,2348 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hidden Workflow App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg-base: #f3f7fc;
+        --bg-cool: #e5eef8;
+        --bg-warm: #dfeaf7;
+        --panel: #fcfdff;
+        --panel-soft: #f4f8fd;
+        --ink: #0b2340;
+        --ink-soft: #244768;
+        --muted: #607a98;
+        --border: #c8d9ec;
+        --accent: #0f6fbd;
+        --accent-strong: #0a4f8b;
+        --accent-warm: #1f87ff;
+        --accent-warm-strong: #156bcc;
+        --success: #2b78d4;
+        --shadow-lg: 0 26px 56px rgba(19, 49, 56, 0.16), 0 10px 20px rgba(19, 49, 56, 0.08);
+        --shadow-md: 0 14px 30px rgba(19, 49, 56, 0.12), 0 6px 14px rgba(19, 49, 56, 0.06);
+        --shadow-sm: 0 6px 16px rgba(19, 49, 56, 0.08);
+        --ring: 0 0 0 3px rgba(15, 111, 189, 0.2);
+        --sans: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", sans-serif;
+        --display: "Syne", "Trebuchet MS", sans-serif;
+        --mono: "IBM Plex Mono", "SF Mono", "Cascadia Code", ui-monospace, monospace;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--sans);
+        color: var(--ink);
+        background:
+          radial-gradient(65rem 42rem at 106% -18%, rgba(15, 111, 189, 0.22), transparent 68%),
+          radial-gradient(48rem 34rem at -8% 104%, rgba(31, 135, 255, 0.2), transparent 72%),
+          linear-gradient(155deg, var(--bg-base) 0%, var(--bg-cool) 52%, var(--bg-warm) 100%);
+        min-height: 100vh;
+        overflow-x: hidden;
+        line-height: 1.5;
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: fixed;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      body::before {
+        inset: 0;
+        opacity: 0.26;
+        background:
+          repeating-linear-gradient(
+            115deg,
+            rgba(19, 49, 56, 0.045) 0 1px,
+            transparent 1px 32px
+          ),
+          repeating-linear-gradient(
+            25deg,
+            rgba(19, 49, 56, 0.04) 0 1px,
+            transparent 1px 30px
+          );
+      }
+
+      body::after {
+        width: 34rem;
+        height: 34rem;
+        right: -14rem;
+        top: -10rem;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.48), transparent 65%);
+        filter: blur(2px);
+        animation: haloFloat 14s ease-in-out infinite;
+      }
+
+      .app {
+        position: relative;
+        z-index: 1;
+        max-width: 1240px;
+        margin: clamp(22px, 3.8vw, 48px) auto 90px;
+        padding: 0 clamp(14px, 2.8vw, 30px);
+      }
+
+      .today-stamp {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        padding: 6px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(15, 111, 189, 0.24);
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--ink-soft);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .step-card-top {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 8px;
+      }
+
+      .app::before {
+        content: "";
+        position: absolute;
+        inset: 18px 10px auto 10px;
+        height: 200px;
+        z-index: -1;
+        border-radius: 28px;
+        background: linear-gradient(140deg, rgba(15, 111, 189, 0.17), rgba(31, 135, 255, 0.13));
+        filter: blur(30px);
+      }
+
+      .hero {
+        position: relative;
+        --hero-line-scale: 0.9;
+        --hero-line-glow: 1.04;
+        --hero-line-duration: 2000ms;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 30px;
+        padding: clamp(20px, 3vw, 30px);
+        border-radius: 28px;
+        border: 1px solid rgba(19, 49, 56, 0.12);
+        background: linear-gradient(
+          120deg,
+          rgba(255, 255, 255, 0.9) 0%,
+          rgba(247, 251, 255, 0.86) 40%,
+          rgba(235, 244, 255, 0.9) 100%
+        );
+        box-shadow: var(--shadow-lg);
+        overflow: hidden;
+      }
+
+      .hero > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 22px;
+        right: 22px;
+        height: 4px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+        z-index: 0;
+        pointer-events: none;
+        transform-origin: center center;
+        transform: scaleX(var(--hero-line-scale));
+        filter: brightness(var(--hero-line-glow));
+        transition:
+          transform var(--hero-line-duration) cubic-bezier(0.35, 0.08, 0.22, 0.98),
+          filter var(--hero-line-duration) ease;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: clamp(180px, 22vw, 300px);
+        height: clamp(270px, 33vw, 450px);
+        border-radius: 28px;
+        transform: translate3d(-190%, -56%, 0) rotate(18deg) scale(1);
+        background: linear-gradient(
+          140deg,
+          rgba(15, 111, 189, 0.17),
+          rgba(31, 135, 255, 0.16)
+        );
+        z-index: 0;
+        pointer-events: none;
+        animation: heroAccentSweep 20s cubic-bezier(0.33, 0.08, 0.16, 0.98) infinite
+          alternate;
+        will-change: transform;
+      }
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 11px;
+        font-family: var(--mono);
+        font-weight: 600;
+        color: var(--accent-strong);
+        margin: 0 0 10px;
+      }
+
+      h1 {
+        font-size: clamp(34px, 5vw, 54px);
+        font-family: var(--sans);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.02;
+        margin: 0 0 12px;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 58ch;
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 15px;
+        line-height: 1.65;
+        font-weight: 500;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .progress-pill {
+        padding: 10px 16px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        font-family: var(--mono);
+        background: linear-gradient(
+          115deg,
+          rgba(15, 111, 189, 0.17),
+          rgba(31, 135, 255, 0.17)
+        );
+        border: 1px solid rgba(19, 49, 56, 0.16);
+        color: var(--ink);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .panel {
+        position: relative;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 250, 255, 0.92));
+        border-radius: 24px;
+        border: 1px solid rgba(19, 49, 56, 0.12);
+        box-shadow: var(--shadow-md);
+        padding: clamp(16px, 2.2vw, 24px);
+        margin-bottom: 30px;
+        backdrop-filter: blur(6px);
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .panel h2 {
+        margin: 0;
+        font-size: clamp(21px, 3vw, 26px);
+        font-family: var(--display);
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+
+      .context-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 14px;
+      }
+
+      .context-card {
+        position: relative;
+        background: linear-gradient(180deg, #fbfdff 0%, var(--panel-soft) 100%);
+        border: 1px solid rgba(19, 49, 56, 0.13);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
+        transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+      }
+
+      .context-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        border-radius: 16px 16px 0 0;
+        background: linear-gradient(90deg, rgba(15, 111, 189, 0.72), rgba(31, 135, 255, 0.68));
+      }
+
+      .context-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(15, 111, 189, 0.42);
+        box-shadow: 0 12px 26px rgba(19, 49, 56, 0.12);
+      }
+
+      .context-card h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        font-family: var(--display);
+        font-weight: 620;
+        color: var(--ink);
+        letter-spacing: 0.01em;
+      }
+
+      .note {
+        margin: 8px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .mono {
+        font-family: var(--mono);
+      }
+
+      .file-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 12px;
+        font-family: var(--mono);
+      }
+
+      .file-list li {
+        padding: 6px 0;
+        border-bottom: 1px dashed rgba(19, 49, 56, 0.14);
+        color: var(--ink);
+      }
+
+      .file-list li:last-child {
+        border-bottom: none;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .status-line {
+        font-size: 12px;
+        color: var(--ink-soft);
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+
+      #modelMode {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(15, 111, 189, 0.28);
+        background: rgba(15, 111, 189, 0.1);
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+
+      .model-override {
+        margin-top: 12px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .model-override label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+
+      .model-inputs {
+        display: grid;
+        gap: 8px;
+      }
+
+      .model-inputs input {
+        width: 100%;
+        border: 1.5px solid rgba(19, 49, 56, 0.16);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 12px;
+        font-family: var(--mono);
+        background: rgba(255, 255, 255, 0.88);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .model-inputs input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: var(--ring);
+      }
+
+      .model-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .steps {
+        display: grid;
+        gap: 16px;
+      }
+
+      .step-card {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(246, 251, 255, 0.96));
+        border-radius: 20px;
+        border: 1px solid rgba(19, 49, 56, 0.14);
+        box-shadow: var(--shadow-md);
+        padding: 20px;
+        opacity: 0;
+        transform: translateY(16px);
+        animation: cardIn 0.52s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        animation-delay: var(--delay, 0s);
+        transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .step-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--accent), var(--accent-warm));
+      }
+
+      .step-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(15, 111, 189, 0.4);
+        box-shadow: 0 18px 34px rgba(19, 49, 56, 0.14);
+      }
+
+      .step-card[data-step="step5a"]::before,
+      .step-card[data-step="step10"]::before,
+      .step-card[data-step="step11"]::before {
+        background: linear-gradient(180deg, var(--accent-warm), #5ca9ff);
+      }
+
+      .step-card.done {
+        border-color: rgba(43, 120, 212, 0.55);
+        box-shadow: 0 18px 40px rgba(43, 120, 212, 0.2);
+        background: linear-gradient(180deg, #f2f8ff 0%, #eaf4ff 100%);
+      }
+
+      .step-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .step-head h3 {
+        margin: 0;
+        font-family: var(--display);
+        font-weight: 640;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+      }
+
+      .step-number {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        font-family: var(--mono);
+        background: rgba(15, 111, 189, 0.14);
+        color: var(--accent-strong);
+        letter-spacing: 0.03em;
+        border: 1px solid rgba(15, 111, 189, 0.24);
+      }
+
+      .done-toggle {
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--muted);
+        font-weight: 600;
+        cursor: pointer;
+        transition: color 0.2s ease;
+      }
+
+      .done-toggle:hover {
+        color: var(--success);
+      }
+
+      .done-toggle input[type="checkbox"] {
+        accent-color: var(--success);
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+
+      .step-card p {
+        margin: 8px 0 14px;
+        color: var(--ink-soft);
+        font-size: 14px;
+        line-height: 1.58;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .field label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .field input,
+      .field textarea,
+      .field select {
+        width: 100%;
+        border: 1.5px solid rgba(19, 49, 56, 0.17);
+        border-radius: 10px;
+        padding: 11px 14px;
+        font-size: 14px;
+        font-family: inherit;
+        color: var(--ink);
+        background: rgba(255, 255, 255, 0.92);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      }
+
+      .field input:focus,
+      .field textarea:focus,
+      .field select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: var(--ring);
+        background: #ffffff;
+      }
+
+      .field textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+
+      .step-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .btn {
+        border: none;
+        border-radius: 12px;
+        padding: 11px 16px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #ffffff;
+        transition: transform 0.1s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 8px 18px rgba(15, 111, 189, 0.28);
+        letter-spacing: 0.01em;
+      }
+
+      .btn:hover {
+        filter: saturate(1.05) brightness(0.98);
+        box-shadow: 0 10px 20px rgba(15, 111, 189, 0.34);
+      }
+
+      .btn:active {
+        transform: translateY(1px);
+      }
+
+      .btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.88), 0 0 0 6px rgba(15, 111, 189, 0.42);
+      }
+
+      .btn.ghost {
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--ink-soft);
+        border: 1.5px solid rgba(19, 49, 56, 0.2);
+        box-shadow: none;
+      }
+
+      .btn.ghost:hover {
+        background: rgba(15, 111, 189, 0.08);
+        border-color: rgba(15, 111, 189, 0.36);
+      }
+
+      .btn.secondary {
+        background: linear-gradient(135deg, var(--accent-warm), var(--accent-warm-strong));
+        box-shadow: 0 8px 18px rgba(31, 135, 255, 0.28);
+      }
+
+      .btn.secondary:hover {
+        box-shadow: 0 10px 20px rgba(31, 135, 255, 0.34);
+      }
+
+      .btn.loading {
+        opacity: 0.72;
+        cursor: progress;
+      }
+
+      .output,
+      .code-block {
+        background: linear-gradient(180deg, #152a2f, #112024);
+        color: #d3f4eb;
+        padding: 14px 16px;
+        border-radius: 12px;
+        font-family: var(--mono);
+        font-size: 12px;
+        white-space: pre-wrap;
+        line-height: 1.62;
+        border: 1px solid rgba(168, 236, 220, 0.22);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .output {
+        min-height: 64px;
+        margin: 0;
+      }
+
+      .output.error {
+        background: linear-gradient(180deg, #3a2319, #2c1912);
+        color: #ffdcca;
+        border-color: rgba(225, 123, 69, 0.4);
+      }
+
+      .flash {
+        outline: 2px solid rgba(31, 135, 255, 0.7);
+        outline-offset: 4px;
+        transition: outline-offset 0.2s ease;
+      }
+
+      .modal-open {
+        overflow: hidden;
+      }
+
+      .html-modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(12, 34, 39, 0.62);
+        backdrop-filter: blur(6px);
+        z-index: 20;
+      }
+
+      .html-modal.active {
+        display: flex;
+      }
+
+      .html-modal-card {
+        width: min(960px, 96vw);
+        background: linear-gradient(180deg, #fffefb, #f6fbf9);
+        border: 1px solid rgba(19, 49, 56, 0.16);
+        border-radius: 20px;
+        box-shadow: var(--shadow-lg);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .html-modal-title {
+        margin: 0;
+        font-size: 24px;
+        font-family: var(--display);
+        font-weight: 640;
+        letter-spacing: -0.01em;
+      }
+
+      .html-modal-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+
+      .html-modal-textarea {
+        width: 100%;
+        min-height: 320px;
+        border-radius: 12px;
+        border: 1.5px solid rgba(19, 49, 56, 0.2);
+        padding: 14px;
+        font-family: var(--mono);
+        font-size: 12px;
+        resize: vertical;
+        background: rgba(255, 255, 255, 0.95);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        line-height: 1.55;
+      }
+
+      .html-modal-textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: var(--ring);
+      }
+
+      .html-modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+
+      @keyframes cardIn {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes haloFloat {
+        0%,
+        100% {
+          transform: translateY(0px) scale(1);
+        }
+        50% {
+          transform: translateY(16px) scale(1.06);
+        }
+      }
+
+      @keyframes heroAccentSweep {
+        0% {
+          transform: translate3d(-190%, -56%, 0) rotate(18deg) scale(1);
+        }
+        24% {
+          transform: translate3d(-108%, -54%, 0) rotate(14deg) scale(1.01);
+        }
+        52% {
+          transform: translate3d(-22%, -57%, 0) rotate(23deg) scale(1.02);
+        }
+        78% {
+          transform: translate3d(72%, -53%, 0) rotate(16deg) scale(0.99);
+        }
+        100% {
+          transform: translate3d(165%, -56%, 0) rotate(21deg) scale(1.01);
+        }
+      }
+
+      @media (max-width: 980px) {
+        .hero {
+          padding: 20px;
+        }
+
+        .hero::after {
+          width: clamp(150px, 28vw, 230px);
+          height: clamp(225px, 42vw, 345px);
+        }
+      }
+
+      @media (max-width: 760px) {
+        .hero-actions {
+          width: 100%;
+          justify-content: flex-start;
+        }
+
+        .hero-actions .btn {
+          flex: 1 1 0;
+          min-width: 140px;
+        }
+
+        .panel {
+          padding: 16px;
+        }
+
+        .step-card {
+          padding: 16px;
+        }
+
+        .html-modal {
+          padding: 12px;
+        }
+
+        .html-modal-card {
+          padding: 14px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .hero {
+          border-radius: 22px;
+        }
+
+        .progress-pill {
+          width: 100%;
+          text-align: center;
+        }
+
+        .step-actions .btn {
+          width: 100%;
+        }
+
+        #step5aResults > div {
+          grid-template-columns: 1fr !important;
+        }
+      }
+
+      @media (max-width: 900px) and (min-width: 561px) {
+        #step5aResults > div {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+
+        .hero::before {
+          transform: scaleX(1) !important;
+          filter: none !important;
+        }
+
+        .hero::after {
+          animation: none !important;
+          transform: translate3d(-50%, -56%, 0) rotate(18deg) scale(1) !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Hidden workflow control</p>
+          <h1>HTML AI Battle Steps</h1>
+          <p class="subtitle">
+            Manual runner for every non-pending step. Run each step when you are
+            ready.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <div class="progress-pill">
+            <span id="progressCount">0</span>/<span id="progressTotal">0</span>
+            done
+          </div>
+          <button class="btn secondary" id="nextStepBtn">Next step</button>
+          <button class="btn ghost" id="resetProgressBtn">Reset progress</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Active context</h2>
+          <button class="btn ghost" id="refreshBtn">Refresh</button>
+        </div>
+        <div class="context-grid">
+          <div class="context-card">
+            <h3>Latest folder</h3>
+            <p class="mono" id="latestFolder">{{ latest_dir_name }}</p>
+            <p class="note">
+              Used by scripts that operate on the newest experiment.
+            </p>
+          </div>
+          <div class="context-card">
+            <h3>Ordered HTML files</h3>
+            <ul class="file-list" id="orderedFilesList">
+              {% if ordered_files %}
+                {% for name in ordered_files %}
+                  <li>{{ name }}</li>
+                {% endfor %}
+              {% else %}
+                <li class="muted">No html files found.</li>
+              {% endif %}
+            </ul>
+          </div>
+          <div class="context-card">
+            <h3>Active model files (top 4)</h3>
+            <div class="status-line">
+              Mode: <span id="modelMode">{{ "Custom" if model_override_active else "Auto" }}</span>
+            </div>
+            <ul class="file-list" id="activeModelList">
+              {% for name in model_files %}
+                <li>{{ name or "(empty)" }}</li>
+              {% endfor %}
+            </ul>
+            <div class="model-override">
+              <label>Override order</label>
+              <div class="model-inputs">
+                <input
+                  type="text"
+                  data-model-input
+                  value="{{ model_files[0] }}"
+                  placeholder="Model 1 file"
+                />
+                <input
+                  type="text"
+                  data-model-input
+                  value="{{ model_files[1] }}"
+                  placeholder="Model 2 file"
+                />
+                <input
+                  type="text"
+                  data-model-input
+                  value="{{ model_files[2] }}"
+                  placeholder="Model 3 file"
+                />
+                <input
+                  type="text"
+                  data-model-input
+                  value="{{ model_files[3] }}"
+                  placeholder="Model 4 file"
+                />
+              </div>
+              <div class="model-actions">
+                <button class="btn" id="saveModelsBtn">Use custom order</button>
+                <button class="btn ghost" id="resetModelsBtn">Reset to auto</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="steps" id="steps">
+        <article class="step-card" data-step="step1" style="--delay: 0.05s">
+          <div class="step-card-top">
+            <div class="today-stamp" id="todayStamp">--_--</div>
+          </div>
+          <div class="step-head">
+            <span class="step-number">Step 1</span>
+            <h3>Clone latest folder</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step1" />
+              Done
+            </label>
+          </div>
+          <p>
+            Copies the newest experiment folder, removes image and csv files,
+            then renames the copy.
+          </p>
+          <div class="field">
+            <label for="step1Name">New folder name</label>
+            <input id="step1Name" type="text" placeholder="example_1231" />
+          </div>
+          <div class="step-actions">
+            <button class="btn" data-run="step1">Run step 1</button>
+          </div>
+          <pre class="output" data-output="step1">Output will appear here.</pre>
+        </article>
+
+        <article class="step-card" data-step="step2" style="--delay: 0.1s">
+          <div class="step-head">
+            <span class="step-number">Step 2</span>
+            <h3>Update README prompt + TLDR</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step2" />
+              Done
+            </label>
+          </div>
+          <p>
+            Paste the original prompt. The tool updates the README and derives
+            a short TLDR line through the configured helper path: OpenAI API if
+            enabled, otherwise the local fallback.
+          </p>
+          <div class="field">
+            <label for="step2Prompt">Original prompt</label>
+            <textarea id="step2Prompt" placeholder="Paste the prompt text..."></textarea>
+          </div>
+          <div class="step-actions">
+            <button class="btn" data-run="step2">Run step 2</button>
+          </div>
+          <pre class="output" data-output="step2">Output will appear here.</pre>
+        </article>
+
+        <article class="step-card" data-step="step3" style="--delay: 0.15s">
+          <div class="step-head">
+            <span class="step-number">Step 3</span>
+            <h3>Clear HTML + README sections</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step3" />
+              Done
+            </label>
+          </div>
+          <p>
+            Empties the HTML files and clears Per-Model Output Summary and
+            Observations sections.
+          </p>
+          <div class="field">
+            <label for="step3Confirm">Proceed?</label>
+            <select id="step3Confirm">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="step-actions">
+            <button class="btn" data-run="step3">Run step 3</button>
+          </div>
+          <pre class="output" data-output="step3">Output will appear here.</pre>
+        </article>
+
+        <article class="step-card" data-step="step5" style="--delay: 0.2s">
+          <div class="step-head">
+            <span class="step-number">Step 5</span>
+            <h3>Time tracker UI</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step5" />
+              Done
+            </label>
+          </div>
+          <p>Launch the time tracker UI or ingest fresh HTML files.</p>
+          <div class="step-actions">
+            <a class="btn" href="/step5" target="_blank" rel="noopener"
+              >Open step 5 UI</a
+            >
+            <button class="btn ghost" type="button" id="ingestHtmlsBtn">
+              Ingest HTMLs
+            </button>
+          </div>
+        </article>
+
+        <article class="step-card" data-step="step5a" style="--delay: 0.22s">
+          <div class="step-head">
+            <span class="step-number">Step 5a</span>
+            <h3>Browser Automation</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step5a" />
+              Done
+            </label>
+          </div>
+          <p>
+            Automates ChatGPT interaction: opens a tab, selects GPT-5.2, pastes the
+            prompt, and records reasoning + total inference times.
+          </p>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px">
+            <button class="btn secondary" id="launchChromeBtn" type="button">Launch Chrome</button>
+            <button class="btn ghost" id="checkCdpBtn" type="button">Check Connection</button>
+            <span id="cdpStatus" style="font-size: 12px; color: var(--muted)">Not checked</span>
+          </div>
+
+          <div class="field">
+            <label for="step5aCdpUrl">CDP URL</label>
+            <input id="step5aCdpUrl" type="text" value="http://localhost:9222" placeholder="http://localhost:9222" />
+          </div>
+
+          <div class="field">
+            <label for="step5aPrompt">Prompt</label>
+            <textarea id="step5aPrompt" placeholder="Paste the prompt for GPT-5.2..."></textarea>
+          </div>
+
+          <div class="step-actions">
+            <button class="btn" id="runStep5aBtn" type="button">Run GPT-5.2 Automation</button>
+            <button class="btn ghost" id="copyStep5aBtn" type="button" style="display:none">Copy Line</button>
+          </div>
+
+          <pre class="output" id="step5aLog">Waiting to run.</pre>
+
+          <div id="step5aResults" style="display:none; margin-top: 12px">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px">
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Reasoning (s)</h3>
+                <span class="mono" id="step5aReasoning" style="font-size: 18px; font-weight: 600">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Total (s)</h3>
+                <span class="mono" id="step5aTotal" style="font-size: 18px; font-weight: 600">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Date</h3>
+                <span class="mono" id="step5aDate" style="font-size: 14px">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Time</h3>
+                <span class="mono" id="step5aTime" style="font-size: 14px">--</span>
+              </div>
+            </div>
+          </div>
+
+          <hr style="border: none; border-top: 1px dashed var(--border); margin: 20px 0" />
+
+          <h3 style="font-family: var(--display); font-weight: 500; font-size: 18px; margin: 0 0 8px">Gemini-3 Pro</h3>
+          <p style="color: var(--muted); font-size: 14px; margin: 0 0 14px">
+            Opens Gemini, selects Pro model, pastes the same prompt.
+            Reasoning starts immediately on send; ends when output text appears.
+          </p>
+
+          <div class="step-actions">
+            <button class="btn secondary" id="runGeminiBtn" type="button">Run Gemini-3 Automation</button>
+            <button class="btn ghost" id="copyGeminiBtn" type="button" style="display:none">Copy Line</button>
+          </div>
+
+          <pre class="output" id="geminiLog">Waiting to run.</pre>
+
+          <div id="geminiResults" style="display:none; margin-top: 12px">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px">
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Reasoning (s)</h3>
+                <span class="mono" id="geminiReasoning" style="font-size: 18px; font-weight: 600">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Total (s)</h3>
+                <span class="mono" id="geminiTotal" style="font-size: 18px; font-weight: 600">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Date</h3>
+                <span class="mono" id="geminiDate" style="font-size: 14px">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Time</h3>
+                <span class="mono" id="geminiTime" style="font-size: 14px">--</span>
+              </div>
+            </div>
+          </div>
+
+          <hr style="border: none; border-top: 1px dashed var(--border); margin: 20px 0" />
+
+          <h3 style="font-family: var(--display); font-weight: 500; font-size: 18px; margin: 0 0 8px">Grok 4.1</h3>
+          <p style="color: var(--muted); font-size: 14px; margin: 0 0 14px">
+            Opens Grok, selects Grok 4.1 Thinking model, pastes the same prompt.
+            Detects thinking start/end and response completion when the public
+            interface still matches the saved selectors.
+          </p>
+
+          <div class="step-actions">
+            <button class="btn secondary" id="runGrokBtn" type="button">Run Grok 4.1 Automation</button>
+            <button class="btn ghost" id="copyGrokBtn" type="button" style="display:none">Copy Line</button>
+          </div>
+
+          <pre class="output" id="grokLog">Waiting to run.</pre>
+
+          <div id="grokResults" style="display:none; margin-top: 12px">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px">
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Reasoning (s)</h3>
+                <span class="mono" id="grokReasoning" style="font-size: 18px; font-weight: 600">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Total (s)</h3>
+                <span class="mono" id="grokTotal" style="font-size: 18px; font-weight: 600">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Date</h3>
+                <span class="mono" id="grokDate" style="font-size: 14px">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Time</h3>
+                <span class="mono" id="grokTime" style="font-size: 14px">--</span>
+              </div>
+            </div>
+          </div>
+
+          <hr style="border: none; border-top: 1px dashed var(--border); margin: 20px 0" />
+
+          <h3 style="font-family: var(--display); font-weight: 500; font-size: 18px; margin: 0 0 8px">Opus 4.6</h3>
+          <p style="color: var(--muted); font-size: 14px; margin: 0 0 14px">
+            Automation coming soon. You can manually enter results below.
+          </p>
+
+          <div class="step-actions">
+            <button class="btn secondary" id="runOpusBtn" type="button">Run Opus 4.6 Automation</button>
+            <button class="btn ghost" id="copyOpusBtn" type="button" style="display:none">Copy Line</button>
+          </div>
+
+          <pre class="output" id="opusLog">Automation not yet implemented.</pre>
+
+          <div id="opusResults" style="display:none; margin-top: 12px">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px">
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Reasoning (s)</h3>
+                <span class="mono" id="opusReasoning" style="font-size: 18px; font-weight: 600">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Total (s)</h3>
+                <span class="mono" id="opusTotal" style="font-size: 18px; font-weight: 600">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Date</h3>
+                <span class="mono" id="opusDate" style="font-size: 14px">--</span>
+              </div>
+              <div class="context-card" style="padding: 12px">
+                <h3 style="font-size: 12px; margin-bottom: 4px">Time</h3>
+                <span class="mono" id="opusTime" style="font-size: 14px">--</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="step-card" data-step="step6" style="--delay: 0.25s">
+          <div class="step-head">
+            <span class="step-number">Step 6</span>
+            <h3>Reasoning word count UI</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step6" />
+              Done
+            </label>
+          </div>
+          <p>Count reasoning words and save stats per model.</p>
+          <div class="step-actions">
+            <a class="btn" href="/step6" target="_blank" rel="noopener"
+              >Open step 6 UI</a
+            >
+          </div>
+        </article>
+
+        <article class="step-card" data-step="step7" style="--delay: 0.3s">
+          <div class="step-head">
+            <span class="step-number">Step 7</span>
+            <h3>Count HTML lines</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step7" />
+              Done
+            </label>
+          </div>
+          <p>Counts lines in the newest folder HTML files.</p>
+          <div class="field">
+            <label for="step7Confirm">Proceed?</label>
+            <select id="step7Confirm">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="step-actions">
+            <button class="btn" data-run="step7">Run step 7</button>
+          </div>
+          <pre class="output" data-output="step7">Output will appear here.</pre>
+        </article>
+
+        <article class="step-card" data-step="step8" style="--delay: 0.35s">
+          <div class="step-head">
+            <span class="step-number">Step 8</span>
+            <h3>Scoring UI</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step8" />
+              Done
+            </label>
+          </div>
+          <p>Score each model and capture observations.</p>
+          <div class="step-actions">
+            <a class="btn" href="/step8" target="_blank" rel="noopener"
+              >Open step 8 UI</a
+            >
+          </div>
+        </article>
+
+        <article class="step-card" data-step="step9" style="--delay: 0.38s">
+          <div class="step-head">
+            <span class="step-number">Step 9</span>
+            <h3>Record the videos</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step9" />
+              Done
+            </label>
+          </div>
+          <p>Record the videos. 780 × 629</p>
+        </article>
+
+        <article class="step-card" data-step="step10" style="--delay: 0.4s">
+          <div class="step-head">
+            <span class="step-number">Step 10</span>
+            <h3>Gemini scoring prompt</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step10" />
+              Done
+            </label>
+          </div>
+          <p>Builds the QA prompt and copies it to the clipboard.</p>
+          <div class="field">
+            <label for="step10Confirm">Proceed?</label>
+            <select id="step10Confirm">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="step-actions">
+            <button class="btn" data-run="step10">Run step 10</button>
+          </div>
+          <pre class="output" data-output="step10">Output will appear here.</pre>
+        </article>
+
+        <article class="step-card" data-step="step11" style="--delay: 0.45s">
+          <div class="step-head">
+            <span class="step-number">Step 11</span>
+            <h3>Song prompt</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step11" />
+              Done
+            </label>
+          </div>
+          <p>Builds the song prompt and copies it to the clipboard.</p>
+          <div class="field">
+            <label for="step11Confirm">Proceed?</label>
+            <select id="step11Confirm">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="step-actions">
+            <button class="btn" data-run="step11">Run step 11</button>
+          </div>
+          <pre class="output" data-output="step11">Output will appear here.</pre>
+        </article>
+
+        <article class="step-card" data-step="step13" style="--delay: 0.5s">
+          <div class="step-head">
+            <span class="step-number">Step 13</span>
+            <h3>Post template + README table</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step13" />
+              Done
+            </label>
+          </div>
+          <p>
+            Requires downloaded_data.csv in the newest folder. Generates the
+            post template and updates the README table.
+          </p>
+          <div class="field">
+            <label for="step13Confirm">Proceed?</label>
+            <select id="step13Confirm">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="step-actions">
+            <button class="btn" data-run="step13">Run step 13</button>
+          </div>
+          <pre class="output" data-output="step13">Output will appear here.</pre>
+        </article>
+
+        <article class="step-card" data-step="step13a" style="--delay: 0.55s">
+          <div class="step-head">
+            <span class="step-number">Step 13a</span>
+            <h3>Format observations</h3>
+            <label class="done-toggle">
+              <input type="checkbox" data-done="step13a" />
+              Done
+            </label>
+          </div>
+          <p>
+            Pulls observations from model_scores.json in the newest folder and
+            formats them into README bullet points through the configured
+            helper path: OpenAI API if enabled, otherwise the local fallback.
+          </p>
+          <div class="field">
+            <label for="step13aConfirm">Proceed?</label>
+            <select id="step13aConfirm">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="step-actions">
+            <button class="btn" data-run="step13a">Run step 13a</button>
+          </div>
+          <pre class="output" data-output="step13a">Output will appear here.</pre>
+        </article>
+
+      </section>
+
+      <div class="html-modal" id="htmlIngestModal" aria-hidden="true">
+        <div
+          class="html-modal-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="htmlIngestTitle"
+        >
+          <div class="html-modal-meta">
+            <span id="htmlIngestProgress">Step 1 of 4</span>
+            <span id="htmlIngestFilename">Target: (unset)</span>
+          </div>
+          <h3 class="html-modal-title" id="htmlIngestTitle">
+            Paste HTML for model
+          </h3>
+          <p class="note">
+            Paste the full HTML exactly as provided. Use Cmd/Ctrl + Enter to
+            continue.
+          </p>
+          <textarea
+            class="html-modal-textarea"
+            id="htmlIngestTextarea"
+            placeholder="Paste HTML here..."
+          ></textarea>
+          <div class="html-modal-actions">
+            <button class="btn ghost" type="button" id="htmlIngestCancel">
+              Cancel
+            </button>
+            <button class="btn" type="button" id="htmlIngestNext">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const STORAGE_KEY = "data_collection_program_steps_v1";
+      const stepCards = Array.from(document.querySelectorAll(".step-card"));
+      const doneInputs = Array.from(document.querySelectorAll("[data-done]"));
+      const progressCount = document.getElementById("progressCount");
+      const progressTotal = document.getElementById("progressTotal");
+      const nextStepBtn = document.getElementById("nextStepBtn");
+      const resetProgressBtn = document.getElementById("resetProgressBtn");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const modelMode = document.getElementById("modelMode");
+      const activeModelList = document.getElementById("activeModelList");
+      const modelInputs = Array.from(
+        document.querySelectorAll("[data-model-input]")
+      );
+      const ingestHtmlsBtn = document.getElementById("ingestHtmlsBtn");
+      const htmlIngestModal = document.getElementById("htmlIngestModal");
+      const htmlIngestTitle = document.getElementById("htmlIngestTitle");
+      const htmlIngestProgress = document.getElementById("htmlIngestProgress");
+      const htmlIngestFilename = document.getElementById("htmlIngestFilename");
+      const htmlIngestTextarea = document.getElementById("htmlIngestTextarea");
+      const htmlIngestCancel = document.getElementById("htmlIngestCancel");
+      const htmlIngestNext = document.getElementById("htmlIngestNext");
+      const heroBanner = document.querySelector(".hero");
+      const todayStamp = document.getElementById("todayStamp");
+      let activeModelFiles = {{ model_files | tojson }};
+
+      progressTotal.textContent = stepCards.length;
+
+      function setTodayStamp() {
+        if (!todayStamp) return;
+        const now = new Date();
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const dd = String(now.getDate()).padStart(2, "0");
+        todayStamp.textContent = `${mm}_${dd}`;
+      }
+
+      setTodayStamp();
+
+      function startHeroHeartbeat() {
+        if (!heroBanner) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+        const minScale = 0.74;
+        const maxScale = 1.0;
+        const minDurationMs = 1300;
+        const maxDurationMs = 3200;
+        const minDelayMs = 900;
+        const maxDelayMs = 2600;
+
+        const pulse = () => {
+          const scale = Math.random() * (maxScale - minScale) + minScale;
+          const glow = 0.98 + Math.random() * 0.18;
+          const durationMs =
+            Math.random() * (maxDurationMs - minDurationMs) + minDurationMs;
+          const nextDelayMs =
+            Math.random() * (maxDelayMs - minDelayMs) + minDelayMs;
+
+          heroBanner.style.setProperty("--hero-line-scale", scale.toFixed(3));
+          heroBanner.style.setProperty("--hero-line-glow", glow.toFixed(2));
+          heroBanner.style.setProperty(
+            "--hero-line-duration",
+            `${Math.round(durationMs)}ms`
+          );
+
+          window.setTimeout(pulse, Math.round(nextDelayMs));
+        };
+
+        pulse();
+      }
+
+      startHeroHeartbeat();
+
+      function loadProgress() {
+        try {
+          return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        } catch (error) {
+          return {};
+        }
+      }
+
+      function saveProgress(state) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+
+      function updateProgressDisplay() {
+        const doneCount = doneInputs.filter((input) => input.checked).length;
+        progressCount.textContent = doneCount;
+      }
+
+      function applyDoneState(stepId, isDone) {
+        progressState[stepId] = isDone;
+        toggleCardState(stepId, isDone);
+        saveProgress(progressState);
+        updateProgressDisplay();
+      }
+
+      function markDone(stepId) {
+        const input = doneInputs.find((item) => item.dataset.done === stepId);
+        if (!input || input.checked) return;
+        input.checked = true;
+        applyDoneState(stepId, true);
+      }
+
+      function toggleCardState(stepId, isDone) {
+        const card = document.querySelector(`[data-step="${stepId}"]`);
+        if (!card) return;
+        card.classList.toggle("done", isDone);
+      }
+
+      const progressState = loadProgress();
+      doneInputs.forEach((input) => {
+        const stepId = input.dataset.done;
+        input.checked = Boolean(progressState[stepId]);
+        toggleCardState(stepId, input.checked);
+        input.addEventListener("change", () => {
+          applyDoneState(stepId, input.checked);
+        });
+      });
+
+      updateProgressDisplay();
+
+      nextStepBtn.addEventListener("click", () => {
+        const next = stepCards.find((card) => !card.classList.contains("done"));
+        if (!next) return;
+        next.scrollIntoView({ behavior: "smooth", block: "start" });
+        next.classList.add("flash");
+        setTimeout(() => next.classList.remove("flash"), 1000);
+      });
+
+      resetProgressBtn.addEventListener("click", () => {
+        doneInputs.forEach((input) => {
+          input.checked = false;
+          toggleCardState(input.dataset.done, false);
+        });
+        saveProgress({});
+        updateProgressDisplay();
+      });
+
+      refreshBtn.addEventListener("click", () => {
+        window.location.reload();
+      });
+
+      function setOutput(stepId, message, isError) {
+        const output = document.querySelector(`[data-output="${stepId}"]`);
+        if (!output) return;
+        output.textContent = message;
+        output.classList.toggle("error", Boolean(isError));
+        output.scrollTop = output.scrollHeight;
+      }
+
+      function extractLineCounts(output) {
+        if (!output) return [];
+        return output
+          .split("\n")
+          .map((line) => {
+            const match = line.match(/^\s*(\d+)\s+lines?\s+->/i);
+            return match ? match[1] : null;
+          })
+          .filter(Boolean);
+      }
+
+      function buildLineCountColumn(counts) {
+        const column = counts.slice(0, 4);
+        while (column.length < 4) {
+          column.push("");
+        }
+        return column.join("\n");
+      }
+
+      async function copyStep7LineCounts(output) {
+        const counts = extractLineCounts(output);
+        if (!counts.length) {
+          return { ok: false, error: "No line counts found." };
+        }
+        const column = buildLineCountColumn(counts);
+        try {
+          await navigator.clipboard.writeText(column);
+          return { ok: true };
+        } catch (error) {
+          return {
+            ok: false,
+            error: error?.message || "Clipboard copy failed.",
+          };
+        }
+      }
+
+      function getValue(id) {
+        const el = document.getElementById(id);
+        return el ? el.value.trim() : "";
+      }
+
+      function getConfirm(id) {
+        return getValue(id) === "yes";
+      }
+
+      function buildPayload(stepId) {
+        if (stepId === "step1") {
+          const name = getValue("step1Name");
+          if (!name) {
+            setOutput(stepId, "Enter a new folder name.", true);
+            return null;
+          }
+          return { new_name: name };
+        }
+        if (stepId === "step2") {
+          const prompt = getValue("step2Prompt");
+          if (!prompt) {
+            setOutput(stepId, "Prompt cannot be empty.", true);
+            return null;
+          }
+          return { prompt };
+        }
+        if (stepId === "step3") {
+          return { confirm: getConfirm("step3Confirm") };
+        }
+        if (stepId === "step7") {
+          return { confirm: getConfirm("step7Confirm") };
+        }
+        if (stepId === "step10") {
+          return { confirm: getConfirm("step10Confirm") };
+        }
+        if (stepId === "step11") {
+          return { confirm: getConfirm("step11Confirm") };
+        }
+        if (stepId === "step13") {
+          return { confirm: getConfirm("step13Confirm") };
+        }
+        if (stepId === "step13a") {
+          const confirm = getConfirm("step13aConfirm");
+          if (!confirm) {
+            return { confirm: false };
+          }
+          return { confirm };
+        }
+        return {};
+      }
+
+      async function runStep(stepId, button) {
+        markDone(stepId);
+        const payload = buildPayload(stepId);
+        if (!payload) return;
+        setOutput(stepId, "Running...", false);
+        button.disabled = true;
+        button.classList.add("loading");
+        try {
+          const response = await fetch(`/run/${stepId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const rawText = await response.text();
+          let data = null;
+          if (rawText) {
+            try {
+              data = JSON.parse(rawText);
+            } catch (error) {
+              data = null;
+            }
+          }
+          if (!data || typeof data !== "object") {
+            const statusLine = `Unexpected response (status ${response.status}).`;
+            const hint =
+              response.status === 404
+                ? " Is the server restarted with the latest code?"
+                : "";
+            const snippet = rawText.trim();
+            const preview = snippet ? `\n\n${snippet.slice(0, 400)}` : "";
+            setOutput(stepId, `${statusLine}${hint}${preview}`, true);
+            return;
+          }
+          const outputMessage = data.output || "(No output)";
+          const ok = typeof data.ok === "boolean" ? data.ok : response.ok;
+          setOutput(stepId, outputMessage, !ok);
+          if (stepId === "step7" && ok) {
+            const copyResult = await copyStep7LineCounts(outputMessage);
+            if (copyResult.ok) {
+              setOutput(
+                stepId,
+                `${outputMessage}\n\nCopied line counts (4x1) to clipboard.`,
+                false
+              );
+            } else {
+              setOutput(
+                stepId,
+                `${outputMessage}\n\nClipboard copy failed: ${copyResult.error}`,
+                false
+              );
+            }
+          }
+        } catch (error) {
+          setOutput(stepId, error.message || "Request failed.", true);
+        } finally {
+          button.disabled = false;
+          button.classList.remove("loading");
+        }
+      }
+
+      document.querySelectorAll("[data-run]").forEach((button) => {
+        button.addEventListener("click", () => {
+          runStep(button.dataset.run, button);
+        });
+      });
+
+      function stepIdFromPath(pathname) {
+        const match = pathname.match(/^\/step(\d+)$/);
+        return match ? `step${match[1]}` : null;
+      }
+
+      document.querySelectorAll('a[href^="/step"]').forEach((link) => {
+        const href = link.getAttribute("href");
+        if (!href) return;
+        const path = new URL(href, window.location.origin).pathname;
+        const stepId = stepIdFromPath(path);
+        if (!stepId) return;
+        link.addEventListener("click", () => {
+          markDone(stepId);
+        });
+      });
+
+      function renderModelList(files) {
+        activeModelList.innerHTML = "";
+        files.forEach((name) => {
+          const li = document.createElement("li");
+          li.textContent = name || "(empty)";
+          activeModelList.appendChild(li);
+        });
+      }
+
+      async function updateModelFiles(files) {
+        const response = await fetch("/api/model-files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model_files: files }),
+        });
+        const data = await response.json();
+        if (!data.ok) {
+          return;
+        }
+        renderModelList(data.model_files);
+        activeModelFiles = data.model_files || [];
+        modelInputs.forEach((input, index) => {
+          input.value = data.model_files[index] || "";
+        });
+        modelMode.textContent = data.override_active ? "Custom" : "Auto";
+      }
+
+      document.getElementById("saveModelsBtn").addEventListener("click", () => {
+        const values = modelInputs.map((input) => input.value.trim());
+        updateModelFiles(values);
+      });
+
+      document.getElementById("resetModelsBtn").addEventListener("click", () => {
+        updateModelFiles([]);
+      });
+
+      function openHtmlModal({ label, filename, index, total }) {
+        if (!htmlIngestModal) {
+          return Promise.resolve(null);
+        }
+        return new Promise((resolve) => {
+          const fileLabel = filename ? `Target: ${filename}` : "Target: (unset)";
+          htmlIngestTitle.textContent = `Paste HTML for model ${label}`;
+          htmlIngestProgress.textContent = `Step ${index + 1} of ${total}`;
+          htmlIngestFilename.textContent = fileLabel;
+          htmlIngestTextarea.value = "";
+          htmlIngestNext.textContent =
+            index + 1 === total ? "Save HTMLs" : "Next";
+          htmlIngestModal.classList.add("active");
+          document.body.classList.add("modal-open");
+          htmlIngestTextarea.focus();
+
+          const cleanup = (value) => {
+            htmlIngestModal.classList.remove("active");
+            document.body.classList.remove("modal-open");
+            htmlIngestCancel.removeEventListener("click", onCancel);
+            htmlIngestNext.removeEventListener("click", onNext);
+            htmlIngestModal.removeEventListener("click", onBackdrop);
+            document.removeEventListener("keydown", onKeydown);
+            resolve(value);
+          };
+
+          const onCancel = () => cleanup(null);
+          const onNext = () => cleanup(htmlIngestTextarea.value);
+          const onBackdrop = (event) => {
+            if (event.target === htmlIngestModal) {
+              cleanup(null);
+            }
+          };
+          const onKeydown = (event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              cleanup(null);
+              return;
+            }
+            if (
+              (event.metaKey || event.ctrlKey) &&
+              event.key.toLowerCase() === "enter"
+            ) {
+              event.preventDefault();
+              cleanup(htmlIngestTextarea.value);
+            }
+          };
+
+          htmlIngestCancel.addEventListener("click", onCancel);
+          htmlIngestNext.addEventListener("click", onNext);
+          htmlIngestModal.addEventListener("click", onBackdrop);
+          document.addEventListener("keydown", onKeydown);
+        });
+      }
+
+      async function ingestHtmls() {
+        const modelLabels = ["x", "y", "z", "m"];
+        const missing = modelLabels.filter(
+          (_, index) => !(activeModelFiles[index] || "").trim()
+        );
+        if (missing.length) {
+          alert("Set active model file names before ingesting HTML.");
+          return;
+        }
+        if (!ingestHtmlsBtn) return;
+        ingestHtmlsBtn.disabled = true;
+        const htmls = [];
+        for (let i = 0; i < modelLabels.length; i += 1) {
+          const label = modelLabels[i];
+          const filename = (activeModelFiles[i] || "").trim();
+          const html = await openHtmlModal({
+            label,
+            filename,
+            index: i,
+            total: modelLabels.length,
+          });
+          if (html === null) {
+            alert("Canceled.");
+            ingestHtmlsBtn.disabled = false;
+            return;
+          }
+          htmls.push(html);
+        }
+        ingestHtmlsBtn.classList.add("loading");
+        try {
+          const response = await fetch("/api/ingest-htmls", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ htmls }),
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            alert(data.output || "Failed to ingest HTML files.");
+            return;
+          }
+          alert(data.output || "HTML files updated.");
+        } catch (error) {
+          alert(error.message || "Request failed.");
+        } finally {
+          ingestHtmlsBtn.disabled = false;
+          ingestHtmlsBtn.classList.remove("loading");
+        }
+      }
+
+      if (ingestHtmlsBtn) {
+        ingestHtmlsBtn.addEventListener("click", ingestHtmls);
+      }
+
+      // ── Step 5a: ChatGPT Automation ──
+      const step5aLog = document.getElementById("step5aLog");
+      const step5aResults = document.getElementById("step5aResults");
+      const step5aReasoning = document.getElementById("step5aReasoning");
+      const step5aTotal = document.getElementById("step5aTotal");
+      const step5aDate = document.getElementById("step5aDate");
+      const step5aTime = document.getElementById("step5aTime");
+      const runStep5aBtn = document.getElementById("runStep5aBtn");
+      const copyStep5aBtn = document.getElementById("copyStep5aBtn");
+      const launchChromeBtn = document.getElementById("launchChromeBtn");
+      const checkCdpBtn = document.getElementById("checkCdpBtn");
+      const cdpStatus = document.getElementById("cdpStatus");
+
+      let step5aData = null;
+
+      function appendLog(text) {
+        const ts = new Date().toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        step5aLog.textContent += `\n[${ts}] ${text}`;
+        step5aLog.scrollTop = step5aLog.scrollHeight;
+      }
+
+      launchChromeBtn.addEventListener("click", async () => {
+        launchChromeBtn.disabled = true;
+        launchChromeBtn.classList.add("loading");
+        try {
+          const res = await fetch("/api/launch-chrome", { method: "POST" });
+          const data = await res.json();
+          cdpStatus.textContent = data.output;
+          cdpStatus.style.color = data.ok ? "var(--success)" : "var(--accent)";
+        } catch (err) {
+          cdpStatus.textContent = err.message;
+          cdpStatus.style.color = "var(--accent)";
+        } finally {
+          launchChromeBtn.disabled = false;
+          launchChromeBtn.classList.remove("loading");
+        }
+      });
+
+      checkCdpBtn.addEventListener("click", async () => {
+        checkCdpBtn.disabled = true;
+        checkCdpBtn.classList.add("loading");
+        const cdpUrl = document.getElementById("step5aCdpUrl").value.trim();
+        try {
+          const res = await fetch(
+            `/api/check-cdp?cdp_url=${encodeURIComponent(cdpUrl)}`
+          );
+          const data = await res.json();
+          cdpStatus.textContent = data.output;
+          cdpStatus.style.color = data.ok ? "var(--success)" : "var(--accent)";
+        } catch (err) {
+          cdpStatus.textContent = err.message;
+          cdpStatus.style.color = "var(--accent)";
+        } finally {
+          checkCdpBtn.disabled = false;
+          checkCdpBtn.classList.remove("loading");
+        }
+      });
+
+      runStep5aBtn.addEventListener("click", async () => {
+        const prompt = document.getElementById("step5aPrompt").value.trim();
+        if (!prompt) {
+          step5aLog.textContent = "Enter a prompt first.";
+          step5aLog.classList.add("error");
+          return;
+        }
+        const cdpUrl = document.getElementById("step5aCdpUrl").value.trim();
+
+        step5aLog.textContent = "Starting automation...";
+        step5aLog.classList.remove("error");
+        step5aResults.style.display = "none";
+        copyStep5aBtn.style.display = "none";
+        step5aData = null;
+        runStep5aBtn.disabled = true;
+        runStep5aBtn.classList.add("loading");
+        markDone("step5a");
+
+        try {
+          const res = await fetch("/run/step5a", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, cdp_url: cdpUrl }),
+          });
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop() || "";
+
+            for (const part of parts) {
+              const lines = part.split("\n");
+              let eventType = "";
+              let dataStr = "";
+              for (const line of lines) {
+                if (line.startsWith("event: ")) {
+                  eventType = line.slice(7);
+                } else if (line.startsWith("data: ")) {
+                  dataStr = line.slice(6);
+                }
+              }
+              if (!eventType || !dataStr) continue;
+
+              let payload;
+              try {
+                payload = JSON.parse(dataStr);
+              } catch {
+                continue;
+              }
+
+              appendLog(`[${eventType}] ${payload.message || ""}`);
+
+              if (eventType === "reasoning_done" && payload.reasoning_seconds != null) {
+                step5aReasoning.textContent = payload.reasoning_seconds;
+              }
+              if (eventType === "inference_done" && payload.total_seconds != null) {
+                step5aTotal.textContent = payload.total_seconds;
+              }
+              if (eventType === "complete") {
+                step5aData = payload;
+                step5aReasoning.textContent = payload.reasoning_seconds ?? "--";
+                step5aTotal.textContent = payload.total_seconds ?? "--";
+                step5aDate.textContent = payload.date || "--";
+                step5aTime.textContent = payload.time || "--";
+                step5aResults.style.display = "block";
+                copyStep5aBtn.style.display = "inline-flex";
+              }
+              if (eventType === "error") {
+                step5aLog.classList.add("error");
+              }
+            }
+          }
+        } catch (err) {
+          appendLog(`Error: ${err.message}`);
+          step5aLog.classList.add("error");
+        } finally {
+          runStep5aBtn.disabled = false;
+          runStep5aBtn.classList.remove("loading");
+        }
+      });
+
+      copyStep5aBtn.addEventListener("click", async () => {
+        if (!step5aData) return;
+        const reasoning = step5aData.reasoning_seconds ?? "";
+        const total = step5aData.total_seconds ?? "";
+        const date = step5aData.date || "";
+        const time = step5aData.time || "";
+        const line = [reasoning, total, date, time].join("\t");
+        try {
+          await navigator.clipboard.writeText(line);
+          copyStep5aBtn.textContent = "Copied!";
+          setTimeout(() => {
+            copyStep5aBtn.textContent = "Copy Line";
+          }, 1200);
+        } catch (err) {
+          copyStep5aBtn.textContent = "Copy failed";
+          setTimeout(() => {
+            copyStep5aBtn.textContent = "Copy Line";
+          }, 1200);
+        }
+      });
+
+      // ── Gemini-3 Pro Automation ──
+      const geminiLog = document.getElementById("geminiLog");
+      const geminiResults = document.getElementById("geminiResults");
+      const geminiReasoning = document.getElementById("geminiReasoning");
+      const geminiTotal = document.getElementById("geminiTotal");
+      const geminiDate = document.getElementById("geminiDate");
+      const geminiTime = document.getElementById("geminiTime");
+      const runGeminiBtn = document.getElementById("runGeminiBtn");
+      const copyGeminiBtn = document.getElementById("copyGeminiBtn");
+
+      let geminiData = null;
+
+      function appendGeminiLog(text) {
+        const ts = new Date().toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        geminiLog.textContent += `\n[${ts}] ${text}`;
+        geminiLog.scrollTop = geminiLog.scrollHeight;
+      }
+
+      runGeminiBtn.addEventListener("click", async () => {
+        const prompt = document.getElementById("step5aPrompt").value.trim();
+        if (!prompt) {
+          geminiLog.textContent = "Enter a prompt in the field above first.";
+          geminiLog.classList.add("error");
+          return;
+        }
+        const cdpUrl = document.getElementById("step5aCdpUrl").value.trim();
+
+        geminiLog.textContent = "Starting Gemini automation...";
+        geminiLog.classList.remove("error");
+        geminiResults.style.display = "none";
+        copyGeminiBtn.style.display = "none";
+        geminiData = null;
+        runGeminiBtn.disabled = true;
+        runGeminiBtn.classList.add("loading");
+
+        try {
+          const res = await fetch("/run/step5a-gemini", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, cdp_url: cdpUrl }),
+          });
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop() || "";
+
+            for (const part of parts) {
+              const lines = part.split("\n");
+              let eventType = "";
+              let dataStr = "";
+              for (const line of lines) {
+                if (line.startsWith("event: ")) eventType = line.slice(7);
+                else if (line.startsWith("data: ")) dataStr = line.slice(6);
+              }
+              if (!eventType || !dataStr) continue;
+
+              let payload;
+              try { payload = JSON.parse(dataStr); } catch { continue; }
+
+              appendGeminiLog(`[${eventType}] ${payload.message || ""}`);
+
+              if (eventType === "reasoning_done" && payload.reasoning_seconds != null) {
+                geminiReasoning.textContent = payload.reasoning_seconds;
+              }
+              if (eventType === "inference_done" && payload.total_seconds != null) {
+                geminiTotal.textContent = payload.total_seconds;
+              }
+              if (eventType === "complete") {
+                geminiData = payload;
+                geminiReasoning.textContent = payload.reasoning_seconds ?? "--";
+                geminiTotal.textContent = payload.total_seconds ?? "--";
+                geminiDate.textContent = payload.date || "--";
+                geminiTime.textContent = payload.time || "--";
+                geminiResults.style.display = "block";
+                copyGeminiBtn.style.display = "inline-flex";
+              }
+              if (eventType === "error") {
+                geminiLog.classList.add("error");
+              }
+            }
+          }
+        } catch (err) {
+          appendGeminiLog(`Error: ${err.message}`);
+          geminiLog.classList.add("error");
+        } finally {
+          runGeminiBtn.disabled = false;
+          runGeminiBtn.classList.remove("loading");
+        }
+      });
+
+      copyGeminiBtn.addEventListener("click", async () => {
+        if (!geminiData) return;
+        const reasoning = geminiData.reasoning_seconds ?? "";
+        const total = geminiData.total_seconds ?? "";
+        const date = geminiData.date || "";
+        const time = geminiData.time || "";
+        const line = [reasoning, total, date, time].join("\t");
+        try {
+          await navigator.clipboard.writeText(line);
+          copyGeminiBtn.textContent = "Copied!";
+          setTimeout(() => { copyGeminiBtn.textContent = "Copy Line"; }, 1200);
+        } catch (err) {
+          copyGeminiBtn.textContent = "Copy failed";
+          setTimeout(() => { copyGeminiBtn.textContent = "Copy Line"; }, 1200);
+        }
+      });
+
+      // ── Grok 4.1 Automation ──
+      const grokLog = document.getElementById("grokLog");
+      const grokResults = document.getElementById("grokResults");
+      const grokReasoning = document.getElementById("grokReasoning");
+      const grokTotal = document.getElementById("grokTotal");
+      const grokDate = document.getElementById("grokDate");
+      const grokTime = document.getElementById("grokTime");
+      const runGrokBtn = document.getElementById("runGrokBtn");
+      const copyGrokBtn = document.getElementById("copyGrokBtn");
+
+      let grokData = null;
+
+      function appendGrokLog(text) {
+        const ts = new Date().toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        grokLog.textContent += `\n[${ts}] ${text}`;
+        grokLog.scrollTop = grokLog.scrollHeight;
+      }
+
+      runGrokBtn.addEventListener("click", async () => {
+        const prompt = document.getElementById("step5aPrompt").value.trim();
+        if (!prompt) {
+          grokLog.textContent = "Enter a prompt in the field above first.";
+          grokLog.classList.add("error");
+          return;
+        }
+        const cdpUrl = document.getElementById("step5aCdpUrl").value.trim();
+
+        grokLog.textContent = "Starting Grok automation...";
+        grokLog.classList.remove("error");
+        grokResults.style.display = "none";
+        copyGrokBtn.style.display = "none";
+        grokData = null;
+        runGrokBtn.disabled = true;
+        runGrokBtn.classList.add("loading");
+
+        try {
+          const res = await fetch("/run/step5a-grok", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, cdp_url: cdpUrl }),
+          });
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop() || "";
+
+            for (const part of parts) {
+              const lines = part.split("\n");
+              let eventType = "";
+              let dataStr = "";
+              for (const line of lines) {
+                if (line.startsWith("event: ")) eventType = line.slice(7);
+                else if (line.startsWith("data: ")) dataStr = line.slice(6);
+              }
+              if (!eventType || !dataStr) continue;
+
+              let payload;
+              try { payload = JSON.parse(dataStr); } catch { continue; }
+
+              appendGrokLog(`[${eventType}] ${payload.message || ""}`);
+
+              if (eventType === "reasoning_done" && payload.reasoning_seconds != null) {
+                grokReasoning.textContent = payload.reasoning_seconds;
+              }
+              if (eventType === "inference_done" && payload.total_seconds != null) {
+                grokTotal.textContent = payload.total_seconds;
+              }
+              if (eventType === "complete") {
+                grokData = payload;
+                grokReasoning.textContent = payload.reasoning_seconds ?? "--";
+                grokTotal.textContent = payload.total_seconds ?? "--";
+                grokDate.textContent = payload.date || "--";
+                grokTime.textContent = payload.time || "--";
+                grokResults.style.display = "block";
+                copyGrokBtn.style.display = "inline-flex";
+              }
+              if (eventType === "error") {
+                grokLog.classList.add("error");
+              }
+            }
+          }
+        } catch (err) {
+          appendGrokLog(`Error: ${err.message}`);
+          grokLog.classList.add("error");
+        } finally {
+          runGrokBtn.disabled = false;
+          runGrokBtn.classList.remove("loading");
+        }
+      });
+
+      copyGrokBtn.addEventListener("click", async () => {
+        if (!grokData) return;
+        const reasoning = grokData.reasoning_seconds ?? "";
+        const total = grokData.total_seconds ?? "";
+        const date = grokData.date || "";
+        const time = grokData.time || "";
+        const line = [reasoning, total, date, time].join("\t");
+        try {
+          await navigator.clipboard.writeText(line);
+          copyGrokBtn.textContent = "Copied!";
+          setTimeout(() => { copyGrokBtn.textContent = "Copy Line"; }, 1200);
+        } catch (err) {
+          copyGrokBtn.textContent = "Copy failed";
+          setTimeout(() => { copyGrokBtn.textContent = "Copy Line"; }, 1200);
+        }
+      });
+
+      // ── Opus 4.6 Placeholder ──
+      const runOpusBtn = document.getElementById("runOpusBtn");
+      const copyOpusBtn = document.getElementById("copyOpusBtn");
+      const opusLog = document.getElementById("opusLog");
+      let opusData = null;
+
+      runOpusBtn.addEventListener("click", () => {
+        opusLog.textContent = "Opus 4.6 automation is not yet implemented.";
+      });
+
+      copyOpusBtn.addEventListener("click", async () => {
+        if (!opusData) return;
+        const reasoning = opusData.reasoning_seconds ?? "";
+        const total = opusData.total_seconds ?? "";
+        const date = opusData.date || "";
+        const time = opusData.time || "";
+        const line = [reasoning, total, date, time].join("\t");
+        try {
+          await navigator.clipboard.writeText(line);
+          copyOpusBtn.textContent = "Copied!";
+          setTimeout(() => { copyOpusBtn.textContent = "Copy Line"; }, 1200);
+        } catch (err) {
+          copyOpusBtn.textContent = "Copy failed";
+          setTimeout(() => { copyOpusBtn.textContent = "Copy Line"; }, 1200);
+        }
+      });
+
+      document.querySelectorAll("[data-copy-target]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const target = document.getElementById(button.dataset.copyTarget);
+          if (!target) return;
+          const text = target.textContent;
+          try {
+            await navigator.clipboard.writeText(text);
+            button.textContent = "Copied";
+            setTimeout(() => {
+              button.textContent = "Copy command";
+            }, 1200);
+          } catch (error) {
+            const original = button.textContent;
+            button.textContent = "Copy failed";
+            setTimeout(() => {
+              button.textContent = original;
+            }, 1200);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Step 5 = Experiment Time Tracker</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef2f6;
+        --panel: #ffffff;
+        --text: #111827;
+        --muted: #6b7280;
+        --border: #d8dee9;
+        --shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+        --green: #1f9d55;
+        --yellow: #f0b429;
+        --red: #d64545;
+        --gray: #7b8794;
+        --blue: #2563eb;
+        --teal: #0f766e;
+        --purple: #7c3aed;
+        --navy: #0f4c81;
+        --active: #fff3d7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        background: radial-gradient(circle at top, #f8fafc, var(--bg));
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 1100px;
+        margin: 40px auto;
+        padding: 28px;
+        background: var(--panel);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .title {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .right-info {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      }
+
+      .clock {
+        font-family: "Courier New", monospace;
+        font-size: 16px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        color: var(--text);
+        white-space: nowrap;
+      }
+
+      .timer {
+        font-family: "Courier New", monospace;
+        font-size: 16px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: #f8e7c4;
+        color: #7c4a03;
+        white-space: nowrap;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid var(--border);
+      }
+
+      thead th {
+        background: #f3f6fb;
+        text-align: left;
+        font-size: 14px;
+        padding: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      tbody td {
+        padding: 12px;
+        border-top: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+        min-height: 44px;
+      }
+
+      tbody td:last-child,
+      thead th:last-child {
+        border-right: none;
+      }
+
+      tbody tr.active {
+        background: var(--active);
+      }
+
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      button {
+        border: none;
+        width: 96px;
+        height: 96px;
+        padding: 8px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.05s ease, box-shadow 0.2s ease;
+        text-align: center;
+        line-height: 1.2;
+        white-space: normal;
+      }
+
+      button:active {
+        transform: scale(0.98);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+        box-shadow: none;
+      }
+
+      #startBtn {
+        background: var(--green);
+        color: #fff;
+      }
+
+      #reasoningBtn {
+        background: var(--yellow);
+        color: #1f2933;
+      }
+
+      #inferenceBtn {
+        background: var(--red);
+        color: #fff;
+      }
+
+      #resetBtn {
+        background: var(--gray);
+        color: #fff;
+      }
+
+      #step6Btn {
+        background: var(--blue);
+        color: #fff;
+      }
+
+      #step8Btn {
+        background: var(--teal);
+        color: #fff;
+      }
+
+      #copyBtn {
+        background: var(--navy);
+        color: #fff;
+      }
+
+      #step7Btn {
+        background: var(--purple);
+        color: #fff;
+      }
+
+      .status {
+        margin-top: 14px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.45);
+        padding: 20px;
+      }
+
+      .modal.active {
+        display: flex;
+      }
+
+      .modal-panel {
+        background: var(--panel);
+        padding: 20px;
+        border-radius: 12px;
+        width: min(360px, 100%);
+        box-shadow: var(--shadow);
+      }
+
+      .modal-panel h3 {
+        margin-top: 0;
+        margin-bottom: 8px;
+      }
+
+      .modal-panel p {
+        margin-top: 0;
+        color: var(--muted);
+      }
+
+      .modal-panel select {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        margin-bottom: 16px;
+      }
+
+      .modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .modal-actions button {
+        padding: 8px 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="title">Experiment Time Tracker</div>
+        <div class="right-info">
+          <div class="clock" id="etClock">--</div>
+          <div class="timer">Timer: <span id="runTimer">00:00:00</span></div>
+        </div>
+      </div>
+
+      <table id="trackerTable">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Reasoning time in seconds</th>
+            <th>Total inference time in seconds</th>
+            <th>Date generated</th>
+            <th>Time generated</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-row="0">
+            <td class="model"></td>
+            <td class="reasoning"></td>
+            <td class="inference"></td>
+            <td class="date"></td>
+            <td class="time"></td>
+          </tr>
+          <tr data-row="1">
+            <td class="model"></td>
+            <td class="reasoning"></td>
+            <td class="inference"></td>
+            <td class="date"></td>
+            <td class="time"></td>
+          </tr>
+          <tr data-row="2">
+            <td class="model"></td>
+            <td class="reasoning"></td>
+            <td class="inference"></td>
+            <td class="date"></td>
+            <td class="time"></td>
+          </tr>
+          <tr data-row="3">
+            <td class="model"></td>
+            <td class="reasoning"></td>
+            <td class="inference"></td>
+            <td class="date"></td>
+            <td class="time"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="buttons">
+        <button id="startBtn">Start</button>
+        <button id="reasoningBtn">End Reasoning</button>
+        <button id="inferenceBtn">End Inference</button>
+        <button id="resetBtn">Reset</button>
+        <button id="copyBtn">Copy 4 Lines</button>
+      </div>
+      <div class="status" id="statusText">Ready to start.</div>
+    </div>
+
+    <div class="modal" id="resetModal" role="dialog" aria-modal="true">
+      <div class="modal-panel">
+        <h3>Reset Model</h3>
+        <p>Select a model to reset.</p>
+        <select id="resetSelect"></select>
+        <div class="modal-actions">
+          <button id="confirmReset">Reset</button>
+          <button id="cancelReset">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const MODEL_FILES = {{ model_files | tojson }};
+      const rowCount = 4;
+      const rows = Array.from(document.querySelectorAll("#trackerTable tbody tr"));
+      const statusText = document.getElementById("statusText");
+      const etClock = document.getElementById("etClock");
+      const resetModal = document.getElementById("resetModal");
+      const resetSelect = document.getElementById("resetSelect");
+      const runTimer = document.getElementById("runTimer");
+
+      const state = Array.from({ length: rowCount }, (_, index) => ({
+        startTs: null,
+        reasoningSec: null,
+        inferenceSec: null,
+        date: "",
+        time: "",
+        label: MODEL_FILES[index] || "",
+      }));
+
+      let activeIndex = 0;
+      let running = false;
+      let reasoningLogged = false;
+
+      function formatETParts(date = new Date()) {
+        const formatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/New_York",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        });
+        const parts = formatter.formatToParts(date);
+        const map = {};
+        parts.forEach((part) => {
+          map[part.type] = part.value;
+        });
+        const dateText = `${map.month}/${map.day}/${map.year}`;
+        const timeText = `${map.hour}:${map.minute}:${map.second} ${map.dayPeriod}`;
+        const timeShort = `${map.hour}:${map.minute} ${map.dayPeriod}`;
+        return {
+          dateText,
+          timeText,
+          timeShort,
+          fullText: `${dateText} ${timeText}`,
+        };
+      }
+
+      function updateClock() {
+        etClock.textContent = formatETParts().fullText;
+      }
+
+      function formatDuration(totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const paddedHours = String(hours).padStart(2, "0");
+        const paddedMinutes = String(minutes).padStart(2, "0");
+        const paddedSeconds = String(seconds).padStart(2, "0");
+        return `${paddedHours}:${paddedMinutes}:${paddedSeconds}`;
+      }
+
+      function updateRunTimer() {
+        if (!running || !state[activeIndex] || !state[activeIndex].startTs) {
+          runTimer.textContent = "00:00:00";
+          return;
+        }
+        const elapsedSec = Math.floor(
+          (Date.now() - state[activeIndex].startTs) / 1000
+        );
+        runTimer.textContent = formatDuration(elapsedSec);
+      }
+
+      function updateRow(index) {
+        const row = rows[index];
+        const data = state[index];
+        row.querySelector(".model").textContent = data.label;
+        row.querySelector(".reasoning").textContent =
+          data.reasoningSec === null ? "" : data.reasoningSec;
+        row.querySelector(".inference").textContent =
+          data.inferenceSec === null ? "" : data.inferenceSec;
+        row.querySelector(".date").textContent = data.date;
+        row.querySelector(".time").textContent = data.time;
+      }
+
+      function updateAllRows() {
+        rows.forEach((_, index) => updateRow(index));
+      }
+
+      function setActiveRow() {
+        rows.forEach((row, index) => {
+          row.classList.toggle("active", running && index === activeIndex);
+        });
+      }
+
+      function updateStatus(message) {
+        statusText.textContent = message;
+      }
+
+      function startTimer() {
+        if (running) {
+          updateStatus("Timer already running.");
+          return;
+        }
+        if (activeIndex >= rowCount) {
+          updateStatus("All models completed.");
+          return;
+        }
+        const nowParts = formatETParts();
+        const data = state[activeIndex];
+        data.startTs = Date.now();
+        data.date = nowParts.dateText;
+        data.time = nowParts.timeShort;
+        data.reasoningSec = null;
+        data.inferenceSec = null;
+        reasoningLogged = false;
+        running = true;
+        updateRow(activeIndex);
+        setActiveRow();
+        updateStatus(`Tracking: ${data.label || "Model " + (activeIndex + 1)}.`);
+        updateRunTimer();
+      }
+
+      function endReasoning() {
+        if (!running) {
+          updateStatus("Timer is not running.");
+          return;
+        }
+        if (reasoningLogged) {
+          updateStatus("Reasoning time already logged.");
+          return;
+        }
+        const elapsedSec = Math.round(
+          (Date.now() - state[activeIndex].startTs) / 1000
+        );
+        state[activeIndex].reasoningSec = elapsedSec;
+        reasoningLogged = true;
+        updateRow(activeIndex);
+        updateStatus("Reasoning time saved.");
+      }
+
+      function endInference() {
+        if (!running) {
+          updateStatus("Timer is not running.");
+          return;
+        }
+        const elapsedSec = Math.round(
+          (Date.now() - state[activeIndex].startTs) / 1000
+        );
+        state[activeIndex].inferenceSec = elapsedSec;
+        updateRow(activeIndex);
+        running = false;
+        reasoningLogged = false;
+        setActiveRow();
+        updateRunTimer();
+        updateStatus(
+          `Inference saved for ${state[activeIndex].label || "Model " + (activeIndex + 1)}.`
+        );
+        activeIndex += 1;
+      }
+
+      function buildResetOptions() {
+        resetSelect.innerHTML = "";
+        state.forEach((row, index) => {
+          const option = document.createElement("option");
+          const label = row.label || `Model ${index + 1}`;
+          option.value = index;
+          option.textContent = `${index + 1}. ${label}`;
+          resetSelect.appendChild(option);
+        });
+      }
+
+      function openResetModal() {
+        buildResetOptions();
+        resetModal.classList.add("active");
+      }
+
+      function closeResetModal() {
+        resetModal.classList.remove("active");
+      }
+
+      function resetRow(index) {
+        const data = state[index];
+        data.startTs = null;
+        data.reasoningSec = null;
+        data.inferenceSec = null;
+        data.date = "";
+        data.time = "";
+        updateRow(index);
+        if (running && activeIndex === index) {
+          running = false;
+          reasoningLogged = false;
+          setActiveRow();
+        }
+        if (index < activeIndex) {
+          activeIndex = index;
+        }
+        updateRunTimer();
+        updateStatus(`Reset ${data.label || "Model " + (index + 1)}.`);
+      }
+
+      function buildClipboardRows() {
+        return state
+          .map((data) => {
+            const reasoning =
+              data.reasoningSec === null ? "" : String(data.reasoningSec);
+            const inference =
+              data.inferenceSec === null ? "" : String(data.inferenceSec);
+            const values = [
+              reasoning,
+              inference,
+              data.date || "",
+              data.time || "",
+            ];
+            return values.join("\t");
+          })
+          .join("\n");
+      }
+
+      function fallbackCopy(text) {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+
+      async function copyAllRows() {
+        const text = buildClipboardRows();
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            fallbackCopy(text);
+          }
+          updateStatus("Copied 4 rows to clipboard.");
+        } catch (error) {
+          try {
+            fallbackCopy(text);
+            updateStatus("Copied 4 rows to clipboard.");
+          } catch (fallbackError) {
+            updateStatus("Copy failed. Try again.");
+          }
+        }
+      }
+
+      document.getElementById("startBtn").addEventListener("click", startTimer);
+      document
+        .getElementById("reasoningBtn")
+        .addEventListener("click", endReasoning);
+      document
+        .getElementById("inferenceBtn")
+        .addEventListener("click", endInference);
+      document.getElementById("resetBtn").addEventListener("click", openResetModal);
+      document.getElementById("copyBtn").addEventListener("click", copyAllRows);
+      document
+        .getElementById("confirmReset")
+        .addEventListener("click", () => {
+          const index = Number(resetSelect.value);
+          resetRow(index);
+          closeResetModal();
+        });
+      document
+        .getElementById("cancelReset")
+        .addEventListener("click", closeResetModal);
+      resetModal.addEventListener("click", (event) => {
+        if (event.target === resetModal) {
+          closeResetModal();
+        }
+      });
+
+      updateAllRows();
+      updateClock();
+      updateRunTimer();
+      setInterval(() => {
+        updateClock();
+        updateRunTimer();
+      }, 1000);
+      setActiveRow();
+    </script>
+  </body>
+</html>

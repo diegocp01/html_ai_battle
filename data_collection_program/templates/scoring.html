@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg-1: #f6f3ec;
+      --bg-2: #edf2ea;
+      --ink: #1c1f24;
+      --muted: #5a6672;
+      --panel: #ffffff;
+      --border: #e2e6dd;
+      --accent: #e07a5f;
+      --accent-dark: #cc674c;
+      --accent-2: #3d405b;
+      --highlight: #fef3e8;
+      --shadow: 0 24px 60px rgba(27, 31, 36, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at top left, var(--bg-2), var(--bg-1));
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 40px auto 60px;
+      padding: 0 24px;
+    }
+
+    .hero {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 6px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      margin: 0 0 6px;
+    }
+
+    .subtitle {
+      max-width: 540px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .hero-pill {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      color: var(--accent-2);
+      box-shadow: var(--shadow);
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .card p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-2);
+    }
+
+    select,
+    input[type="number"],
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #fcfcfb;
+      color: var(--ink);
+    }
+
+    select:focus,
+    input[type="number"]:focus,
+    textarea:focus {
+      outline: 2px solid rgba(224, 122, 95, 0.3);
+      border-color: var(--accent);
+    }
+
+    textarea {
+      min-height: 130px;
+      resize: vertical;
+    }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+    }
+
+    .helper {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+
+    .actions button {
+      border: none;
+      padding: 12px 18px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.05s ease, box-shadow 0.2s ease;
+    }
+
+    .actions button:active {
+      transform: scale(0.98);
+    }
+
+    #saveBtn {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 12px 24px rgba(224, 122, 95, 0.25);
+    }
+
+    #clearBtn {
+      background: #f1f2ee;
+      color: var(--accent-2);
+    }
+
+    .copy-btn {
+      background: #f1f2ee;
+      color: var(--accent-2);
+      box-shadow: none;
+    }
+
+    .form-error {
+      font-size: 12px;
+      color: #b45309;
+      min-height: 18px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      background: #f7f6f1;
+    }
+
+    tbody tr.active {
+      background: var(--highlight);
+    }
+
+    .mono {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: #f3ede3;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--accent-2);
+    }
+
+    @media (max-width: 960px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Model Evaluation</p>
+        <h1>Scoring</h1>
+        <p class="subtitle">Score each model across prompt adherence, functional correctness, and UI. Add your observations, then save them to the scoreboard.</p>
+      </div>
+      <div class="hero-pill">
+        <button type="button" onclick="window.location.href='/'" style="background: none; border: none; padding: 0; font: inherit; color: inherit; cursor: pointer;">
+          Return
+        </button>
+      </div>
+    </header>
+
+    <section class="content">
+      <form class="card" id="scoreForm">
+        <h2>Score Entry</h2>
+        <p>Pick a model, enter scores (0-10, one decimal max), and add observations.</p>
+
+        <div class="form-row">
+          <label for="modelSelect">Model</label>
+          <select id="modelSelect" required></select>
+        </div>
+
+        <div class="score-grid">
+          <div class="form-row">
+            <label for="promptScore">prompt_adherence_score (0-10)</label>
+            <input id="promptScore" type="number" min="0" max="10" step="0.1" placeholder="0 - 10" required />
+            <span class="helper">Example: 8 or 8.5</span>
+          </div>
+          <div class="form-row">
+            <label for="functionalScore">functional_correctness_score (0-10)</label>
+            <input id="functionalScore" type="number" min="0" max="10" step="0.1" placeholder="0 - 10" required />
+            <span class="helper">Example: 9 or 9.2</span>
+          </div>
+          <div class="form-row">
+            <label for="uiScore">ui_score (0-10)</label>
+            <input id="uiScore" type="number" min="0" max="10" step="0.1" placeholder="0 - 10" required />
+            <span class="helper">Example: 7 or 7.3</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="observations">Observations</label>
+          <textarea id="observations" placeholder="Write your notes for this model..."></textarea>
+        </div>
+
+        <div class="form-error" id="formError"></div>
+
+        <div class="actions">
+          <button type="submit" id="saveBtn">Save Model Scores</button>
+          <button type="button" id="clearBtn">Clear Form</button>
+        </div>
+      </form>
+
+      <div class="card">
+        <div class="actions" style="margin-top: 0; margin-bottom: 12px;">
+          <div>
+            <h2>Scoreboard</h2>
+            <p class="helper" style="margin: 0;">Saved scores appear here by model order.</p>
+            <p class="helper" style="margin: 6px 0 0;" id="copyStatus"></p>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+            <button type="button" class="copy-btn" id="copyPA">Copy PA</button>
+            <button type="button" class="copy-btn" id="copyFC">Copy FC</button>
+            <button type="button" class="copy-btn" id="copyUI">Copy UI</button>
+            <div class="badge" id="savedBadge">Saved 0/4</div>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Prompt Adherence</th>
+                <th>Functional Correctness</th>
+                <th>UI Score</th>
+                <th>Performance Score</th>
+                <th>Observations</th>
+              </tr>
+            </thead>
+            <tbody id="scoreTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    window.MODEL_FILES = {{ model_files | tojson }};
+  </script>
+  <script>
+    const MODEL_FILES = Array.isArray(window.MODEL_FILES) && window.MODEL_FILES.length
+      ? window.MODEL_FILES
+      : ["GPT", "Gemini Pro", "Grok", "Opus"];
+
+    const modelSelect = document.getElementById("modelSelect");
+    const scoreForm = document.getElementById("scoreForm");
+    const promptScore = document.getElementById("promptScore");
+    const functionalScore = document.getElementById("functionalScore");
+    const uiScore = document.getElementById("uiScore");
+    const observations = document.getElementById("observations");
+    const formError = document.getElementById("formError");
+    const scoreTableBody = document.getElementById("scoreTableBody");
+    const savedBadge = document.getElementById("savedBadge");
+    const copyStatus = document.getElementById("copyStatus");
+    const clearBtn = document.getElementById("clearBtn");
+    const copyPA = document.getElementById("copyPA");
+    const copyFC = document.getElementById("copyFC");
+    const copyUI = document.getElementById("copyUI");
+
+    const scores = MODEL_FILES.map(() => ({
+      prompt: null,
+      functional: null,
+      ui: null,
+      performance: null,
+      observations: ""
+    }));
+
+    function buildModelOptions() {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Select a model";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      modelSelect.appendChild(placeholder);
+
+      MODEL_FILES.forEach((model, index) => {
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = `${index + 1}. ${model}`;
+        modelSelect.appendChild(option);
+      });
+    }
+
+    function formatScore(value) {
+      if (value === null || value === undefined) {
+        return "-";
+      }
+      return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+    }
+
+    function formatScoreForClipboard(value) {
+      if (value === null || value === undefined) {
+        return "";
+      }
+      return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+    }
+
+    function formatPerformance(value) {
+      if (value === null || value === undefined) {
+        return "-";
+      }
+      return value.toFixed(2);
+    }
+
+    function calculatePerformanceScore(prompt, functional, ui) {
+      const total = 0.4 * prompt + 0.35 * functional + 0.25 * ui;
+      return Math.round(total * 100) / 100;
+    }
+
+    function updateSavedBadge() {
+      const savedCount = scores.filter((score) => score.prompt !== null).length;
+      savedBadge.textContent = `Saved ${savedCount}/${MODEL_FILES.length}`;
+    }
+
+    function renderTable(activeIndex = null) {
+      scoreTableBody.innerHTML = "";
+      scores.forEach((score, index) => {
+        const row = document.createElement("tr");
+        if (activeIndex === index) {
+          row.classList.add("active");
+        }
+        row.innerHTML = `
+          <td class="mono">${MODEL_FILES[index]}</td>
+          <td class="mono">${formatScore(score.prompt)}</td>
+          <td class="mono">${formatScore(score.functional)}</td>
+          <td class="mono">${formatScore(score.ui)}</td>
+          <td class="mono">${formatPerformance(score.performance)}</td>
+          <td>${score.observations ? score.observations.replace(/\n/g, "<br />") : "-"}</td>
+        `;
+        scoreTableBody.appendChild(row);
+      });
+      updateSavedBadge();
+    }
+
+    function setFormValues(index) {
+      const score = scores[index];
+      promptScore.value = score.prompt ?? "";
+      functionalScore.value = score.functional ?? "";
+      uiScore.value = score.ui ?? "";
+      observations.value = score.observations || "";
+    }
+
+    function parseScore(inputEl) {
+      const raw = inputEl.value.trim();
+      const value = Number(raw);
+      if (!raw || Number.isNaN(value)) {
+        return { ok: false, value: null };
+      }
+      if (value < 0 || value > 10) {
+        return { ok: false, value: null };
+      }
+      if (Math.round(value * 10) !== value * 10) {
+        return { ok: false, value: null };
+      }
+      return { ok: true, value: Number(value.toFixed(1)) };
+    }
+
+    function clearForm() {
+      promptScore.value = "";
+      functionalScore.value = "";
+      uiScore.value = "";
+      observations.value = "";
+      formError.textContent = "";
+    }
+
+    function buildColumnClipboardRows(key) {
+      return scores
+        .map((score) => formatScoreForClipboard(score[key]))
+        .join("\n");
+    }
+
+    function fallbackCopyText(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "absolute";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+
+    function showCopyStatus(message) {
+      if (!copyStatus) {
+        return;
+      }
+      copyStatus.textContent = message;
+      if (message) {
+        setTimeout(() => {
+          copyStatus.textContent = "";
+        }, 2000);
+      }
+    }
+
+    async function copyColumn(key, label) {
+      const text = buildColumnClipboardRows(key);
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          fallbackCopyText(text);
+        }
+        showCopyStatus(`${label} column copied.`);
+      } catch (error) {
+        try {
+          fallbackCopyText(text);
+          showCopyStatus(`${label} column copied.`);
+        } catch (fallbackError) {
+          showCopyStatus("Copy failed. Try again.");
+        }
+      }
+    }
+
+    async function persistScoreEntry(payload) {
+      try {
+        const response = await fetch("/api/step8-scores", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) {
+          throw new Error(data.output || "Unable to save scores.");
+        }
+      } catch (error) {
+        formError.textContent = error.message || "Unable to save scores.";
+      }
+    }
+
+    modelSelect.addEventListener("change", (event) => {
+      const index = Number(event.target.value);
+      setFormValues(index);
+      renderTable(index);
+      formError.textContent = "";
+    });
+
+    scoreForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      formError.textContent = "";
+
+      if (!modelSelect.value) {
+        formError.textContent = "Select a model before saving.";
+        return;
+      }
+
+      const promptValue = parseScore(promptScore);
+      const functionalValue = parseScore(functionalScore);
+      const uiValue = parseScore(uiScore);
+
+      if (!promptValue.ok || !functionalValue.ok || !uiValue.ok) {
+        formError.textContent = "Scores must be 0-10 with up to 1 decimal place.";
+        return;
+      }
+
+      const index = Number(modelSelect.value);
+      const modelName = MODEL_FILES[index];
+      if (!modelName) {
+        formError.textContent = "Selected model is missing.";
+        return;
+      }
+      const performanceScore = calculatePerformanceScore(
+        promptValue.value,
+        functionalValue.value,
+        uiValue.value
+      );
+      scores[index] = {
+        prompt: promptValue.value,
+        functional: functionalValue.value,
+        ui: uiValue.value,
+        performance: performanceScore,
+        observations: observations.value.trim()
+      };
+
+      renderTable(index);
+      await persistScoreEntry({
+        model_name: modelName,
+        performance_score: performanceScore,
+        observations: observations.value.trim()
+      });
+    });
+
+    clearBtn.addEventListener("click", clearForm);
+    copyPA.addEventListener("click", () => copyColumn("prompt", "PA"));
+    copyFC.addEventListener("click", () => copyColumn("functional", "FC"));
+    copyUI.addEventListener("click", () => copyColumn("ui", "UI"));
+
+    buildModelOptions();
+    renderTable();
+  </script>
+</body>
+</html>

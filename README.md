@@ -1,68 +1,101 @@
-# The Single-File Test
+# HTML AI Battle
 
-Longitudinal evaluation of frontier LLM web generation under a first-output-only protocol, plus supervised analysis of what predicts social reach.
+HTML AI Battle is a long-running experiment where multiple AI models get the exact same prompt and one shot to build a complete single-file web app.
 
-## Quick Links
-- Research notebook: [`research_supervised_ml.ipynb`](./research_supervised_ml.ipynb)
-- Paper archive (placeholder): [`paper/`](./paper/)
+The idea is simple: ask different models to make something like a game, animation, or simulation in one `.html` file, keep the first answer, and save the raw results. No repair prompts. No manual cleanup. No hidden post-editing of the code before judging it.
 
-## Abstract
-This repository contains the analysis for a study of how frontier LLMs perform on single-file HTML generation tasks and whether technical generation metrics predict 24-hour social engagement.
+This repository is the public archive of that process. It includes the raw experiment folders, the workflow scripts used to collect and score the runs, and the paper materials built from the results.
 
-The study uses a real-world workflow (public model UIs, first response only, no iterative correction) and links model-side properties (reasoning time, code length, score quality, audio packaging) to distribution outcomes on X, TikTok, and YouTube.
+![HTML AI Battle example preview](./experiments/paper_airplane_0204/image.png)
 
-## Study Setup
-- Data window: 2025-12-10 to 2026-02-04
-- Scope: 17 experiments, 68 model runs (4 model outputs per experiment)
-- Model families: GPT, Gemini, Grok, Opus
-- Protocol: same prompt per experiment, first output only, raw outputs preserved, no post-edit before evaluation
+## Start Here
 
-## Research Questions
-- Does more model compute (reasoning time / response time) improve output quality?
-- Are AI-as-judge scores aligned with human scoring?
-- Do technical generation features predict 24-hour impressions?
+| If you want to... | Go here |
+| --- | --- |
+| Browse the actual model outputs | [`experiments/`](./experiments/) |
+| Open one example experiment first | [`experiments/paper_airplane_0204/`](./experiments/paper_airplane_0204/) |
+| Read the current paper draft | [`paper/paper_final.md`](./paper/paper_final.md) |
+| Open the analysis notebook | [`paper/research.ipynb`](./paper/research.ipynb) |
+| Download the dataset as CSV | [`paper/experiment_tracker.csv`](./paper/experiment_tracker.csv) |
+| Inspect the tracking spreadsheet | [`paper/experiment_tracker.xlsx`](./paper/experiment_tracker.xlsx) |
+| See the original collection/scoring workflow | [`data_collection_program/`](./data_collection_program/) |
 
-## Methods (Notebook)
-- Notebook: [`research_supervised_ml.ipynb`](./research_supervised_ml.ipynb)
-- Data is analyzed at two levels:
-- `df`: model-level rows (68 rows)
-- `exp_df`: experiment-level aggregation (17 rows)
-- Target for virality modeling: `log(1 + X_Impressions_24h)`
-- Main regression model: Ridge (L2) with Leave-One-Out Cross-Validation (LOOCV)
-- Final four model inputs for prediction:
-- `ReasonTime_mean`
-- `Reasoning_Ratio_mean`
-- `Suno_version`
-- `Song_BPM`
+## What This Repo Is
 
-## Key Findings
-- Compute does not reliably improve quality across models.
-- For Gemini, higher reasoning/inference time correlated with lower performance (Spearman `r=-0.540, p=0.025` for reasoning time; `r=-0.577, p=0.015` for response time).
-- AI judging showed measurable self-bias/leniency.
-- Gemini vs human functional correctness: Wilcoxon `p=0.0372` (significant), with higher Gemini self-scores on average.
-- Virality was poorly predicted from technical pre-publication features.
-- Ridge LOOCV out-of-sample performance: MAE `+/- 46,221` impressions, `R^2 = -0.331`.
-- Strongest correlation with impressions was account-timeline related (starting followers), not code/compute quality (`X_followers r=-0.828`).
-- Prompt length, song BPM, and most posting/audio variables showed weak or non-significant relationships in this sample.
+This is not a polished benchmark package or a clean Python library.
+
+It is a working archive of a real experiment series:
+
+- the prompts that were used
+- the raw HTML files returned by each model
+- the screenshots and per-experiment notes
+- the scoring and tracking data
+- the paper and analysis notebook built on top of that archive
+
+That makes the repository a little rough around the edges, but it also makes it transparent. You can inspect the exact outputs instead of only reading a summary.
+
+## How A Battle Works
+
+1. Write one prompt for a browser-based app, game, animation, or simulation.
+2. Give that same prompt to each model.
+3. Accept the first output only.
+4. Save the raw `.html` files exactly as returned.
+5. Review how well each result followed the prompt, whether it actually worked, and how good the interface looked.
+6. Store the notes, scores, screenshots, and tracking data in the matching experiment folder.
+
+The main recurring model families in the repo are GPT, Gemini, Grok, and Opus. Some folders also include extra comparison runs from other models.
 
 ## Repository Map
-- [`research_supervised_ml.ipynb`](./research_supervised_ml.ipynb): full analysis notebook (EDA, stats tests, modeling, prediction playground)
-- [`paper/`](./paper/): paper assets and archive placeholder
-- `paper/experiment_tracker.xlsx`: experiment tracker data source used in analysis
-- `experiments/`: per-experiment model outputs and assets
-- `data_collection_program/`: collection utilities and scripts used in the broader workflow
 
-## Reproducibility
-- Open `research_supervised_ml.ipynb` and run cells top to bottom.
-- Python packages used in the notebook include:
-- `pandas`
-- `numpy`
-- `scipy`
-- `scikit-learn`
-- `matplotlib`
-- `seaborn`
-- `gradio`
+### [`experiments/`](./experiments/)
 
-## Notes
-- Sample size is intentionally small (`n=17` experiments), so inferential results should be treated as directional.
-- This repo tracks an ongoing longitudinal process; metrics and conclusions may evolve as new experiments are added.
+This is the main archive.
+
+Each experiment folder usually contains:
+
+- a `README.md` with the original prompt, summary table, rules, and observations
+- one raw `.html` file per model
+- an `image.png` preview
+- tracking files such as `model_scores.json` or a per-experiment `.csv`
+
+Good folders to start with:
+
+- [`experiments/paper_airplane_0204/`](./experiments/paper_airplane_0204/)
+- [`experiments/snake_0121/`](./experiments/snake_0121/)
+- [`experiments/super_mario_1224/`](./experiments/super_mario_1224/)
+- [`experiments/physics_simulation/`](./experiments/physics_simulation/)
+
+### [`paper/`](./paper/)
+
+This folder contains the paper and its supporting assets:
+
+- [`paper/paper_final.pdf`](./paper/paper_final.pdf): the current paper draft
+- [`paper/paper_final.md`](./paper/paper_final.md): paper source in Markdown
+- [`paper/paper_final.tex`](./paper/paper_final.tex): LaTeX version
+- [`paper/research.ipynb`](./paper/research.ipynb): analysis notebook
+- [`paper/figures/`](./paper/figures/) and [`paper/tables/`](./paper/tables/): exported visuals
+
+Important scope note: the current paper focuses on 17 experiments collected from December 10, 2025 to February 4, 2026, while the repository itself is the broader working archive and currently contains more than that paper subset. In other words, the repo and the paper are related, but they are not exactly the same thing.
+
+### [`data_collection_program/`](./data_collection_program/)
+
+This is the original workflow tooling used during collection and evaluation.
+
+It includes scripts for tasks like:
+
+- creating the next experiment folder
+- cleaning and resetting files between runs
+- timing and logging model outputs
+- counting reasoning words and HTML lines
+- recording scores and observations
+- preparing metadata used later in the paper workflow
+
+If you want to understand that workflow, start with [`data_collection_program/README.md`](./data_collection_program/README.md).
+
+## If You Just Want The Quick Version
+
+This project asks a practical question:
+
+What happens when you open public AI chat products, give them the same creative coding prompt, and judge only the first result they return?
+
+If that question interests you, go to [`experiments/`](./experiments/). If you want the formal write-up, go to [`paper/`](./paper/).

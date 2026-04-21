@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Counter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .stat-card { transition: all 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+        /* Custom scrollbar for textarea */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-auto">
+
+    <!-- Model Selection Modal -->
+    <div id="modelSelectModal" class="fixed inset-0 bg-slate-900/40 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
+            <h2 class="text-lg font-semibold text-slate-800">Select a model</h2>
+            <p class="text-sm text-slate-500 mt-1">Choose which model's reasoning you are counting first.</p>
+            <select id="modelSelect" class="mt-4 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            </select>
+            <div class="mt-5 flex justify-end gap-2">
+                <button id="cancelModelSelect" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+                <button id="confirmModelSelect" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">Start Counting</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-10">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                <i class="fa-solid fa-file-lines text-lg"></i>
+            </div>
+            <h1 class="text-xl font-bold text-slate-800 tracking-tight">Word Counter</h1>
+            <div class="hidden sm:inline-flex items-center gap-2 text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                Model: <span id="currentModelLabel" class="text-slate-700">Not selected</span>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2 justify-end">
+            <button onclick="window.location.href='/'" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">
+                Return
+            </button>
+            <button id="selectModelBtn" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">
+                Select Model
+            </button>
+            <button id="saveStatsBtn" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                Save Stats
+            </button>
+            <button id="copySummaryBtn" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">
+                <i class="fa-regular fa-copy mr-2"></i>Copy Summary
+            </button>
+            <button onclick="copyText()" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">
+                <i class="fa-regular fa-copy mr-2"></i>Copy
+            </button>
+            <button onclick="clearText()" class="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-slate-300 rounded-lg hover:bg-red-50 hover:border-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1">
+                <i class="fa-solid fa-trash-can mr-2"></i>Clear
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- Input Area -->
+        <div class="flex-1 p-4 md:p-6 flex flex-col h-full relative">
+            <textarea 
+                id="textInput" 
+                placeholder="Type or paste your text here..." 
+                class="w-full h-full p-6 text-lg text-slate-700 bg-white border border-slate-200 rounded-xl shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all placeholder:text-slate-300"
+                spellcheck="false"
+            ></textarea>
+            
+            <!-- Quick Floating Badge for Mobile -->
+            <div class="md:hidden absolute bottom-8 right-8 bg-indigo-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium">
+                <span id="mobileWordCount">0</span> Words
+            </div>
+        </div>
+
+        <!-- Sidebar Stats -->
+        <aside class="w-full md:w-80 bg-white border-l border-slate-200 overflow-y-auto z-20">
+            <div class="p-6 space-y-6">
+                
+                <!-- Primary Stats -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="stat-card bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div class="text-indigo-600 text-3xl font-bold mb-1" id="wordCount">0</div>
+                        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Words</div>
+                    </div>
+                    <div class="stat-card bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div class="text-emerald-600 text-3xl font-bold mb-1" id="charCount">0</div>
+                        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Chars</div>
+                    </div>
+                </div>
+
+                <!-- Secondary Stats List -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Details</h3>
+                    
+                    <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                        <span class="text-slate-600 text-sm"><i class="fa-solid fa-align-justify w-6 text-slate-400"></i>Sentences</span>
+                        <span class="font-mono font-medium text-slate-800" id="sentenceCount">0</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                        <span class="text-slate-600 text-sm"><i class="fa-solid fa-paragraph w-6 text-slate-400"></i>Paragraphs</span>
+                        <span class="font-mono font-medium text-slate-800" id="paragraphCount">0</span>
+                    </div>
+
+                    <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                        <span class="text-slate-600 text-sm"><i class="fa-solid fa-text-width w-6 text-slate-400"></i>Chars (no space)</span>
+                        <span class="font-mono font-medium text-slate-800" id="charNoSpaceCount">0</span>
+                    </div>
+                </div>
+
+                <!-- Reading Time -->
+                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-regular fa-clock text-indigo-500"></i>
+                        <h3 class="text-sm font-semibold text-indigo-800">Reading Time</h3>
+                    </div>
+                    <p class="text-2xl font-bold text-indigo-900" id="readingTime">0 min</p>
+                    <p class="text-xs text-indigo-600 mt-1">Based on 200 words/min</p>
+                </div>
+
+                <!-- Keyword Density (Simple Top 3) -->
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Top Keywords</h3>
+                    <div id="topKeywords" class="space-y-2">
+                        <p class="text-sm text-slate-400 italic">Start typing to see keywords...</p>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+    </main>
+
+    <!-- Summary Table -->
+    <section class="px-4 md:px-6 pb-10">
+        <div class="max-w-6xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-800">Reasoning Totals</h2>
+                <div class="text-xs text-slate-500">Saved <span id="savedCount">0</span>/4</div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-600">
+                        <tr>
+                            <th class="text-left px-4 py-3 font-semibold">Model</th>
+                            <th class="text-left px-4 py-3 font-semibold">Reasoning Total words</th>
+                            <th class="text-left px-4 py-3 font-semibold">Reasoning Total characters</th>
+                            <th class="text-left px-4 py-3 font-semibold">Reasoning Total sentences</th>
+                            <th class="text-left px-4 py-3 font-semibold">Reasoning top keyword</th>
+                            <th class="text-left px-4 py-3 font-semibold">Reasoning top keyword repetitions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50">
+        Action Completed
+    </div>
+
+    <script>
+        const MODEL_FILES = {{ model_files | tojson }};
+        const MODEL_COUNT = MODEL_FILES.length;
+
+        const textInput = document.getElementById('textInput');
+        const modelSelectModal = document.getElementById('modelSelectModal');
+        const modelSelect = document.getElementById('modelSelect');
+        const confirmModelSelect = document.getElementById('confirmModelSelect');
+        const cancelModelSelect = document.getElementById('cancelModelSelect');
+        const selectModelBtn = document.getElementById('selectModelBtn');
+        const saveStatsBtn = document.getElementById('saveStatsBtn');
+        const copySummaryBtn = document.getElementById('copySummaryBtn');
+        const currentModelLabel = document.getElementById('currentModelLabel');
+        const summaryTableBody = document.getElementById('summaryTableBody');
+        const savedCountEl = document.getElementById('savedCount');
+
+        // Stats Elements
+        const wordCountEl = document.getElementById('wordCount');
+        const mobileWordCountEl = document.getElementById('mobileWordCount');
+        const charCountEl = document.getElementById('charCount');
+        const charNoSpaceCountEl = document.getElementById('charNoSpaceCount');
+        const sentenceCountEl = document.getElementById('sentenceCount');
+        const paragraphCountEl = document.getElementById('paragraphCount');
+        const readingTimeEl = document.getElementById('readingTime');
+        const topKeywordsEl = document.getElementById('topKeywords');
+
+        const STOP_WORDS = ['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at', 'this', 'but', 'his', 'by', 'from'];
+
+        const results = Array.from({ length: MODEL_COUNT }, () => ({
+            saved: false,
+            words: 0,
+            chars: 0,
+            sentences: 0,
+            topKeyword: '',
+            topKeywordCount: 0
+        }));
+
+        let activeModelIndex = null;
+
+        textInput.addEventListener('input', updateStats);
+        selectModelBtn.addEventListener('click', openModelModal);
+        saveStatsBtn.addEventListener('click', saveCurrentModel);
+        copySummaryBtn.addEventListener('click', copySummaryTable);
+        confirmModelSelect.addEventListener('click', confirmModelSelection);
+        cancelModelSelect.addEventListener('click', () => {
+            closeModelModal();
+            if (activeModelIndex === null) {
+                showToast("Select a model to begin.");
+            }
+        });
+        modelSelectModal.addEventListener('click', (event) => {
+            if (event.target === modelSelectModal) {
+                closeModelModal();
+            }
+        });
+
+        function getModelLabel(index) {
+            const label = MODEL_FILES[index];
+            if (label && label.trim().length > 0) {
+                return label;
+            }
+            return `Model ${index + 1}`;
+        }
+
+        function buildModelOptions() {
+            modelSelect.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Select a model';
+            placeholder.disabled = true;
+            placeholder.selected = activeModelIndex === null;
+            modelSelect.appendChild(placeholder);
+
+            MODEL_FILES.forEach((_, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = `${index + 1}. ${getModelLabel(index)}`;
+                modelSelect.appendChild(option);
+            });
+
+            if (activeModelIndex !== null) {
+                modelSelect.value = String(activeModelIndex);
+            }
+        }
+
+        function openModelModal() {
+            buildModelOptions();
+            modelSelectModal.classList.remove('hidden');
+            modelSelectModal.classList.add('flex');
+        }
+
+        function closeModelModal() {
+            modelSelectModal.classList.add('hidden');
+            modelSelectModal.classList.remove('flex');
+        }
+
+        function confirmModelSelection() {
+            if (!modelSelect.value) {
+                showToast("Select a model to start.");
+                return;
+            }
+            setActiveModel(Number(modelSelect.value));
+            closeModelModal();
+        }
+
+        function setActiveModel(index) {
+            const previousIndex = activeModelIndex;
+            activeModelIndex = index;
+            currentModelLabel.textContent = getModelLabel(index);
+            setInputEnabled(true);
+            if (previousIndex !== null && previousIndex !== index) {
+                resetTextInput();
+            }
+        }
+
+        function setInputEnabled(enabled) {
+            textInput.disabled = !enabled;
+            saveStatsBtn.disabled = !enabled;
+            if (enabled) {
+                textInput.classList.remove('bg-slate-100');
+                textInput.placeholder = 'Type or paste your text here...';
+            } else {
+                textInput.classList.add('bg-slate-100');
+                textInput.placeholder = 'Select a model to begin...';
+            }
+        }
+
+        function calculateStats(text) {
+            const chars = text.length;
+            const charsNoSpace = text.replace(/\s/g, '').length;
+            const wordsArray = text.trim().split(/\s+/).filter(word => word.length > 0);
+            const words = wordsArray.length;
+            const sentences = text.split(/[.!?]+(?=\s|$)/).filter(s => s.trim().length > 0).length;
+            const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0).length;
+            return { chars, charsNoSpace, wordsArray, words, sentences, paragraphs };
+        }
+
+        function updateStats() {
+            const stats = calculateStats(textInput.value);
+
+            wordCountEl.innerText = formatNumber(stats.words);
+            mobileWordCountEl.innerText = formatNumber(stats.words);
+            charCountEl.innerText = formatNumber(stats.chars);
+            charNoSpaceCountEl.innerText = formatNumber(stats.charsNoSpace);
+            sentenceCountEl.innerText = formatNumber(stats.sentences);
+            paragraphCountEl.innerText = textInput.value.trim().length === 0 ? 0 : formatNumber(stats.paragraphs);
+            readingTimeEl.innerText = stats.words < 200 && stats.words > 0 ? "< 1 min" : `~ ${Math.ceil(stats.words / 200)} min`;
+
+            updateKeywords(stats.wordsArray);
+        }
+
+        function buildKeywordFrequency(wordsArray) {
+            const frequency = {};
+            wordsArray.forEach(word => {
+                const cleanWord = word.toLowerCase().replace(/[.,!?;:()]/g, '');
+                if (cleanWord.length > 2 && !STOP_WORDS.includes(cleanWord)) {
+                    frequency[cleanWord] = (frequency[cleanWord] || 0) + 1;
+                }
+            });
+            return frequency;
+        }
+
+        function sortKeywords(frequency) {
+            return Object.entries(frequency).sort((a, b) => {
+                if (b[1] !== a[1]) {
+                    return b[1] - a[1];
+                }
+                return a[0].localeCompare(b[0]);
+            });
+        }
+
+        function updateKeywords(wordsArray) {
+            if (wordsArray.length === 0) {
+                topKeywordsEl.innerHTML = '<p class="text-sm text-slate-400 italic">Start typing to see keywords...</p>';
+                return;
+            }
+
+            const frequency = buildKeywordFrequency(wordsArray);
+            const sortedWords = sortKeywords(frequency).slice(0, 5);
+
+            if (sortedWords.length === 0) {
+                topKeywordsEl.innerHTML = '<p class="text-sm text-slate-400 italic">Type more meaningful words...</p>';
+                return;
+            }
+
+            topKeywordsEl.innerHTML = sortedWords.map(([word, count]) => `
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-700 capitalize">${word}</span>
+                    <span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-xs font-medium">${count}</span>
+                </div>
+            `).join('');
+        }
+
+        function getTopKeyword(wordsArray) {
+            const frequency = buildKeywordFrequency(wordsArray);
+            const sortedWords = sortKeywords(frequency);
+            if (sortedWords.length === 0) {
+                return { word: '', count: 0 };
+            }
+            return { word: sortedWords[0][0], count: sortedWords[0][1] };
+        }
+
+        function saveCurrentModel() {
+            if (activeModelIndex === null) {
+                showToast("Select a model first.");
+                openModelModal();
+                return;
+            }
+            const stats = calculateStats(textInput.value);
+            const topKeyword = getTopKeyword(stats.wordsArray);
+            results[activeModelIndex] = {
+                saved: true,
+                words: stats.words,
+                chars: stats.chars,
+                sentences: stats.sentences,
+                topKeyword: topKeyword.word,
+                topKeywordCount: topKeyword.count
+            };
+            renderSummaryTable();
+            showToast(`Saved stats for ${getModelLabel(activeModelIndex)}.`);
+        }
+
+        function renderSummaryTable() {
+            summaryTableBody.innerHTML = '';
+            let savedCount = 0;
+
+            results.forEach((result, index) => {
+                if (result.saved) {
+                    savedCount += 1;
+                }
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-slate-800">${getModelLabel(index)}</td>
+                    <td class="px-4 py-3 text-slate-700">${result.saved ? formatNumber(result.words) : '-'}</td>
+                    <td class="px-4 py-3 text-slate-700">${result.saved ? formatNumber(result.chars) : '-'}</td>
+                    <td class="px-4 py-3 text-slate-700">${result.saved ? formatNumber(result.sentences) : '-'}</td>
+                    <td class="px-4 py-3 text-slate-700">${result.saved ? (result.topKeyword || '-') : '-'}</td>
+                    <td class="px-4 py-3 text-slate-700">${result.saved ? formatNumber(result.topKeywordCount) : '-'}</td>
+                `;
+                summaryTableBody.appendChild(row);
+            });
+
+            savedCountEl.innerText = savedCount;
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat().format(num);
+        }
+
+        function buildSummaryClipboardRows() {
+            return results.map((result) => {
+                if (!result.saved) {
+                    return ['', '', '', '', ''].join('\t');
+                }
+                const values = [
+                    String(result.words),
+                    String(result.chars),
+                    String(result.sentences),
+                    result.topKeyword || '',
+                    String(result.topKeywordCount),
+                ];
+                return values.join('\t');
+            }).join('\n');
+        }
+
+        function fallbackCopyText(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
+
+        async function copySummaryTable() {
+            const text = buildSummaryClipboardRows();
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    fallbackCopyText(text);
+                }
+                showToast('Summary copied to clipboard!');
+            } catch (error) {
+                try {
+                    fallbackCopyText(text);
+                    showToast('Summary copied to clipboard!');
+                } catch (fallbackError) {
+                    showToast('Copy failed. Try again.');
+                }
+            }
+        }
+
+        function clearText() {
+            if(confirm("Are you sure you want to clear all text?")) {
+                resetTextInput();
+            }
+        }
+
+        function resetTextInput() {
+            textInput.value = '';
+            updateStats();
+            textInput.focus();
+        }
+
+        function copyText() {
+            if(textInput.value.trim().length === 0) return;
+
+            textInput.select();
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+
+            showToast("Text copied to clipboard!");
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.remove('opacity-0');
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        // Initialize empty stats and prompt for model selection
+        setInputEnabled(false);
+        updateStats();
+        renderSummaryTable();
+        openModelModal();
+
+    </script>
+</body>
+</html>
