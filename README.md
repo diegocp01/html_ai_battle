@@ -15,6 +15,7 @@ This repository is the public archive of that process. It includes the raw exper
 | Browse the actual model outputs | [`experiments/`](./experiments/) |
 | Open one example experiment first | [`experiments/paper_airplane_0204/`](./experiments/paper_airplane_0204/) |
 | Open the analysis notebook | [`paper/research.ipynb`](./paper/research.ipynb) |
+| View the project slide show | [`presentation.pdf`](./presentation.pdf) |
 | Download the dataset as CSV | [`paper/experiment_tracker.csv`](./paper/experiment_tracker.csv) |
 | Inspect the tracking spreadsheet | [`paper/experiment_tracker.xlsx`](./paper/experiment_tracker.xlsx) |
 | See the original collection/scoring workflow | [`data_collection_program/`](./data_collection_program/) |
@@ -72,6 +73,7 @@ This folder contains the public analysis materials that support the project:
 - [`paper/experiment_tracker.csv`](./paper/experiment_tracker.csv): public CSV export
 - [`paper/experiment_tracker.xlsx`](./paper/experiment_tracker.xlsx): tracking spreadsheet
 - [`paper/figures/`](./paper/figures/) and [`paper/tables/`](./paper/tables/): exported visuals
+- [`presentation.pdf`](./presentation.pdf): slide show version of the project presentation
 
 Important scope note: the current analysis focuses on 17 experiments collected from December 10, 2025 to February 4, 2026, while the repository itself is the broader working archive and currently contains more than that subset. In other words, the repo and the formal write-up are related, but they are not exactly the same thing.
 
