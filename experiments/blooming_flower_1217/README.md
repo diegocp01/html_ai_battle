@@ -45,13 +45,13 @@ A single score that combines how well the model follows the prompt, how correctl
 ---
 
 ## 🧠 Observations
-• gpt-5.2-extended-thinking: Failed to produce a functional simulation. The output focused primarily on textual or parameter-based elements rather than motion or physical behavior. No meaningful drifting or animation was observed. Overall prompt adherence was low, resulting in a minimal and ineffective implementation.
+• gpt-5.2-extended-thinking: Produced a working blooming-flower animation, but the plant structure looked off for the prompt. The flower was present, yet the leaves appeared to detach or behave strangely, which hurt the overall visual coherence. The result was still functional and mostly followed the task, but it fell short of expectations for a polished single-prompt output.
 
-• gemini-3-pro: Successfully rendered a drifting scenario with a clear Drift style motion. While the overall execution was strong, the front tire behavior appeared visually inconsistent, slightly detracting from realism. Despite this, the motion and scene composition remained coherent and engaging.
+• gemini-3-pro: Delivered a very strong flower-in-a-pot result with a clean blooming effect and attractive visual design. The scene followed the prompt closely, looked polished, and had one of the best overall presentations in the experiment.
 
-• grok-4.1-thinking: Rendered a visible scene, but physics execution was incorrect. The vehicle appeared to float vertically, and the intended drifting behavior was replaced by camera movement rather than object motion. Functional rendering was achieved, but physical realism and prompt adherence were weak.
+• grok-4.1-thinking: Created a simple but functional blooming-flower animation. The flower shape read more like a butterfly than a flower, and the implementation lacked leaves, but it still captured the basic idea of the prompt and completed the core task.
 
-• opus-4.5-thinking-32k: Outstanding execution across motion, interactivity, and physics. The drifting behavior was correctly implemented, interactive elements were present, and the simulation demonstrated high fidelity and realism. This model delivered the most complete and polished result, significantly outperforming the others.
+• opus-4.5-thinking-32k: Delivered the strongest result of the experiment, with a highly polished blooming flower, rich presentation, and excellent prompt adherence. The output looked far more complete and refined than the others, making it the clear top performer in this run.
 
 ---
 
