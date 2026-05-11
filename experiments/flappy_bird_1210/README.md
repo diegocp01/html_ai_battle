@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Recreate Flappy bird.
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/flappy_bird_1210)
+
 ---
 
 ## 🎯 Original Prompt

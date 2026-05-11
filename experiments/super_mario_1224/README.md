@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Make a Super Mario Game in HTML
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/super_mario_1224)
+
 ---
 
 ## 🎯 Original Prompt

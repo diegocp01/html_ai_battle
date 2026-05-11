@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Dog fetching a ball animation
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/dog_fetch_0103)
+
 ---
 
 ## 🎯 Original Prompt

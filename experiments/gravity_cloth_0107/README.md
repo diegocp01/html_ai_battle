@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Interactive tearable cloth physics simulation html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/gravity_cloth_0107)
+
 ---
 
 ## 🎯 Original Prompt

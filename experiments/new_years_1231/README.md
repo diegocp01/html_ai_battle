@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Interactive New Year's fireworks with finale html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/new_years_1231)
+
 ---
 
 ## 🎯 Original Prompt

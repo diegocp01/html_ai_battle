@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Underwater SpongeBob home animation using html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/spongebob_0128)
+
 ---
 
 ## 🎯 Original Prompt

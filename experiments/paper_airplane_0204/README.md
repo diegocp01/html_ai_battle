@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Paper airplane glide simulation using html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/paper_airplane_0204)
+
 ---
 
 ## 🎯 Original Prompt

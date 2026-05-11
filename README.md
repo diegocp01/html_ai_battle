@@ -14,12 +14,15 @@ This repository is the public archive of that process. It includes the raw exper
 | --- | --- |
 | Browse the actual model outputs | [`experiments/`](./experiments/) |
 | Open one example experiment first | [`experiments/paper_airplane_0204/`](./experiments/paper_airplane_0204/) |
+| Try a live rendered experiment | [Live viewer for `snake_0121`](https://gptaiacademy.com/ai-battles/html-viewer/experiments/snake_0121) |
 | Read the paper | [arXiv:2605.06707](https://arxiv.org/pdf/2605.06707) |
 | Open the analysis notebook | [`paper/research.ipynb`](./paper/research.ipynb) |
 | View the project slide show | [`presentation.pdf`](./presentation.pdf) |
 | Download the dataset as CSV | [`paper/experiment_tracker.csv`](./paper/experiment_tracker.csv) |
 | Inspect the tracking spreadsheet | [`paper/experiment_tracker.xlsx`](./paper/experiment_tracker.xlsx) |
 | See the original collection/scoring workflow | [`data_collection_program/`](./data_collection_program/) |
+
+Live rendered viewers are available for each experiment at `https://gptaiacademy.com/ai-battles/html-viewer/experiments/<experiment_folder>`.
 
 ## What This Repo Is
 

@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Generate a single file interactive falling sand simulation with gravity, sand, water, and stone using cellular automata physics.
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/physics_simulation)
+
 ---
 
 ## 🎯 Original Prompt

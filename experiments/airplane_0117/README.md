@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: 3D airplane landing simulation using html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/airplane_0117)
+
 ---
 
 ## 🎯 Original Prompt

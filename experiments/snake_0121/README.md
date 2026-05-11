@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Realistic pseudo-3D Snake game with CGI-style html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/snake_0121)
+
 ---
 
 ## 🎯 Original Prompt

@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: DVD logo bouncing simulation HTML
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/dvd_logo_1220)
+
 ---
 
 ## 🎯 Original Prompt

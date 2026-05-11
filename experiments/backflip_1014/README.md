@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Slow-motion articulated stick-figure backflip animation html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/backflip_1014)
+
 ---
 
 ## 🎯 Original Prompt

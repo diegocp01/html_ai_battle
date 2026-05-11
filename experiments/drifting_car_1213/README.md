@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Create 3D drifting F1 donut simulation
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/drifting_car_1213)
+
 ---
 
 ## 🎯 Original Prompt

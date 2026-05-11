@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Pirate ship ocean voyage simulation html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/pirate_ship_0110)
+
 ---
 
 ## 🎯 Original Prompt

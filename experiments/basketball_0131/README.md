@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Create a basketball shot using HTML/CSS/JS html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/basketball_0131)
+
 ---
 
 ## 🎯 Original Prompt

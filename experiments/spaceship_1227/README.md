@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Rocket liftoff animation using html
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/spaceship_1227)
+
 ---
 
 ## 🎯 Original Prompt

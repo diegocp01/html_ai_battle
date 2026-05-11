@@ -3,6 +3,8 @@
 **TLDR:**  
 4 Models try to: Create flower blooming in a pot simulation
 
+**Live viewer:** [Open all rendered outputs](https://gptaiacademy.com/ai-battles/html-viewer/experiments/blooming_flower_1217)
+
 ---
 
 ## 🎯 Original Prompt
