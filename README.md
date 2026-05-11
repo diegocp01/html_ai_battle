@@ -14,6 +14,7 @@ This repository is the public archive of that process. It includes the raw exper
 | --- | --- |
 | Browse the actual model outputs | [`experiments/`](./experiments/) |
 | Open one example experiment first | [`experiments/paper_airplane_0204/`](./experiments/paper_airplane_0204/) |
+| Read the paper | [arXiv:2605.06707](https://arxiv.org/pdf/2605.06707) |
 | Open the analysis notebook | [`paper/research.ipynb`](./paper/research.ipynb) |
 | View the project slide show | [`presentation.pdf`](./presentation.pdf) |
 | Download the dataset as CSV | [`paper/experiment_tracker.csv`](./paper/experiment_tracker.csv) |
