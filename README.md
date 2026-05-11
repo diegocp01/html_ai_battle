@@ -6,7 +6,7 @@ The idea is simple: ask different models to make something like a game, animatio
 
 This repository is the public archive of that process. It includes the raw experiment folders, the workflow scripts used to collect and score the runs, and the paper materials built from the results.
 
-![HTML AI Battle example preview](./experiments/paper_airplane_0204/image.png)
+![HTML AI Battle example preview](./experiments/drifting_car_1213/image.png)
 
 ## Start Here
 
