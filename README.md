@@ -24,6 +24,20 @@ This repository is the public archive of that process. It includes the raw exper
 
 Live rendered viewers are available for each experiment at `https://gptaiacademy.com/ai-battles/html-viewer/experiments/<experiment_folder>`.
 
+## Dataset
+
+The experiment tracker is also available as a Hugging Face Dataset:
+
+https://huggingface.co/datasets/diegocp01/html-ai-battle-experiment-tracker
+
+The Hugging Face version provides the tracker as a CSV file for easier loading with Python and the Hugging Face Dataset Viewer. The full project materials, including the notebook, figures, experiment folders, and generated HTML outputs, remain in this GitHub repository.
+
+```python
+from datasets import load_dataset
+
+dataset = load_dataset("diegocp01/html-ai-battle-experiment-tracker")
+```
+
 ## What This Repo Is
 
 This is not a polished benchmark package or a clean Python library.
